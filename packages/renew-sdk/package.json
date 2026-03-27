@@ -1,0 +1,74 @@
+{
+  "name": "@renew.sh/sdk",
+  "version": "0.1.2",
+  "description": "Renew SDK for checkout sessions, server integrations, and React checkout flows.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chigozzdevv/renew.sh.git",
+    "directory": "packages/renew-sdk"
+  },
+  "homepage": "https://renew.sh",
+  "bugs": {
+    "url": "https://github.com/chigozzdevv/renew.sh/issues"
+  },
+  "keywords": [
+    "renew",
+    "checkout",
+    "billing",
+    "subscriptions",
+    "avalanche",
+    "usdc"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepublishOnly": "npm run typecheck && npm run test"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "typescript": "^5.9.2"
+  }
+}

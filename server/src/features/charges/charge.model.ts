@@ -1,0 +1,100 @@
+import { InferSchemaType, Model, Schema, Types, model, models } from "mongoose";
+
+const chargeSchema = new Schema(
+  {
+    merchantId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "Merchant",
+    },
+    environment: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "test",
+    },
+    subscriptionId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "Subscription",
+    },
+    externalChargeId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    settlementSource: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    localAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    fxRate: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    usdcAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    feeAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+    status: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "pending",
+    },
+    failureCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    protocolChargeId: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    protocolSyncStatus: {
+      type: String,
+      trim: true,
+      default: "not_synced",
+    },
+    protocolTxHash: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    processedAt: {
+      type: Date,
+      required: true,
+      default: () => new Date(),
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  }
+);
+
+type ChargeEntry = InferSchemaType<typeof chargeSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ChargeDocument = ChargeEntry;
+
+export const ChargeModel =
+  (models.Charge as Model<ChargeDocument> | undefined) ??
+  model<ChargeDocument>("Charge", chargeSchema);

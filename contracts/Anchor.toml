@@ -1,0 +1,21 @@
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+renew_protocol = "BvDY6tUDwfsfVSVenC9fPg4ohNMuYm2kFiePSysWJyua"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[workspace]
+members = ["programs/renew_protocol"]
+
+[scripts]
+test = "cargo test --workspace"

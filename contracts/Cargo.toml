@@ -1,0 +1,14 @@
+[workspace]
+members = ["programs/renew_protocol"]
+resolver = "2"
+
+[workspace.dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = "0.31.1"
+solana-program = "2.3.0"
+solana-system-interface = "1.0.0"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1

@@ -1,0 +1,31 @@
+[package]
+name = "renew-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "Renew Solana billing and settlement program"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "renew_protocol"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true, features = ["token"] }
+solana-program = { workspace = true }
+solana-system-interface = { workspace = true }
+
+[dev-dependencies]
+serial_test = "3.2.0"
+solana-program-test = "2.3"
+solana-sdk = "2.3"
+solana-system-interface = "1.0.0"
+spl-token = "8.0.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

@@ -1,0 +1,107 @@
+import { appendAuditLog } from "@/features/audit/audit.service";
+import type { EnableGovernanceInput } from "@/features/governance/governance.validation";
+import { MerchantModel } from "@/features/merchants/merchant.model";
+import { queueGovernanceToggleNotification } from "@/features/notifications/notification.service";
+import { TeamMemberModel } from "@/features/teams/team.model";
+import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
+import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { HttpError } from "@/shared/errors/http-error";
+
+async function getMerchantOrThrow(merchantId: string) {
+  const merchant = await MerchantModel.findById(merchantId).exec();
+
+  if (!merchant) {
+    throw new HttpError(404, "Merchant was not found.");
+  }
+
+  return merchant;
+}
+
+export async function getGovernanceState(
+  merchantId: string,
+  _environment: RuntimeMode = "test"
+) {
+  const merchant = await getMerchantOrThrow(merchantId);
+  const [signers, teamMembers] = await Promise.all([
+    TreasurySignerModel.find({ merchantId })
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec(),
+    TeamMemberModel.find({ merchantId })
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec(),
+  ]);
+
+  const memberMap = new Map(teamMembers.map((member) => [member._id.toString(), member]));
+  const approvers = signers.map((signer) => {
+    const member = memberMap.get(signer.teamMemberId.toString());
+
+    return {
+      id: signer._id.toString(),
+      teamMemberId: signer.teamMemberId.toString(),
+      walletAddress: signer.walletAddress,
+      status: signer.status,
+      verifiedAt: signer.verifiedAt ?? null,
+      revokedAt: signer.revokedAt ?? null,
+      role: member?.role ?? "support",
+      name: member?.name ?? "Unknown team member",
+      email: member?.email ?? null,
+    };
+  });
+
+  const activeApprovers = approvers.filter((entry) => entry.status === "active");
+  const threshold =
+    activeApprovers.length <= 1 ? 1 : Math.min(2, activeApprovers.length);
+
+  return {
+    merchantId,
+    enabled: merchant.governanceEnabled,
+    onboardingStatus: merchant.onboardingStatus,
+    mode:
+      merchant.governanceEnabled && activeApprovers.length > 1
+        ? ("multisig" as const)
+        : ("single_owner" as const),
+    controllerWalletAddress: merchant.operatorSmartAccountAddress ?? null,
+    payoutWallet: merchant.payoutWallet,
+    activeSignerCount: activeApprovers.length,
+    threshold,
+    approvers,
+  };
+}
+
+export async function enableGovernance(input: {
+  merchantId: string;
+  actor: string;
+  payload: EnableGovernanceInput;
+}) {
+  const merchant = await getMerchantOrThrow(input.merchantId);
+  merchant.governanceEnabled = input.payload.enabled;
+  await merchant.save();
+
+  await appendAuditLog({
+    merchantId: input.merchantId,
+    actor: input.actor,
+    action: input.payload.enabled ? "Enabled governance" : "Disabled governance",
+    category: "security",
+    status: "ok",
+    target: merchant.name,
+    detail: input.payload.enabled
+      ? "Advanced governance controls were enabled."
+      : "Advanced governance controls were disabled.",
+    metadata: {
+      environment: input.payload.environment,
+      enabled: input.payload.enabled,
+    },
+    ipAddress: null,
+    userAgent: null,
+  });
+
+  await queueGovernanceToggleNotification({
+    merchantId: input.merchantId,
+    environment: input.payload.environment,
+    enabled: input.payload.enabled,
+  }).catch(() => undefined);
+
+  return getGovernanceState(input.merchantId, input.payload.environment);
+}
