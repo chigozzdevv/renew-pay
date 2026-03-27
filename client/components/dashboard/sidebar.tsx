@@ -39,7 +39,7 @@ export function DashboardSidebar({
         className="inline-flex w-fit items-center rounded-2xl px-2 py-2"
         aria-label="Renew home"
       >
-        <Logo />
+        <Logo size="compact" />
       </Link>
 
       <div className="mt-6 space-y-1">

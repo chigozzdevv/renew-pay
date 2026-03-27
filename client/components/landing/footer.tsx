@@ -6,11 +6,11 @@ import { Logo } from "@/components/shared/logo";
 
 export function Footer() {
   return (
-    <footer className="pb-10 pt-2 sm:pb-12">
+    <footer className="bg-[#f7f9fc] pb-10 pt-2 sm:pb-12">
       <Container>
-        <div className="flex flex-col gap-5 border-t border-[#e5e7eb] pt-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+        <div className="flex flex-col gap-5 border-t border-black/6 pt-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <Logo />
+            <Logo size="compact" />
             <p className="max-w-[20ch] text-sm text-[#6b7280]">
               Local-fiat billing, USDC settlement.
             </p>

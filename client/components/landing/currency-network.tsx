@@ -1,75 +1,66 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-type Node = {
+
+const CX = 310;
+const CY = 240;
+const VW = 640;
+const VH = 480;
+const LOGO_R = 48;
+
+type CurrencyNode = {
   id: string;
   label: string;
+  sub: string;
   x: number;
   y: number;
-  type: "fiat" | "stable" | "center";
+  side: "fiat" | "stable";
 };
 
-type Connection = {
-  from: string;
-  to: string;
-};
-
-const nodes: Node[] = [
-  // Fiat currencies (left side)
-  { id: "usd", label: "USD", x: 100, y: 140, type: "fiat" },
-  { id: "eur", label: "EUR", x: 60, y: 300, type: "fiat" },
-  { id: "ngn", label: "NGN", x: 130, y: 460, type: "fiat" },
-  { id: "gbp", label: "GBP", x: 220, y: 220, type: "fiat" },
-  { id: "mxn", label: "MXN", x: 80, y: 560, type: "fiat" },
-
-  // Center
-  { id: "renew", label: "Renew", x: 450, y: 350, type: "center" },
-
-  // Stablecoins (right side)
-  { id: "usdc", label: "USDC", x: 780, y: 160, type: "stable" },
-  { id: "usdt", label: "USDT", x: 820, y: 340, type: "stable" },
-  { id: "pyusd", label: "PYUSD", x: 760, y: 510, type: "stable" },
+const fiatNodes: CurrencyNode[] = [
+  { id: "ngn", label: "NGN", sub: "Nigeria", x: 72, y: 100, side: "fiat" },
+  { id: "kes", label: "KES", sub: "Kenya", x: 52, y: 240, side: "fiat" },
+  { id: "ghs", label: "GHS", sub: "Ghana", x: 72, y: 380, side: "fiat" },
 ];
 
-const connections: Connection[] = [
-  // Fiat → Renew
-  { from: "usd", to: "renew" },
-  { from: "eur", to: "renew" },
-  { from: "ngn", to: "renew" },
-  { from: "gbp", to: "renew" },
-  { from: "mxn", to: "renew" },
-  // Renew → Stablecoins
-  { from: "renew", to: "usdc" },
-  { from: "renew", to: "usdt" },
-  { from: "renew", to: "pyusd" },
+const stableNodes: CurrencyNode[] = [
+  { id: "usdc", label: "USDC", sub: "Circle", x: 558, y: 115, side: "stable" },
+  { id: "usdt", label: "USDT", sub: "Tether", x: 568, y: 255, side: "stable" },
+  { id: "pyusd", label: "PYUSD", sub: "PayPal", x: 548, y: 385, side: "stable" },
 ];
 
-function getNode(id: string) {
-  return nodes.find((n) => n.id === id)!;
+const allNodes = [...fiatNodes, ...stableNodes];
+
+function buildCurve(from: { x: number; y: number }, to: { x: number; y: number }): string {
+  const midX = (from.x + to.x) / 2;
+  return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`;
 }
 
-function buildCurvePath(from: Node, to: Node): string {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const cx1 = from.x + dx * 0.4;
-  const cy1 = from.y + dy * 0.1;
-  const cx2 = from.x + dx * 0.6;
-  const cy2 = to.y - dy * 0.1;
-  return `M ${from.x} ${from.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${to.x} ${to.y}`;
-}
-
-function Particle({ path, delay, color }: { path: string; delay: number; color: string }) {
+function Particle({
+  pathId,
+  delay,
+  dur,
+  color,
+  size = 3,
+}: {
+  pathId: string;
+  delay: number;
+  dur: number;
+  color: string;
+  size?: number;
+}) {
   return (
-    <circle r="3" fill={color}>
-      <animateMotion dur="3s" begin={`${delay}s`} repeatCount="indefinite" fill="freeze">
-        <mpath href={`#${path}`} />
+    <circle r={size} fill={color} opacity="0">
+      <animateMotion dur={`${dur}s`} begin={`${delay}s`} repeatCount="indefinite">
+        <mpath href={`#${pathId}`} />
       </animateMotion>
       <animate
         attributeName="opacity"
-        values="0;1;1;0"
-        dur="3s"
+        values="0;0.8;0.8;0"
+        keyTimes="0;0.1;0.9;1"
+        dur={`${dur}s`}
         begin={`${delay}s`}
         repeatCount="indefinite"
       />
@@ -79,97 +70,110 @@ function Particle({ path, delay, color }: { path: string; delay: number; color: 
 
 export function CurrencyNetwork() {
   const [mounted, setMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const connections = allNodes.map((node, i) => {
+    const isFiat = node.side === "fiat";
+    const pillHalfW = isFiat ? 38 : 44;
+    const from = isFiat
+      ? { x: node.x + pillHalfW, y: node.y }
+      : { x: CX + LOGO_R + 6, y: CY };
+    const to = isFiat
+      ? { x: CX - LOGO_R - 6, y: CY }
+      : { x: node.x - pillHalfW, y: node.y };
+    return {
+      pathId: `path-${node.id}`,
+      d: buildCurve(from, to),
+      isFiat,
+      index: i,
+    };
+  });
+
   return (
-    <div ref={containerRef} className="relative mx-auto w-full max-w-[56rem]">
+    <div className="relative mx-auto w-full">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={mounted ? { opacity: 1, scale: 1 } : {}}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        initial={{ opacity: 0 }}
+        animate={mounted ? { opacity: 1 } : {}}
+        transition={{ duration: 0.8 }}
       >
         <svg
-          viewBox="0 0 900 700"
+          viewBox={`0 0 ${VW} ${VH}`}
           preserveAspectRatio="xMidYMid meet"
           className="h-auto w-full"
-          aria-label="Currency network showing fiat currencies flowing through Renew to stablecoins"
+          role="img"
+          aria-label="Fiat currencies flow through Renew and settle as stablecoins"
         >
           <defs>
-            {/* Gradient for fiat → center lines */}
-            <linearGradient id="grad-fiat" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#9ca3af" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#111111" stopOpacity="0.25" />
-            </linearGradient>
-
-            {/* Gradient for center → stable lines */}
-            <linearGradient id="grad-stable" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#111111" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#16a34a" stopOpacity="0.3" />
-            </linearGradient>
-
-            {/* Glow filter for center node */}
-            <filter id="center-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="12" result="blur" />
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
 
-            {/* Particle glow */}
-            <filter id="particle-glow" x="-100%" y="-100%" width="300%" height="300%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
+            <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+              <feDropShadow dx="0" dy="3" stdDeviation="10" floodColor="#000" floodOpacity="0.08" />
+            </filter>
+
+            <filter id="pill-shadow" x="-20%" y="-20%" width="140%" height="150%">
+              <feDropShadow dx="0" dy="1" stdDeviation="3" floodColor="#000" floodOpacity="0.06" />
             </filter>
           </defs>
 
-          {/* Connection paths */}
-          {connections.map((conn, i) => {
-            const from = getNode(conn.from);
-            const to = getNode(conn.to);
-            const pathId = `path-${conn.from}-${conn.to}`;
-            const d = buildCurvePath(from, to);
-            const isFiatSide = from.type === "fiat";
+          {[90, 130, 175].map((r, i) => (
+            <motion.circle
+              key={`ring-${r}`}
+              cx={CX}
+              cy={CY}
+              r={r}
+              fill="none"
+              stroke="#16a34a"
+              strokeOpacity={0.04 - i * 0.01}
+              strokeWidth="1"
+              strokeDasharray={i === 2 ? "3 6" : "none"}
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={mounted ? { opacity: 1, scale: 1 } : {}}
+              transition={{ delay: 0.2 + i * 0.15, duration: 1 }}
+              style={{ transformOrigin: `${CX}px ${CY}px` }}
+            />
+          ))}
 
+          {connections.map(({ pathId, d, isFiat, index }) => {
+            const strokeColor = isFiat ? "#c4c8cf" : "#86efac";
             return (
               <g key={pathId}>
-                {/* Invisible path for particle motion */}
                 <path id={pathId} d={d} fill="none" stroke="none" />
 
-                {/* Visible dashed line */}
                 <motion.path
                   d={d}
                   fill="none"
-                  stroke={`url(#grad-${isFiatSide ? "fiat" : "stable"})`}
-                  strokeWidth="1.5"
-                  strokeDasharray="6 4"
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={mounted ? { pathLength: 1, opacity: 1 } : {}}
-                  transition={{
-                    pathLength: { duration: 1.2, delay: 0.3 + i * 0.12, ease: "easeInOut" },
-                    opacity: { duration: 0.4, delay: 0.3 + i * 0.12 },
-                  }}
+                  stroke={strokeColor}
+                  strokeWidth="1.2"
+                  strokeOpacity="0.5"
+                  initial={{ opacity: 0 }}
+                  animate={mounted ? { opacity: 1 } : {}}
+                  transition={{ delay: 0.4 + index * 0.12, duration: 0.8 }}
                 />
 
-                {/* Animated particles */}
                 {mounted && (
-                  <g filter="url(#particle-glow)">
+                  <g filter="url(#glow)">
                     <Particle
-                      path={pathId}
-                      delay={i * 0.4}
-                      color={isFiatSide ? "#6b7280" : "#16a34a"}
+                      pathId={pathId}
+                      delay={index * 0.6}
+                      dur={3.2}
+                      color={isFiat ? "#6b7280" : "#22c55e"}
+                      size={2.5}
                     />
                     <Particle
-                      path={pathId}
-                      delay={i * 0.4 + 1.5}
-                      color={isFiatSide ? "#6b7280" : "#16a34a"}
+                      pathId={pathId}
+                      delay={index * 0.6 + 1.6}
+                      dur={3.2}
+                      color={isFiat ? "#9ca3af" : "#4ade80"}
+                      size={2}
                     />
                   </g>
                 )}
@@ -177,150 +181,194 @@ export function CurrencyNetwork() {
             );
           })}
 
-          {/* Small square connectors at node edges (like the reference image) */}
-          {nodes
-            .filter((n) => n.type !== "center")
-            .map((node) => {
-              const isStable = node.type === "stable";
-              const offsetX = isStable ? -18 : 18;
-              return (
-                <motion.rect
-                  key={`sq-${node.id}`}
-                  x={node.x + offsetX - 3}
-                  y={node.y - 3}
-                  width="6"
-                  height="6"
-                  rx="1"
-                  fill={isStable ? "#16a34a" : "#9ca3af"}
-                  fillOpacity="0.5"
-                  initial={{ opacity: 0 }}
-                  animate={mounted ? { opacity: 1 } : {}}
-                  transition={{ delay: 0.8, duration: 0.5 }}
+          {allNodes.map((node) => {
+            const isFiat = node.side === "fiat";
+            const dx = isFiat ? 38 : -44;
+            return (
+              <motion.circle
+                key={`c-${node.id}`}
+                cx={node.x + dx}
+                cy={node.y}
+                r="2.5"
+                fill={isFiat ? "#9ca3af" : "#4ade80"}
+                initial={{ opacity: 0 }}
+                animate={mounted ? { opacity: 0.7 } : {}}
+                transition={{ delay: 0.8, duration: 0.5 }}
+              />
+            );
+          })}
+
+          {allNodes.map((node, i) => {
+            const isStable = node.side === "stable";
+            const w = isStable ? 90 : 76;
+            const h = 44;
+
+            return (
+              <motion.g
+                key={node.id}
+                initial={{ opacity: 0, x: isStable ? 20 : -20 }}
+                animate={mounted ? { opacity: 1, x: 0 } : {}}
+                transition={{
+                  delay: 0.35 + i * 0.1,
+                  duration: 0.65,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
+                <rect
+                  x={node.x - w / 2}
+                  y={node.y - h / 2}
+                  width={w}
+                  height={h}
+                  rx="12"
+                  fill="white"
+                  stroke={isStable ? "rgba(22,163,74,0.12)" : "rgba(0,0,0,0.06)"}
+                  strokeWidth="1"
+                  filter="url(#pill-shadow)"
                 />
-              );
-            })}
 
-          {/* Currency nodes */}
-          {nodes
-            .filter((n) => n.type !== "center")
-            .map((node, i) => {
-              const isStable = node.type === "stable";
-              const w = isStable ? 82 : 68;
-              const h = 36;
-
-              return (
-                <motion.g
-                  key={node.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={mounted ? { opacity: 1, y: 0 } : {}}
-                  transition={{ delay: 0.4 + i * 0.08, duration: 0.5 }}
+                <text
+                  x={node.x}
+                  y={node.y - 4}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill={isStable ? "#15803d" : "#1f2937"}
+                  fontSize="14"
+                  fontWeight="700"
+                  fontFamily="var(--font-geist), system-ui, sans-serif"
+                  letterSpacing="-0.01em"
                 >
-                  <rect
-                    x={node.x - w / 2}
-                    y={node.y - h / 2}
-                    width={w}
-                    height={h}
-                    rx="8"
-                    fill="white"
-                    stroke={isStable ? "rgba(22, 163, 74, 0.2)" : "rgba(0,0,0,0.08)"}
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={node.x}
-                    y={node.y + 1}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill={isStable ? "#16a34a" : "#374151"}
-                    fontSize="13"
-                    fontWeight="600"
-                    fontFamily="var(--font-geist), system-ui, sans-serif"
-                  >
-                    {node.label}
-                  </text>
-                </motion.g>
-              );
-            })}
+                  {node.label}
+                </text>
 
-          {/* Center Renew node */}
+                <text
+                  x={node.x}
+                  y={node.y + 12}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#9ca3af"
+                  fontSize="9"
+                  fontFamily="var(--font-geist), system-ui, sans-serif"
+                >
+                  {node.sub}
+                </text>
+              </motion.g>
+            );
+          })}
+
           <motion.g
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.5 }}
             animate={mounted ? { opacity: 1, scale: 1 } : {}}
-            transition={{ delay: 0.2, duration: 0.6, ease: "easeOut" }}
-            style={{ transformOrigin: "450px 350px" }}
+            transition={{
+              delay: 0.05,
+              duration: 0.9,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            style={{ transformOrigin: `${CX}px ${CY}px` }}
           >
-            {/* Outer pulse ring */}
-            <circle cx="450" cy="350" r="52" fill="none" stroke="rgba(17,17,17,0.06)" strokeWidth="1">
+            <circle
+              cx={CX}
+              cy={CY}
+              r={LOGO_R + 10}
+              fill="none"
+              stroke="#16a34a"
+              strokeOpacity="0.06"
+              strokeWidth="1"
+            >
               <animate
                 attributeName="r"
-                values="52;62;52"
-                dur="3s"
+                values={`${LOGO_R + 10};${LOGO_R + 20};${LOGO_R + 10}`}
+                dur="4s"
                 repeatCount="indefinite"
               />
               <animate
                 attributeName="stroke-opacity"
-                values="0.06;0.12;0.06"
-                dur="3s"
+                values="0.06;0.14;0.06"
+                dur="4s"
                 repeatCount="indefinite"
               />
             </circle>
 
-            {/* Main circle */}
             <circle
-              cx="450"
-              cy="350"
-              r="46"
-              fill="#111111"
-              filter="url(#center-glow)"
+              cx={CX}
+              cy={CY}
+              r={LOGO_R + 6}
+              fill="none"
+              stroke="#16a34a"
+              strokeOpacity="0.04"
+              strokeWidth="0.8"
+            >
+              <animate
+                attributeName="r"
+                values={`${LOGO_R + 6};${LOGO_R + 14};${LOGO_R + 6}`}
+                dur="4s"
+                begin="1s"
+                repeatCount="indefinite"
+              />
+              <animate
+                attributeName="stroke-opacity"
+                values="0.04;0.1;0.04"
+                dur="4s"
+                begin="1s"
+                repeatCount="indefinite"
+              />
+            </circle>
+
+            <circle
+              cx={CX}
+              cy={CY}
+              r={LOGO_R}
+              fill="white"
+              filter="url(#shadow)"
             />
 
-            {/* Renew text */}
-            <text
-              x="450"
-              y="351"
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="white"
-              fontSize="15"
-              fontWeight="700"
-              fontFamily="var(--font-geist), system-ui, sans-serif"
-              letterSpacing="-0.02em"
-            >
-              renew
-            </text>
+            <circle
+              cx={CX}
+              cy={CY}
+              r={LOGO_R}
+              fill="none"
+              stroke="#16a34a"
+              strokeOpacity="0.12"
+              strokeWidth="1.5"
+            />
+
+            <image
+              href="/renew-logo.png"
+              x={CX - 36}
+              y={CY - 16}
+              width="72"
+              height="32"
+              preserveAspectRatio="xMidYMid meet"
+            />
           </motion.g>
 
-          {/* Side labels */}
-          <motion.text
-            x="100"
-            y="80"
-            textAnchor="middle"
-            fill="#9ca3af"
-            fontSize="11"
-            fontWeight="500"
-            fontFamily="var(--font-geist), system-ui, sans-serif"
-            letterSpacing="0.08em"
+          <motion.g
             initial={{ opacity: 0 }}
             animate={mounted ? { opacity: 1 } : {}}
-            transition={{ delay: 1.2 }}
+            transition={{ delay: 1.4, duration: 0.5 }}
           >
-            BILL IN FIAT
-          </motion.text>
-
-          <motion.text
-            x="790"
-            y="80"
-            textAnchor="middle"
-            fill="#16a34a"
-            fontSize="11"
-            fontWeight="500"
-            fontFamily="var(--font-geist), system-ui, sans-serif"
-            letterSpacing="0.08em"
-            initial={{ opacity: 0 }}
-            animate={mounted ? { opacity: 1 } : {}}
-            transition={{ delay: 1.2 }}
-          >
-            SETTLE IN STABLE
-          </motion.text>
+            <g transform={`translate(${CX - LOGO_R - 24}, ${CY})`}>
+              <path
+                d="M 0 -4 L 5 0 L 0 4"
+                fill="none"
+                stroke="#9ca3af"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.4"
+              />
+            </g>
+            <g transform={`translate(${CX + LOGO_R + 18}, ${CY})`}>
+              <path
+                d="M 0 -4 L 5 0 L 0 4"
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.5"
+              />
+            </g>
+          </motion.g>
         </svg>
       </motion.div>
     </div>

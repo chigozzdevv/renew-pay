@@ -361,7 +361,7 @@ export function DocsPageClient() {
                 aria-label="Renew home"
                 className="inline-flex items-center gap-3"
               >
-                <Logo />
+                <Logo size="compact" />
                 <span className="rounded-full border border-black/6 bg-white/88 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--brand)]">
                   Docs
                 </span>

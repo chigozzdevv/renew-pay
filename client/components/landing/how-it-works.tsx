@@ -262,10 +262,6 @@ export function HowItWorksSection() {
                 <h2 className="text-balance font-display text-4xl leading-[1] tracking-[-0.03em] text-[#111111] sm:text-[3.2rem]">
                   From local collection to USDC settlement.
                 </h2>
-                <p className="mx-auto mt-4 max-w-[42rem] text-balance text-base leading-7 text-[#6b7280] sm:text-lg">
-                  Create billing once, collect in local fiat, settle on Solana in USDC, and
-                  withdraw when you are ready.
-                </p>
               </motion.div>
             </Reveal>
           </Container>
