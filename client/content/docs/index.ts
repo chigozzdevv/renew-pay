@@ -97,11 +97,11 @@ export const docsPages: DocsPage[] = [
           language: "bash",
           filename: "integration-modes.sh",
           code: `# Sandbox
-API_ORIGIN=https://sandbox.renew.sh
+API_ORIGIN=https://staging-pay.renew.sh
 SERVER_KEY_PREFIX=rw_test_
 
 # Live
-API_ORIGIN=https://api.renew.sh
+API_ORIGIN=https://pay.renew.sh
 SERVER_KEY_PREFIX=rw_live_`,
         },
       },
@@ -152,7 +152,7 @@ SERVER_KEY_PREFIX=rw_live_`,
         samples: [
           createJsonSample("Create session request", "create-session.request.json", {
             method: "POST",
-            url: "https://sandbox.renew.sh/v1/checkout/sessions",
+            url: "https://staging-pay.renew.sh/v1/checkout/sessions",
             headers: {
               "x-renew-secret-key": "rw_test_xxxxxxxxxxxxxxxxxxxxxxxx",
               "content-type": "application/json",
@@ -214,12 +214,12 @@ SERVER_KEY_PREFIX=rw_live_`,
         references: [
           {
             label: "Sandbox",
-            value: "https://sandbox.renew.sh",
+            value: "https://staging-pay.renew.sh",
             detail: "Use with `rw_test_` keys and sandbox checkout traffic.",
           },
           {
             label: "Live",
-            value: "https://api.renew.sh",
+            value: "https://pay.renew.sh",
             detail: "Use with `rw_live_` keys and live traffic.",
           },
           {
@@ -296,7 +296,7 @@ SERVER_KEY_PREFIX=rw_live_`,
           {
             label: "List plans request",
             language: "bash",
-            code: `curl https://sandbox.renew.sh/v1/checkout/plans \\
+            code: `curl https://staging-pay.renew.sh/v1/checkout/plans \\
   -H "x-renew-secret-key: rw_test_xxxxxxxxxxxxxxxxxxxxxxxx"`,
           },
           createJsonSample("List plans response", "list-plans.response.json", {
@@ -1281,8 +1281,8 @@ const isValid = verifyRenewWebhookSignature({
           "The SDK uses the same public environment names as the docs: `sandbox` and `live`.",
         ],
         bullets: [
-          "`sandbox` resolves to `https://sandbox.renew.sh`.",
-          "`live` resolves to `https://api.renew.sh`.",
+          "`sandbox` resolves to `https://staging-pay.renew.sh`.",
+          "`live` resolves to `https://pay.renew.sh`.",
           "`rw_test_` keys map to sandbox and `rw_live_` keys map to live.",
         ],
       },
@@ -1540,7 +1540,7 @@ async function getRuntimeConfig(apiOrigin: string): Promise<RenewProtocolConfig>
   return payload.data.config;
 }
 
-const config = await getRuntimeConfig("https://sandbox.renew.sh");
+const config = await getRuntimeConfig("https://staging-pay.renew.sh");
 
 const protocol = createRenewProtocolClient(transport, config.protocolAddress);
 const vault = createRenewVaultClient(transport, config.vaultAddress);`,
