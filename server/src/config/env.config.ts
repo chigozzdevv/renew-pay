@@ -17,6 +17,8 @@ const envSchema = z
     MONGODB_DB_NAME: z.string().trim().min(1).default("renew_v2"),
     CORS_ORIGINS: z.string().trim().default("http://localhost:3000"),
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
+    PAYMENT_RAIL_PROVIDER_TEST: z.enum(["yellow_card", "partna"]).default("partna"),
+    PAYMENT_RAIL_PROVIDER_LIVE: z.enum(["yellow_card", "partna"]).default("partna"),
     SOLANA_CLUSTER_TEST: z
       .string()
       .trim()
@@ -94,6 +96,23 @@ const envSchema = z
     YELLOW_CARD_WEBHOOK_SECRET_TEST: z.string().trim().default(""),
     YELLOW_CARD_WEBHOOK_SECRET_LIVE: z.string().trim().default(""),
     YELLOW_CARD_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    PARTNA_V4_BASE_URL_TEST: z
+      .string()
+      .trim()
+      .default("https://staging-api.getpartna.com/v4"),
+    PARTNA_V4_BASE_URL_LIVE: z.string().trim().default(""),
+    PARTNA_VOUCHERS_BASE_URL_TEST: z
+      .string()
+      .trim()
+      .default("https://staging-vouchers.ventogram.com/api/v1"),
+    PARTNA_VOUCHERS_BASE_URL_LIVE: z.string().trim().default(""),
+    PARTNA_API_KEY_TEST: z.string().trim().default(""),
+    PARTNA_API_KEY_LIVE: z.string().trim().default(""),
+    PARTNA_API_USER_TEST: z.string().trim().default(""),
+    PARTNA_API_USER_LIVE: z.string().trim().default(""),
+    PARTNA_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    PARTNA_WEBHOOK_PUBLIC_KEY_TEST: z.string().trim().default(""),
+    PARTNA_WEBHOOK_PUBLIC_KEY_LIVE: z.string().trim().default(""),
     SUMSUB_BASE_URL_TEST: z
       .string()
       .trim()
@@ -131,7 +150,8 @@ const envSchema = z
       .default(8 * 60 * 60),
     PLATFORM_AUTH_PASSWORD_ITERATIONS: z.coerce.number().int().positive().default(310000),
     PRIVY_APP_ID: z.string().trim().default(""),
-    PRIVY_VERIFICATION_KEY: z.string().trim().default(""),
+    PRIVY_APP_SECRET: z.string().trim().default(""),
+    API_BASE_URL: z.string().trim().min(1).default("http://localhost:4000"),
     APP_BASE_URL: z.string().trim().min(1).default("http://localhost:3000"),
     RESEND_API_KEY: z.string().trim().default(""),
     RESEND_FROM_EMAIL: z

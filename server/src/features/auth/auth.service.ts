@@ -1,4 +1,6 @@
-import { createPublicKey, randomBytes, verify as verifySignature } from "crypto";
+import { randomBytes } from "crypto";
+
+import { PrivyClient } from "@privy-io/node";
 
 import { env } from "@/config/env.config";
 import { MerchantModel } from "@/features/merchants/merchant.model";
@@ -82,100 +84,29 @@ function createUnconfiguredAddress() {
   return createUnconfiguredWalletAddress();
 }
 
-function toBase64UrlBuffer(value: string) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
 
-  return Buffer.from(`${normalized}${padding}`, "base64");
-}
+function getPrivyClient() {
+  const appId = env.PRIVY_APP_ID.trim();
+  const appSecret = env.PRIVY_APP_SECRET.trim();
 
-function parseJwt(token: string) {
-  const segments = token.split(".");
-
-  if (segments.length !== 3) {
-    throw new HttpError(401, "Privy token is malformed.");
-  }
-
-  const [encodedHeader, encodedPayload, encodedSignature] = segments;
-  const header = JSON.parse(toBase64UrlBuffer(encodedHeader).toString("utf8")) as Record<
-    string,
-    unknown
-  >;
-  const payload = JSON.parse(toBase64UrlBuffer(encodedPayload).toString("utf8")) as Record<
-    string,
-    unknown
-  >;
-  const signature = toBase64UrlBuffer(encodedSignature);
-  const signingInput = Buffer.from(`${encodedHeader}.${encodedPayload}`, "utf8");
-
-  return {
-    header,
-    payload,
-    signature,
-    signingInput,
-  };
-}
-
-function normalizePrivyVerificationKey() {
-  const value = env.PRIVY_VERIFICATION_KEY.trim();
-
-  if (!value) {
+  if (!appId || !appSecret) {
     throw new HttpError(
       503,
-      "Privy verification is not configured. Set PRIVY_VERIFICATION_KEY to enable passkey auth."
+      "Privy is not configured. Set PRIVY_APP_ID and PRIVY_APP_SECRET to enable passkey auth."
     );
   }
 
-  return value.replace(/\\n/g, "\n");
+  return new PrivyClient({ appId, appSecret });
 }
 
-function verifyPrivyJwt(token: string) {
-  const parsed = parseJwt(token);
-  const algorithm = typeof parsed.header.alg === "string" ? parsed.header.alg : null;
+async function verifyPrivyJwt(token: string) {
+  const privy = getPrivyClient();
 
-  if (algorithm !== "ES256") {
-    throw new HttpError(401, "Privy token algorithm is not supported.");
-  }
-
-  const publicKey = createPublicKey(normalizePrivyVerificationKey());
-  const isValid = verifySignature(
-    "sha256",
-    parsed.signingInput,
-    {
-      key: publicKey,
-      dsaEncoding: "ieee-p1363",
-    },
-    parsed.signature
-  );
-
-  if (!isValid) {
+  try {
+    return await privy.utils().auth().verifyAccessToken(token);
+  } catch {
     throw new HttpError(401, "Privy token verification failed.");
   }
-
-  const expiresAt = typeof parsed.payload.exp === "number" ? parsed.payload.exp : null;
-
-  if (expiresAt && expiresAt * 1000 <= Date.now()) {
-    throw new HttpError(401, "Privy token has expired.");
-  }
-
-  const appId = env.PRIVY_APP_ID.trim();
-
-  if (!appId) {
-    throw new HttpError(503, "Privy app ID is not configured. Set PRIVY_APP_ID to enable passkey auth.");
-  }
-
-  const audience = parsed.payload.aud;
-  const audiences = Array.isArray(audience)
-    ? audience.filter((entry): entry is string => typeof entry === "string")
-    : typeof audience === "string"
-      ? [audience]
-      : [];
-
-  if (!audiences.includes(appId)) {
-    throw new HttpError(401, "Privy token audience does not match this app.");
-  }
-
-  return parsed.payload;
 }
 
 function toRecordArray(value: unknown) {
@@ -443,14 +374,11 @@ export async function getAuthenticatedUser(input: AuthTokenPayload) {
 }
 
 export async function exchangePrivySession(input: PrivySessionInput) {
-  const authClaims = verifyPrivyJwt(input.authToken);
-  const identityClaims = input.identityToken ? verifyPrivyJwt(input.identityToken) : null;
-  const providerUserId =
-    typeof authClaims.sub === "string" && authClaims.sub.trim()
-      ? authClaims.sub.trim()
-      : typeof identityClaims?.sub === "string" && identityClaims.sub.trim()
-        ? identityClaims.sub.trim()
-        : null;
+  const authClaims = await verifyPrivyJwt(input.authToken);
+  const identityClaims = input.identityToken
+    ? await getPrivyClient().utils().auth().verifyIdentityToken(input.identityToken)
+    : null;
+  const providerUserId = authClaims.user_id?.trim() || null;
 
   if (!providerUserId) {
     throw new HttpError(401, "Privy session is missing a subject.");
@@ -463,13 +391,10 @@ export async function exchangePrivySession(input: PrivySessionInput) {
 
   if (!member) {
     const resolvedEmail =
-      extractEmailFromIdentityClaims(identityClaims ?? {}) ??
+      extractEmailFromIdentityClaims(identityClaims as unknown as Record<string, unknown> ?? {}) ??
       input.email?.trim().toLowerCase() ??
       null;
-    const resolvedName =
-      (typeof identityClaims?.name === "string" ? identityClaims.name.trim() : null) ??
-      input.name?.trim() ??
-      null;
+    const resolvedName = input.name?.trim() ?? null;
 
     if (!resolvedEmail) {
       throw new HttpError(409, "Privy session is missing an email address.");
