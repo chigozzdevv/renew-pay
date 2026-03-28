@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -14,7 +14,6 @@
   "dependencies": {
     "@privy-io/react-auth": "^3.18.0",
     "@renew.sh/sdk": "^0.1.2",
-    "@solana-program/memo": "^0.8.0",
     "framer-motion": "12.23.12",
     "next": "^16.1.6",
     "ox": "^0.8.9",
