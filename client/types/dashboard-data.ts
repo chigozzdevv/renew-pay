@@ -92,7 +92,11 @@ export type SubscriptionRecord = {
 export type ChargeRecord = {
   id: string;
   merchantId: string;
-  subscriptionId: string;
+  sourceKind: "subscription" | "invoice";
+  subscriptionId: string | null;
+  invoiceId: string | null;
+  customerName: string | null;
+  invoiceNumber: string | null;
   externalChargeId: string;
   settlementSource: string | null;
   localAmount: number;
@@ -102,6 +106,77 @@ export type ChargeRecord = {
   status: string;
   failureCode: string | null;
   processedAt: string;
+};
+
+export type InvoiceRecord = {
+  id: string;
+  merchantId: string;
+  environment: "test" | "live";
+  invoiceNumber: string;
+  publicToken: string;
+  publicUrl: string;
+  title: string;
+  customerId: string | null;
+  customerName: string;
+  customerEmail: string;
+  billingCurrency: string;
+  status: string;
+  note: string | null;
+  dueDate: string;
+  issuedAt: string | null;
+  sentAt: string | null;
+  lastRemindedAt: string | null;
+  paidAt: string | null;
+  voidedAt: string | null;
+  lineItems: Array<{
+    description: string;
+    quantity: number;
+    unitAmountUsd: number;
+    totalAmountUsd: number;
+  }>;
+  totals: {
+    usdAmount: number;
+    localAmount: number;
+    fxRate: number;
+    usdcAmount: number;
+    feeAmount: number;
+  };
+  charge: {
+    id: string;
+    externalChargeId: string;
+    status: string;
+    failureCode: string | null;
+    processedAt: string;
+  } | null;
+  settlement: {
+    id: string;
+    status: string;
+    netUsdc: number;
+    grossUsdc: number;
+    creditTxHash: string | null;
+  } | null;
+  paymentInstructions: {
+    provider: string | null;
+    kind: string | null;
+    externalChargeId: string | null;
+    billingCurrency: string | null;
+    localAmount: number | null;
+    usdcAmount: number | null;
+    feeAmount: number | null;
+    status: string | null;
+    reference: string | null;
+    expiresAt: string | null;
+    redirectUrl: string | null;
+    bankTransfer: {
+      bankCode: string | null;
+      bankName: string | null;
+      accountNumber: string | null;
+      accountName: string | null;
+      currency: string | null;
+    } | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type SettlementRecord = {

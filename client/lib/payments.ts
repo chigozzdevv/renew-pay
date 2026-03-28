@@ -5,8 +5,11 @@ import { fetchApi, type ApiPagination } from "@/lib/api";
 export type PaymentRecord = {
   id: string;
   merchantId: string;
-  subscriptionId: string;
-  subscriptionCustomerName: string | null;
+  sourceKind: "subscription" | "invoice";
+  subscriptionId: string | null;
+  invoiceId: string | null;
+  customerName: string | null;
+  invoiceNumber: string | null;
   externalChargeId: string;
   settlementSource: string | null;
   localAmount: number;
@@ -50,6 +53,7 @@ export async function loadPaymentWorkspace(input: {
   merchantId: string;
   environment: "test" | "live";
   status?: PaymentRecord["status"] | "all";
+  sourceKind?: PaymentRecord["sourceKind"] | "all";
   search?: string;
 }) {
   const chargesResponse = await fetchApi<PaymentRecord[]>("/charges", {
@@ -58,6 +62,8 @@ export async function loadPaymentWorkspace(input: {
       merchantId: input.merchantId,
       environment: input.environment,
       status: input.status && input.status !== "all" ? input.status : undefined,
+      sourceKind:
+        input.sourceKind && input.sourceKind !== "all" ? input.sourceKind : undefined,
       search: input.search?.trim() || undefined,
     },
   });
@@ -72,6 +78,7 @@ export async function loadPaymentPage(input: {
   merchantId: string;
   environment: "test" | "live";
   status?: PaymentRecord["status"] | "all";
+  sourceKind?: PaymentRecord["sourceKind"] | "all";
   search?: string;
   page: number;
   limit?: number;
@@ -83,6 +90,8 @@ export async function loadPaymentPage(input: {
       merchantId: input.merchantId,
       environment: input.environment,
       status: input.status && input.status !== "all" ? input.status : undefined,
+      sourceKind:
+        input.sourceKind && input.sourceKind !== "all" ? input.sourceKind : undefined,
       search: input.search?.trim() || undefined,
       page: input.page,
       limit,

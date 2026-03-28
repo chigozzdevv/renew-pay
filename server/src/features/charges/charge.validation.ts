@@ -12,6 +12,7 @@ const addressSchema = z
 export const createChargeSchema = z.object({
   merchantId: z.string().trim().min(1),
   environment: environmentInputSchema.default("test"),
+  sourceKind: z.enum(["subscription", "invoice"]).default("subscription"),
   subscriptionId: z.string().trim().min(1),
   externalChargeId: z.string().trim().min(2).max(120),
   settlementSource: addressSchema.nullish().transform((value) => value ?? null),
@@ -37,6 +38,7 @@ export const listChargesQuerySchema = z
   .object({
     merchantId: z.string().trim().min(1).optional(),
     environment: environmentInputSchema.optional(),
+    sourceKind: z.enum(["subscription", "invoice"]).optional(),
     subscriptionId: z.string().trim().min(1).optional(),
     status: z
       .enum([

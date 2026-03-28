@@ -10,6 +10,19 @@ import {
 
 import { ApiError, fetchApi, getApiOrigin, readAccessToken, type WorkspaceMode } from "@/lib/api";
 
+export type PlaygroundWorkspaceUser = {
+  merchantId: string;
+  teamMemberId: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  workspaceMode: "test" | "live";
+  permissions: string[];
+  markets: string[];
+  onboardingStatus: string;
+};
+
 export function createPlaygroundCheckoutClient() {
   return createRenewCheckoutClient({
     apiOrigin: getApiOrigin(),
@@ -33,6 +46,15 @@ export async function listPlaygroundPlans(environment: WorkspaceMode) {
     query: {
       environment,
     },
+  });
+
+  return payload.data;
+}
+
+export async function loadPlaygroundWorkspaceUser() {
+  const payload = await fetchApi<PlaygroundWorkspaceUser>("/auth/me", {
+    method: "GET",
+    token: getRequiredPlaygroundToken(),
   });
 
   return payload.data;

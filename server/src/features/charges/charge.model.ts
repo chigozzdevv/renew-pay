@@ -13,10 +13,21 @@ const chargeSchema = new Schema(
       trim: true,
       default: "test",
     },
+    sourceKind: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "subscription",
+    },
     subscriptionId: {
       type: Schema.Types.ObjectId,
-      required: true,
       ref: "Subscription",
+      default: null,
+    },
+    invoiceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Invoice",
+      default: null,
     },
     externalChargeId: {
       type: String,
@@ -95,6 +106,9 @@ const chargeSchema = new Schema(
     versionKey: false,
   }
 );
+
+chargeSchema.index({ merchantId: 1, environment: 1, sourceKind: 1, processedAt: -1 });
+chargeSchema.index({ invoiceId: 1 }, { sparse: true });
 
 type ChargeEntry = InferSchemaType<typeof chargeSchema> & {
   _id: Types.ObjectId;

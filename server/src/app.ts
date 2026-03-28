@@ -8,6 +8,7 @@ import { checkoutRouter } from "@/features/checkout/checkout.routes";
 import { customerRouter } from "@/features/customers/customer.routes";
 import { dashboardRouter } from "@/features/dashboard/dashboard.routes";
 import { developerRouter } from "@/features/developers/developer.routes";
+import { invoiceRouter, publicInvoiceRouter } from "@/features/invoices/invoice.routes";
 import { kycRouter } from "@/features/kyc/kyc.routes";
 import { merchantRouter } from "@/features/merchants/merchant.routes";
 import { notificationRouter } from "@/features/notifications/notification.routes";
@@ -77,6 +78,7 @@ export function createApp() {
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
     app.use(`${apiBasePath}/governance`, governanceRouter);
     app.use(`${apiBasePath}/checkout`, checkoutRouter);
+    app.use(`${apiBasePath}/invoices/public`, publicInvoiceRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
     app.use(`${apiBasePath}/payment-rails`, paymentRailRouter);
     app.use(
@@ -92,6 +94,7 @@ export function createApp() {
         "customers",
         "plans",
         "subscriptions",
+        "invoices",
         "payments",
         "treasury",
         "developers",
@@ -120,6 +123,13 @@ export function createApp() {
       requirePlatformPermissions(["subscriptions", "team_admin"]),
       blockLiveModeUntilLaunch(),
       subscriptionRouter
+    );
+    app.use(
+      `${apiBasePath}/invoices`,
+      requirePlatformAuth,
+      requirePlatformPermissions(["invoices", "team_admin"]),
+      blockLiveModeUntilLaunch(),
+      invoiceRouter
     );
     app.use(
       `${apiBasePath}/charges`,

@@ -100,38 +100,38 @@ const envSchema = z
       .string()
       .trim()
       .default("https://staging-api.getpartna.com/v4"),
-    PARTNA_V4_BASE_URL_LIVE: z.string().trim().default(""),
     PARTNA_VOUCHERS_BASE_URL_TEST: z
       .string()
       .trim()
       .default("https://staging-vouchers.ventogram.com/api/v1"),
-    PARTNA_VOUCHERS_BASE_URL_LIVE: z.string().trim().default(""),
     PARTNA_API_KEY_TEST: z.string().trim().default(""),
-    PARTNA_API_KEY_LIVE: z.string().trim().default(""),
     PARTNA_API_USER_TEST: z.string().trim().default(""),
-    PARTNA_API_USER_LIVE: z.string().trim().default(""),
-    PARTNA_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
     PARTNA_WEBHOOK_PUBLIC_KEY_TEST: z.string().trim().default(""),
+    PARTNA_V4_BASE_URL_LIVE: z.string().trim().default(""),
+    PARTNA_VOUCHERS_BASE_URL_LIVE: z.string().trim().default(""),
+    PARTNA_API_KEY_LIVE: z.string().trim().default(""),
+    PARTNA_API_USER_LIVE: z.string().trim().default(""),
     PARTNA_WEBHOOK_PUBLIC_KEY_LIVE: z.string().trim().default(""),
+    PARTNA_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
     SUMSUB_BASE_URL_TEST: z
       .string()
       .trim()
       .min(1)
       .default("https://api.sumsub.com"),
+    SUMSUB_APP_TOKEN_TEST: z.string().trim().default(""),
+    SUMSUB_SECRET_KEY_TEST: z.string().trim().default(""),
+    SUMSUB_LEVEL_NAME_KYC_TEST: z.string().trim().min(1).default("renew-kyc-test"),
+    SUMSUB_LEVEL_NAME_KYB_TEST: z.string().trim().min(1).default("renew-kyb-test"),
+    SUMSUB_WEBHOOK_SECRET_TEST: z.string().trim().default(""),
     SUMSUB_BASE_URL_LIVE: z
       .string()
       .trim()
       .min(1)
       .default("https://api.sumsub.com"),
-    SUMSUB_APP_TOKEN_TEST: z.string().trim().default(""),
     SUMSUB_APP_TOKEN_LIVE: z.string().trim().default(""),
-    SUMSUB_SECRET_KEY_TEST: z.string().trim().default(""),
     SUMSUB_SECRET_KEY_LIVE: z.string().trim().default(""),
-    SUMSUB_LEVEL_NAME_KYC_TEST: z.string().trim().min(1).default("renew-kyc-test"),
     SUMSUB_LEVEL_NAME_KYC_LIVE: z.string().trim().min(1).default("renew-kyc-live"),
-    SUMSUB_LEVEL_NAME_KYB_TEST: z.string().trim().min(1).default("renew-kyb-test"),
     SUMSUB_LEVEL_NAME_KYB_LIVE: z.string().trim().min(1).default("renew-kyb-live"),
-    SUMSUB_WEBHOOK_SECRET_TEST: z.string().trim().default(""),
     SUMSUB_WEBHOOK_SECRET_LIVE: z.string().trim().default(""),
     SUMSUB_SDK_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
     SUMSUB_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),

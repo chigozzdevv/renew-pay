@@ -28,11 +28,13 @@ import {
 import { loadPaymentPage, retryCharge, type PaymentRecord } from "@/lib/payments";
 
 type PaymentStatusFilter = PaymentRecord["status"] | "all";
+type PaymentSourceFilter = PaymentRecord["sourceKind"] | "all";
 
 export default function PaymentsPage() {
   const { token } = useDashboardSession();
   const { mode } = useWorkspaceMode();
   const [status, setStatus] = useState<PaymentStatusFilter>("all");
+  const [sourceKind, setSourceKind] = useState<PaymentSourceFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,11 +51,12 @@ export default function PaymentsPage() {
         merchantId,
         environment: mode,
         status,
+        sourceKind,
         search,
         page,
         limit: pageSize,
       }),
-    [mode, page, status, search]
+    [mode, page, search, sourceKind, status]
   );
 
   const payments = data?.payments ?? [];
@@ -89,7 +92,7 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [mode, search, status]);
+  }, [mode, search, sourceKind, status]);
 
   const metrics = useMemo(() => {
     const settled = payments.filter((payment) => payment.status === "settled");
@@ -158,26 +161,33 @@ export default function PaymentsPage() {
         <Card title="Charge ledger" description="Charges and settlement state for the selected environment.">
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-              <Select value={status} onChange={(event) => { setStatus(event.target.value as PaymentStatusFilter); setPage(1); }}>
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="awaiting_settlement">Awaiting settlement</option>
-                <option value="confirming">Confirming</option>
-                <option value="settled">Settled</option>
-                <option value="failed">Failed</option>
-                <option value="reversed">Reversed</option>
-              </Select>
-              <Input
-                placeholder="Search by external charge id"
-                value={search}
-                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-              />
+              <div className="grid gap-3 md:grid-cols-[180px_180px_minmax(0,1fr)] md:col-span-2">
+                <Select value={sourceKind} onChange={(event) => { setSourceKind(event.target.value as PaymentSourceFilter); setPage(1); }}>
+                  <option value="all">All sources</option>
+                  <option value="subscription">Subscriptions</option>
+                  <option value="invoice">Invoices</option>
+                </Select>
+                <Select value={status} onChange={(event) => { setStatus(event.target.value as PaymentStatusFilter); setPage(1); }}>
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="awaiting_settlement">Awaiting settlement</option>
+                  <option value="confirming">Confirming</option>
+                  <option value="settled">Settled</option>
+                  <option value="failed">Failed</option>
+                  <option value="reversed">Reversed</option>
+                </Select>
+                <Input
+                  placeholder="Search by charge, invoice, or customer"
+                  value={search}
+                  onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+                />
+              </div>
             </div>
 
             {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
             {errorMessage ? <p className="text-sm text-[#a8382b]">{errorMessage}</p> : null}
 
-            <Table columns={["Charge", "Subscription", "USDC", "Processed", "Status"]}>
+            <Table columns={["Charge", "Source", "USDC", "Processed", "Status"]}>
               {payments.map((payment) => (
                 <button key={payment.id} type="button" className="text-left" onClick={() => setSelectedId(payment.id)}>
                   <TableRow columns={5}>
@@ -185,7 +195,16 @@ export default function PaymentsPage() {
                       <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{payment.externalChargeId}</p>
                       <p className="mt-1 text-sm text-[color:var(--muted)]">{payment.id.slice(-8)}</p>
                     </div>
-                    <p className="text-sm text-[color:var(--muted)]">{payment.subscriptionCustomerName ?? payment.subscriptionId.slice(-8)}</p>
+                    <div>
+                      <p className="text-sm text-[color:var(--muted)]">
+                        {payment.sourceKind === "invoice"
+                          ? payment.invoiceNumber ?? "Invoice"
+                          : payment.customerName ?? payment.subscriptionId?.slice(-8) ?? "Subscription"}
+                      </p>
+                      <p className="mt-1 text-sm text-[color:var(--muted)]/80 capitalize">
+                        {payment.sourceKind}
+                      </p>
+                    </div>
                     <p className="text-sm text-[color:var(--muted)]">{formatCurrency(payment.usdcAmount)}</p>
                     <p className="text-sm text-[color:var(--muted)]">{formatDateTime(payment.processedAt)}</p>
                     <div><StatusBadge value={payment.status} /></div>
@@ -210,7 +229,9 @@ export default function PaymentsPage() {
           title={selectedPayment?.externalChargeId ?? "Charge details"}
           description={
             selectedPayment
-              ? selectedPayment.subscriptionCustomerName ?? selectedPayment.subscriptionId
+              ? selectedPayment.sourceKind === "invoice"
+                ? selectedPayment.invoiceNumber ?? selectedPayment.customerName ?? "Invoice payment"
+                : selectedPayment.customerName ?? selectedPayment.subscriptionId ?? "Subscription payment"
               : "Select a charge to inspect it."
           }
         >
@@ -228,6 +249,14 @@ export default function PaymentsPage() {
                   value={formatCurrency(selectedPayment.feeAmount)}
                 />
                 <DarkField
+                  label="Source"
+                  value={
+                    selectedPayment.sourceKind === "invoice"
+                      ? selectedPayment.invoiceNumber ?? "Invoice"
+                      : selectedPayment.subscriptionId ?? "Subscription"
+                  }
+                />
+                <DarkField
                   label="Settlement source"
                   value={selectedPayment.settlementSource ?? "Not set"}
                 />
@@ -243,7 +272,9 @@ export default function PaymentsPage() {
                 </div>
               ) : null}
 
-              {selectedPayment.status !== "settled" && selectedPayment.status !== "reversed" ? (
+              {selectedPayment.sourceKind !== "invoice" &&
+              selectedPayment.status !== "settled" &&
+              selectedPayment.status !== "reversed" ? (
                 <Button tone="darkBrand" disabled={isBusy} onClick={() => void handleRetry()}>
                   {isBusy ? "Queueing..." : "Retry charge"}
                 </Button>

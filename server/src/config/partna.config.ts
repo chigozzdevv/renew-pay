@@ -1,6 +1,10 @@
 import { env } from "@/config/env.config";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 
+function normalizePem(value: string) {
+  return value.trim().replace(/\\n/g, "\n");
+}
+
 export function getPartnaConfig(mode: RuntimeMode = env.PAYMENT_ENV) {
   const isLive = mode === "live";
 
@@ -15,9 +19,9 @@ export function getPartnaConfig(mode: RuntimeMode = env.PAYMENT_ENV) {
       isLive ? env.PARTNA_VOUCHERS_BASE_URL_LIVE : env.PARTNA_VOUCHERS_BASE_URL_TEST
     ).trim(),
     timeoutMs: env.PARTNA_TIMEOUT_MS,
-    webhookPublicKey: (
+    webhookPublicKey: normalizePem(
       isLive ? env.PARTNA_WEBHOOK_PUBLIC_KEY_LIVE : env.PARTNA_WEBHOOK_PUBLIC_KEY_TEST
-    ).trim(),
+    ),
   };
 }
 

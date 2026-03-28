@@ -139,6 +139,15 @@ function SidebarIcon({ icon, className }: SidebarIconProps) {
           <path d="M15.2 17.2V13.7H11.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+    case "receipt":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+          <path d="M6 3.8H14V16.2L12.2 15L10 16.2L7.8 15L6 16.2V3.8Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M8 7H12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M8 10H12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M8 13H10.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      );
     case "card":
       return (
         <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">

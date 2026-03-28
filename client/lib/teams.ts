@@ -14,6 +14,7 @@ export type TeamPermission =
   | "customers"
   | "plans"
   | "subscriptions"
+  | "invoices"
   | "payments"
   | "treasury"
   | "developers"

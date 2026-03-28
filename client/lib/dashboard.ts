@@ -10,6 +10,7 @@ export const dashboardNav: DashboardNavItem[] = [
     href: "/dashboard/subscriptions",
     icon: "refresh",
   },
+  { key: "invoices", label: "Invoices", href: "/dashboard/invoices", icon: "receipt" },
   { key: "payments", label: "Payments", href: "/dashboard/payments", icon: "card" },
   { key: "treasury", label: "Treasury", href: "/dashboard/treasury", icon: "vault" },
   { key: "governance", label: "Governance", href: "/dashboard/governance", icon: "shield" },
