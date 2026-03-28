@@ -83,6 +83,8 @@ declare module "@privy-io/react-auth/solana" {
     }>;
   };
 
+  export function toSolanaWalletConnectors(args?: Record<string, unknown>): unknown;
+
   export function useSignMessage(): {
     signMessage: (input: {
       message: Uint8Array;

@@ -69,18 +69,6 @@ function extractEmbeddedWalletAddress(wallets: Array<{
   return wallet?.address?.trim() ?? null;
 }
 
-function formatAddress(value: string | null) {
-  if (!value) {
-    return "Provisioning";
-  }
-
-  if (value.length < 12) {
-    return value;
-  }
-
-  return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
 function toErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
     return error.message;
@@ -114,6 +102,8 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
   const embeddedWalletAddress = useMemo(() => extractEmbeddedWalletAddress(wallets), [wallets]);
   const operatorWalletAddress = embeddedWalletAddress;
+
+  const isBusy = isSubmitting || isProvisioningWallet;
 
   async function finishExchange() {
     setIsSubmitting(true);
@@ -215,70 +205,49 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
     return null;
   }
 
-  return (
-    <div className="space-y-4 rounded-[2rem] border border-[#d3e4cf] bg-[radial-gradient(circle_at_top_left,_rgba(217,246,188,0.82),_rgba(244,247,241,0.96)_56%,_rgba(255,255,255,0.98)_100%)] p-6 shadow-[0_24px_80px_rgba(12,74,39,0.08)]">
-      <div className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--brand)]">
-          Passkey first
-        </p>
-        <h2 className="font-display text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-          {mode === "signup" ? "Create a walletless workspace." : "Continue with Privy."}
-        </h2>
-        <p className="text-sm leading-7 text-[color:var(--muted)]">
-          Use passkey or email in Privy. Renew will exchange that session for your platform token
-          and route you into onboarding after provisioning your Solana operator wallet.
-        </p>
-      </div>
+  const buttonLabel = isBusy
+    ? "Setting up..."
+    : mode === "signup"
+      ? "Create workspace"
+      : "Sign in";
 
-      {authenticated ? (
-        <div className="rounded-[1.15rem] border border-[color:var(--line)] bg-white/82 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-            Operator wallet
-          </p>
-          <p className="mt-1 text-sm font-semibold text-[color:var(--ink)]">
-            {embeddedWalletAddress
-              ? `Operator wallet ${formatAddress(embeddedWalletAddress)}`
-              : "Provisioning operator wallet"}
-          </p>
-          <p className="mt-1 text-xs leading-6 text-[color:var(--muted)]">
-            Privy provisions the embedded Solana wallet first, then Renew binds that wallet as the
-            operator authority for the workspace.
-          </p>
-        </div>
-      ) : null}
+  return (
+    <div className="rounded-2xl border border-black/6 bg-white/90 px-6 py-8 shadow-[0_12px_40px_rgba(12,74,39,0.08)] backdrop-blur-sm sm:px-8 sm:py-10">
+      <h2 className="font-display text-[clamp(1.5rem,3vw,2rem)] leading-[1.1] tracking-[-0.04em] text-[#111111]">
+        {mode === "signup" ? "Create your workspace." : "Welcome back."}
+      </h2>
+      <p className="mt-2 text-[15px] leading-relaxed text-[#6b7280]">
+        {mode === "signup"
+          ? "Sign up with passkey or email to get started."
+          : "Sign in with passkey or email to continue."}
+      </p>
 
       {mode === "signup" ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold text-[color:var(--ink)]">Full name</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="h-12 rounded-[1.15rem] border border-[color:var(--line)] bg-white px-4 text-[color:var(--ink)] outline-none transition-colors focus:border-[color:var(--brand)]"
-              placeholder="Jane Doe"
-            />
-          </label>
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold text-[color:var(--ink)]">Company</span>
-            <input
-              type="text"
-              value={company}
-              onChange={(event) => setCompany(event.target.value)}
-              className="h-12 rounded-[1.15rem] border border-[color:var(--line)] bg-white px-4 text-[color:var(--ink)] outline-none transition-colors focus:border-[color:var(--brand)]"
-              placeholder="Acme Inc."
-            />
-          </label>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="h-11 rounded-xl border border-black/8 bg-[#f7f9fc] px-4 text-sm text-[#111111] outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#111111]"
+            placeholder="Full name"
+          />
+          <input
+            type="text"
+            value={company}
+            onChange={(event) => setCompany(event.target.value)}
+            className="h-11 rounded-xl border border-black/8 bg-[#f7f9fc] px-4 text-sm text-[#111111] outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#111111]"
+            placeholder="Company"
+          />
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-[1.15rem] border border-[#e7c3bc] bg-[#fff7f5] px-4 py-3 text-sm text-[#9b3b2d]">
+        <div className="mt-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#991b1b]">
           {error}
           {mode === "login" ? (
             <>
               {" "}
-              <Link href="/signup" className="font-semibold underline">
+              <Link href="/signup" className="font-medium underline">
                 Create a workspace instead.
               </Link>
             </>
@@ -290,8 +259,7 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
         type="button"
         disabled={
           !ready ||
-          isSubmitting ||
-          isProvisioningWallet ||
+          isBusy ||
           (mode === "signup" && (!name.trim() || !company.trim()))
         }
         onClick={async () => {
@@ -318,16 +286,12 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
             setIsSubmitting(false);
           }
         }}
-        className="inline-flex h-12 items-center justify-center rounded-full bg-[#0c4a27] px-6 text-sm font-semibold text-[#d9f6bc] transition-colors hover:bg-[#093a1e] disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#111111] text-sm font-semibold text-white transition-colors hover:bg-[#222222] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isProvisioningWallet
-          ? "Provisioning wallet..."
-          : isSubmitting
-            ? "Opening Privy..."
-          : mode === "signup"
-            ? "Create workspace with passkey"
-            : "Sign in with passkey"}
+        {buttonLabel}
+        {!isBusy && <span className="ml-2 text-white/60">→</span>}
       </button>
+
     </div>
   );
 }

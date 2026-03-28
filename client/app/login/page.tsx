@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { PrivySessionCard } from "@/components/auth/privy-session-card";
-import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/shared/logo";
 
 function getNextPath(value: string | null) {
@@ -21,26 +20,21 @@ function LoginPageContent() {
   const nextPath = getNextPath(searchParams.get("next"));
 
   return (
-    <main className="min-h-screen bg-[color:var(--surface)] py-8 sm:py-12">
-      <Container className="max-w-6xl">
-        <div className="flex items-center justify-between gap-4">
-          <Link href="/" aria-label="Renew home" className="shrink-0">
-            <Logo />
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#e8f5e9] px-4">
+      <div className="w-full max-w-[26rem]">
+        <div className="mb-8 flex items-center justify-between">
+          <Link href="/" aria-label="Renew home" className="flex items-center">
+            <Logo size="compact" />
           </Link>
           <Link
             href="/"
-            className="text-sm font-semibold text-[color:var(--muted)] transition-colors hover:text-[color:var(--brand)]"
+            className="text-sm font-medium text-[#6b7280] transition-colors hover:text-[#111111]"
           >
             Back home
           </Link>
         </div>
-
-        <section className="mt-8">
-          <div className="mx-auto max-w-[34rem]">
-            <PrivySessionCard mode="login" nextPath={nextPath} />
-          </div>
-        </section>
-      </Container>
+        <PrivySessionCard mode="login" nextPath={nextPath} />
+      </div>
     </main>
   );
 }
