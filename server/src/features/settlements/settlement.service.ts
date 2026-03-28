@@ -540,6 +540,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     const bridgeResult = await executeProtocolSettlement({
       environment: toStoredRuntimeMode(settlement.environment),
       mode: "invoice_settlement",
+      providerRef: "partna",
       merchantAddress: protocolMerchantAddress,
       externalChargeId: settlement.batchRef,
       commercialRef: settlement.commercialRef,
@@ -611,6 +612,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
   const bridgeResult = await executeProtocolSettlement({
     environment: toStoredRuntimeMode(settlement.environment),
     mode: "subscription_charge_success",
+    providerRef: sourceCharge.paymentProvider ?? "yellow_card",
     externalChargeId: sourceCharge.externalChargeId,
     protocolSubscriptionId: subscription.protocolSubscriptionId,
     billingPeriodStart: sourceCharge.createdAt,

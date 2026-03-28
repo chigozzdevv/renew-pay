@@ -91,6 +91,40 @@ const customerSchema = new Schema(
       type: Schema.Types.Mixed,
       default: {},
     },
+    paymentProvider: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    paymentProfile: {
+      type: {
+        provider: { type: String, trim: true, default: null },
+        status: { type: String, trim: true, default: null },
+        verifiedAt: { type: Date, default: null },
+        bankTransfer: {
+          type: {
+            bankCode: { type: String, trim: true, default: null },
+            bankName: { type: String, trim: true, default: null },
+            accountName: { type: String, trim: true, default: null },
+            accountNumber: { type: String, trim: true, default: null },
+            currency: { type: String, trim: true, uppercase: true, default: null },
+          },
+          default: null,
+        },
+        partna: {
+          type: {
+            email: { type: String, trim: true, lowercase: true, default: null },
+            fullName: { type: String, trim: true, default: null },
+            accountName: { type: String, trim: true, default: null },
+            bvnLast4: { type: String, trim: true, default: null },
+            callbackUrl: { type: String, trim: true, default: null },
+            raw: { type: Schema.Types.Mixed, default: {} },
+          },
+          default: null,
+        },
+      },
+      default: null,
+    },
   },
   {
     timestamps: true,

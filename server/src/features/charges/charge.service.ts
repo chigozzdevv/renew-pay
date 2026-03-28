@@ -3,8 +3,10 @@ import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
 import { queueNames } from "@/shared/workers/queue-names";
 
 import { ChargeModel } from "@/features/charges/charge.model";
+import { CustomerModel } from "@/features/customers/customer.model";
 import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
+import type { MerchantRecord } from "@/features/merchants/merchant.model";
 import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
 import { recordProtocolChargeFailure } from "@/features/protocol/protocol.settlement";
 import { createSettlement } from "@/features/settlements/settlement.service";
@@ -22,7 +24,10 @@ import {
   getPreferredCollectionNetwork,
   quoteUsdAmountInBillingCurrency,
 } from "@/features/payment-rails/payment-rails.service";
+import { createPartnaChargeInstruction } from "@/features/payment-rails/partna.service";
+import type { PlanRecord } from "@/features/plans/plan.model";
 import { PlanModel } from "@/features/plans/plan.model";
+import type { SubscriptionRecord } from "@/features/subscriptions/subscription.model";
 import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import {
@@ -144,6 +149,135 @@ function toProtocolFailureCode(value: string) {
     .replace(/^_+|_+$/g, "");
 
   return (normalized || "COLLECTION_FAILED").slice(0, 32);
+}
+
+async function runPartnaSubscriptionChargeJob(input: {
+  merchant: MerchantRecord;
+  plan: PlanRecord;
+  subscription: SubscriptionRecord;
+  environment: RuntimeMode;
+}) {
+  const merchant = input.merchant;
+  const plan = input.plan;
+  const subscription = input.subscription;
+
+  if (!merchant || !plan || !subscription) {
+    throw new HttpError(404, "Partna charge dependencies were not found.");
+  }
+
+  const customer = await CustomerModel.findOne({
+    merchantId: merchant._id,
+    customerRef: subscription.customerRef,
+    ...createRuntimeModeCondition("environment", input.environment),
+  }).exec();
+
+  if (!customer?.paymentProfile?.bankTransfer?.accountNumber) {
+    throw new HttpError(
+      409,
+      "Customer is missing active Partna bank instructions."
+    );
+  }
+
+  const quote = await quoteUsdAmountInBillingCurrency({
+    environment: input.environment,
+    currency: subscription.billingCurrency,
+    usdAmount: plan.usdAmount,
+  });
+  const localAmount = quote.localAmount;
+  const usdcAmount = quote.usdcAmount;
+  const fxRate = quote.fxRate;
+  const feeAmount = quote.feeAmount;
+  const netUsdc = Number(Math.max(0.01, usdcAmount - feeAmount).toFixed(2));
+
+  const { voucher, paymentSnapshot } = await createPartnaChargeInstruction({
+    environment: input.environment,
+    customerEmail: customer.email,
+    customerName: customer.name,
+    localAmount,
+    paymentProfile: customer.paymentProfile,
+  });
+  const treasury = await getTreasuryByMerchantId(
+    merchant._id.toString(),
+    input.environment
+  ).catch(() => ({
+    account: null,
+  }));
+  const protocolMerchantAddress = deriveProtocolMerchantAddress({
+    environment: toStoredRuntimeMode(input.environment),
+    merchantId: merchant._id.toString(),
+  });
+  const now = new Date();
+
+  const charge = await ChargeModel.create({
+    merchantId: merchant._id,
+    environment: input.environment,
+    subscriptionId: subscription._id,
+    externalChargeId: voucher.voucherId,
+    settlementSource: protocolMerchantAddress,
+    paymentProvider: "partna",
+    localAmount,
+    fxRate,
+    usdcAmount,
+    feeAmount,
+    status: "pending",
+    failureCode: null,
+    protocolChargeId: null,
+    protocolSyncStatus: "pending_execution",
+    protocolTxHash: null,
+    providerMetadata: {
+      email: customer.email,
+      voucherCode: voucher.voucherCode,
+      voucherId: voucher.voucherId,
+      reference: voucher.reference,
+      paymentInstructions: paymentSnapshot,
+      callbackUrl: customer.paymentProfile?.partna?.callbackUrl ?? null,
+    },
+    processedAt: now,
+  });
+
+  const settlement = await createSettlement({
+    merchantId: merchant._id.toString(),
+    environment: input.environment,
+    sourceChargeId: charge._id.toString(),
+    batchRef: `settlement-${voucher.voucherId}`,
+    grossUsdc: Number(usdcAmount.toFixed(2)),
+    feeUsdc: feeAmount,
+    netUsdc,
+    destinationWallet: treasury.account?.payoutWallet ?? merchant.payoutWallet,
+    sourceKind: "subscription",
+    commercialRef: null,
+    localAmount,
+    fxRate,
+    status: "queued",
+    scheduledFor: new Date(now.getTime() + 5 * 60 * 1000),
+  });
+
+  subscription.status = "active";
+  subscription.localAmount = localAmount;
+  subscription.lastChargeAt = now;
+  subscription.retryAvailableAt = null;
+  subscription.nextChargeAt = addDays(now, plan.billingIntervalDays);
+  await subscription.save();
+
+  return {
+    subscriptionId: subscription._id.toString(),
+    chargeId: charge._id.toString(),
+    externalChargeId: voucher.voucherId,
+    settlementId: settlement.id,
+    collectionStatus: voucher.status,
+    settlementStatus: settlement.status,
+    collection: {
+      provider: "partna",
+      kind: "bank_transfer",
+      id: voucher.voucherId,
+      sequenceId: voucher.voucherId,
+      status: voucher.status,
+      reference: voucher.reference,
+      expiresAt: null,
+      redirectUrl: voucher.paymentUrl,
+      bankTransfer: paymentSnapshot.bankTransfer,
+    },
+  };
 }
 
 async function ensureChargeScope(
@@ -497,6 +631,15 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     };
   }
 
+  if (subscription.paymentProvider === "partna") {
+    return runPartnaSubscriptionChargeJob({
+      merchant,
+      plan,
+      subscription,
+      environment,
+    });
+  }
+
   const channel = await getPreferredCollectionChannel(
     subscription.billingCurrency,
     environment
@@ -552,25 +695,29 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     collection.sequenceId ?? collection.id ?? `renew-charge-${Date.now()}`
   );
   const collectionSnapshot = {
+    provider: "yellow_card",
+    kind: "bank_transfer",
     id: toNullableString(collection.id),
     sequenceId: toNullableString(collection.sequenceId) ?? externalChargeId,
     status: collectionStatus,
     reference: toNullableString(collection.reference),
-    depositId: toNullableString(collection.depositId),
     expiresAt:
       typeof collection.expiresAt === "string" || collection.expiresAt instanceof Date
         ? new Date(collection.expiresAt)
         : null,
-    bankInfo:
+    redirectUrl: null,
+    bankTransfer:
       typeof collection.bankInfo === "object" && collection.bankInfo !== null
         ? {
-            name: toNullableString((collection.bankInfo as Record<string, unknown>).name),
+            bankCode: toNullableString((collection.bankInfo as Record<string, unknown>).bankCode),
+            bankName: toNullableString((collection.bankInfo as Record<string, unknown>).name),
             accountNumber: toNullableString(
               (collection.bankInfo as Record<string, unknown>).accountNumber
             ),
             accountName: toNullableString(
               (collection.bankInfo as Record<string, unknown>).accountName
             ),
+            currency: subscription.billingCurrency,
           }
         : null,
   };
@@ -662,6 +809,7 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     subscriptionId: subscription._id,
     externalChargeId,
     settlementSource: protocolMerchantAddress,
+    paymentProvider: "yellow_card",
     localAmount,
     fxRate,
     usdcAmount,

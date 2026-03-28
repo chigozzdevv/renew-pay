@@ -2,19 +2,25 @@ import { createHash, randomBytes } from "crypto";
 
 import { HttpError } from "@/shared/errors/http-error";
 
+import { getDefaultPaymentRailProvider } from "@/config/payment-rail.config";
 import { ChargeModel, type ChargeDocument } from "@/features/charges/charge.model";
 import { CheckoutSessionModel } from "@/features/checkout/checkout-session.model";
 import type {
   CreateCheckoutSessionInput,
   SubmitCheckoutCustomerInput,
+  SubmitCheckoutVerificationInput,
 } from "@/features/checkout/checkout.validation";
 import { CustomerModel } from "@/features/customers/customer.model";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueSubscriptionCreatedNotifications } from "@/features/notifications/notification.service";
+import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
-  processYellowCardWebhook,
-  quoteUsdAmountInBillingCurrency,
-} from "@/features/payment-rails/payment-rails.service";
+  buildPartnaVerificationSnapshot,
+  ensurePartnaCustomerPaymentProfile,
+  hasActivePartnaPaymentProfile,
+  processPartnaWebhook,
+} from "@/features/payment-rails/partna.service";
+import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import { PlanModel } from "@/features/plans/plan.model";
 import {
   SettlementModel,
@@ -74,6 +80,15 @@ function deriveSessionStatus(input: {
   const chargeStatus = input.chargeStatus ?? null;
   const settlementStatus = input.settlementStatus ?? null;
 
+  if (
+    input.currentStatus === "pending_verification" &&
+    !input.hasSubscription &&
+    !chargeStatus &&
+    !settlementStatus
+  ) {
+    return "pending_verification";
+  }
+
   if (chargeStatus === "settled" || settlementStatus === "settled") {
     return "settled";
   }
@@ -113,9 +128,14 @@ function deriveNextAction(input: {
   status: string;
   environment: RuntimeMode;
   hasCharge: boolean;
+  paymentKind?: string | null;
 }) {
   if (input.status === "open") {
     return "submit_customer";
+  }
+
+  if (input.status === "pending_verification") {
+    return "complete_verification";
   }
 
   if (input.status === "scheduled") {
@@ -125,7 +145,9 @@ function deriveNextAction(input: {
   if (input.status === "pending_payment") {
     return input.environment === "test" && input.hasCharge
       ? "complete_test_payment"
-      : "wait_for_provider";
+      : input.paymentKind === "redirect"
+        ? "redirect_to_provider"
+        : "show_payment_instructions";
   }
 
   if (input.status === "processing") {
@@ -309,6 +331,7 @@ function toCheckoutSessionResponse(input: {
       status: session.status,
       environment: runtimeEnvironment,
       hasCharge: Boolean(session.chargeId),
+      paymentKind: session.paymentSnapshot?.kind ?? null,
     }),
     plan: {
       id: session.planId.toString(),
@@ -327,11 +350,24 @@ function toCheckoutSessionResponse(input: {
           name: session.customerDraft.name,
           email: session.customerDraft.email,
           market: session.customerDraft.market,
-          paymentAccountType: session.customerDraft.paymentAccountType,
-          paymentAccountNumber: session.customerDraft.paymentAccountNumber,
-          paymentNetworkId: session.customerDraft.paymentNetworkId,
         }
         : null,
+    verification: session.verificationSnapshot
+      ? {
+        provider:
+          session.verificationSnapshot.provider === "partna" ||
+          session.verificationSnapshot.provider === "yellow_card"
+            ? session.verificationSnapshot.provider
+            : null,
+        status: session.verificationSnapshot.status ?? null,
+        country: session.verificationSnapshot.country ?? null,
+        currency: session.verificationSnapshot.currency ?? null,
+        instructions: session.verificationSnapshot.instructions ?? null,
+        requiredFields: Array.isArray(session.verificationSnapshot.requiredFields)
+          ? session.verificationSnapshot.requiredFields
+          : [],
+      }
+      : null,
     charge: charge
       ? {
         id: charge._id.toString(),
@@ -358,22 +394,32 @@ function toCheckoutSessionResponse(input: {
       : null,
     paymentInstructions: session.paymentSnapshot
       ? {
+        provider:
+          session.paymentSnapshot.provider === "partna" ||
+          session.paymentSnapshot.provider === "yellow_card"
+            ? session.paymentSnapshot.provider
+            : null,
+        kind:
+          session.paymentSnapshot.kind === "bank_transfer" ||
+          session.paymentSnapshot.kind === "redirect"
+            ? session.paymentSnapshot.kind
+            : null,
         externalChargeId: session.paymentSnapshot.externalChargeId,
         billingCurrency: session.paymentSnapshot.billingCurrency,
         localAmount: session.paymentSnapshot.localAmount,
         usdcAmount: session.paymentSnapshot.usdcAmount,
         feeAmount: session.paymentSnapshot.feeAmount,
         status: session.paymentSnapshot.status,
-        collectionId: session.paymentSnapshot.collectionId,
-        collectionSequenceId: session.paymentSnapshot.collectionSequenceId,
-        reference: session.paymentSnapshot.collectionReference,
-        depositId: session.paymentSnapshot.depositId,
+        reference: session.paymentSnapshot.reference,
         expiresAt: session.paymentSnapshot.expiresAt,
-        bankInfo: session.paymentSnapshot.bankInfo
+        redirectUrl: session.paymentSnapshot.redirectUrl ?? null,
+        bankTransfer: session.paymentSnapshot.bankTransfer
           ? {
-            name: session.paymentSnapshot.bankInfo.name,
-            accountNumber: session.paymentSnapshot.bankInfo.accountNumber,
-            accountName: session.paymentSnapshot.bankInfo.accountName,
+            bankCode: session.paymentSnapshot.bankTransfer.bankCode,
+            bankName: session.paymentSnapshot.bankTransfer.bankName,
+            accountNumber: session.paymentSnapshot.bankTransfer.accountNumber,
+            accountName: session.paymentSnapshot.bankTransfer.accountName,
+            currency: session.paymentSnapshot.bankTransfer.currency,
           }
           : null,
       }
@@ -474,6 +520,109 @@ export async function getCheckoutSession(sessionId: string) {
   return toCheckoutSessionResponse(hydrated);
 }
 
+async function activateCheckoutSubscription(input: {
+  sessionId: string;
+  session: Awaited<ReturnType<typeof ensureCheckoutSession>>;
+  merchant: Awaited<ReturnType<typeof ensureMerchantForCheckout>>;
+  plan: Awaited<ReturnType<typeof ensurePlanForCheckout>>;
+  customer: Awaited<ReturnType<typeof upsertCheckoutCustomer>>;
+  runtimeEnvironment: RuntimeMode;
+}) {
+  const initialQuote = await quoteUsdAmountInBillingCurrency({
+    environment: input.runtimeEnvironment,
+    currency: input.customer.market,
+    usdAmount: input.plan.usdAmount,
+  });
+  const nextChargeAt =
+    input.plan.trialDays > 0 ? addDays(new Date(), input.plan.trialDays) : new Date();
+  const paymentProvider = getDefaultPaymentRailProvider(input.runtimeEnvironment);
+  const paymentProfile =
+    paymentProvider === "partna" ? input.customer.paymentProfile ?? null : null;
+  const partnaBankTransfer = paymentProfile?.bankTransfer ?? null;
+
+  const subscription = await SubscriptionModel.create({
+    merchantId: input.merchant._id,
+    environment: input.runtimeEnvironment,
+    planId: input.plan._id,
+    customerRef: input.customer.customerRef,
+    customerName: input.customer.name,
+    billingCurrency: input.customer.market,
+    localAmount: initialQuote.localAmount,
+    paymentProvider,
+    paymentAccountType: "bank",
+    paymentAccountNumber:
+      paymentProvider === "partna" ? partnaBankTransfer?.accountNumber ?? null : null,
+    paymentNetworkId:
+      paymentProvider === "partna" ? partnaBankTransfer?.bankCode ?? null : null,
+    paymentProfileSnapshot: paymentProfile,
+    status: "pending_activation",
+    pendingStatus: "active",
+    protocolSyncStatus: "pending_activation",
+    nextChargeAt,
+  });
+
+  const activationOperation = await queueSubscriptionProtocolCreate({
+    merchantId: input.merchant._id.toString(),
+    actor: input.customer.email,
+    environment: input.runtimeEnvironment,
+    subscriptionId: subscription._id.toString(),
+    checkoutSessionId: input.session._id.toString(),
+    triggerInitialCharge: true,
+  });
+
+  if (!activationOperation) {
+    await SubscriptionModel.findByIdAndDelete(subscription._id).exec();
+    throw new HttpError(
+      409,
+      "Subscription could not be created on-chain for this checkout."
+    );
+  }
+
+  const persistedSubscription = await SubscriptionModel.findById(subscription._id)
+    .select({ nextChargeAt: 1 })
+    .exec();
+
+  input.customer.subscriptionCount += 1;
+  input.customer.nextRenewalAt =
+    persistedSubscription?.nextChargeAt ?? subscription.nextChargeAt;
+  await input.customer.save();
+
+  const refreshedSession = await ensureCheckoutSession(input.sessionId);
+  refreshedSession.customerDraft = {
+    name: input.customer.name,
+    email: input.customer.email,
+    market: input.customer.market,
+  };
+  refreshedSession.customerId = input.customer._id;
+  refreshedSession.subscriptionId = subscription._id;
+  refreshedSession.submittedAt = refreshedSession.submittedAt ?? new Date();
+  refreshedSession.verificationSnapshot =
+    paymentProvider === "partna"
+      ? {
+        provider: "partna",
+        status: "verified",
+        country: "NG",
+        currency: input.customer.market,
+        instructions: "Permanent bank instructions are ready for this customer.",
+        requiredFields: [],
+      }
+      : null;
+
+  if (!refreshedSession.chargeId) {
+    refreshedSession.status = "scheduled";
+  }
+
+  await refreshedSession.save();
+
+  await queueSubscriptionCreatedNotifications({
+    merchantId: input.merchant._id.toString(),
+    environment: input.runtimeEnvironment,
+    subscriptionId: subscription._id.toString(),
+  }).catch(() => undefined);
+
+  return getCheckoutSession(input.sessionId);
+}
+
 export async function submitCheckoutCustomer(
   sessionId: string,
   input: SubmitCheckoutCustomerInput
@@ -515,9 +664,6 @@ export async function submitCheckoutCustomer(
       name: input.name,
       email: input.email.trim().toLowerCase(),
       market: input.market,
-      paymentAccountType: input.paymentAccountType,
-      paymentAccountNumber: input.paymentAccountNumber ?? null,
-      paymentNetworkId: input.paymentNetworkId ?? null,
     };
     await session.save();
     return getCheckoutSession(sessionId);
@@ -529,82 +675,98 @@ export async function submitCheckoutCustomer(
     runtimeEnvironment,
     input
   );
-  const initialQuote = await quoteUsdAmountInBillingCurrency({
-    environment: runtimeEnvironment,
-    currency: input.market,
-    usdAmount: plan.usdAmount,
-  });
-  const nextChargeAt =
-    plan.trialDays > 0 ? addDays(new Date(), plan.trialDays) : new Date();
-
-  const subscription = await SubscriptionModel.create({
-    merchantId: merchant._id,
-    environment: runtimeEnvironment,
-    planId: plan._id,
-    customerRef: customer.customerRef,
-    customerName: customer.name,
-    billingCurrency: input.market,
-    localAmount: initialQuote.localAmount,
-    paymentAccountType: input.paymentAccountType,
-    paymentAccountNumber: input.paymentAccountNumber ?? null,
-    paymentNetworkId: input.paymentNetworkId ?? null,
-    status: "pending_activation",
-    pendingStatus: "active",
-    protocolSyncStatus: "pending_activation",
-    nextChargeAt,
-  });
-
-  const activationOperation = await queueSubscriptionProtocolCreate({
-    merchantId: merchant._id.toString(),
-    actor: customer.email,
-    environment: runtimeEnvironment,
-    subscriptionId: subscription._id.toString(),
-    checkoutSessionId: session._id.toString(),
-    triggerInitialCharge: true,
-  });
-
-  if (!activationOperation) {
-    await SubscriptionModel.findByIdAndDelete(subscription._id).exec();
-    throw new HttpError(
-      409,
-      "Subscription could not be created on-chain for this checkout."
-    );
-  }
-
-  const persistedSubscription = await SubscriptionModel.findById(subscription._id)
-    .select({ nextChargeAt: 1 })
-    .exec();
-
-  customer.subscriptionCount += 1;
-  customer.nextRenewalAt = persistedSubscription?.nextChargeAt ?? subscription.nextChargeAt;
-  await customer.save();
-
-  const refreshedSession = await ensureCheckoutSession(sessionId);
-  refreshedSession.customerDraft = {
+  session.customerDraft = {
     name: customer.name,
     email: customer.email,
-    market: input.market,
-    paymentAccountType: input.paymentAccountType,
-    paymentAccountNumber: input.paymentAccountNumber ?? null,
-    paymentNetworkId: input.paymentNetworkId ?? null,
+    market: customer.market,
   };
-  refreshedSession.customerId = customer._id;
-  refreshedSession.subscriptionId = subscription._id;
-  refreshedSession.submittedAt = refreshedSession.submittedAt ?? new Date();
+  session.customerId = customer._id;
+  session.submittedAt = session.submittedAt ?? new Date();
 
-  if (!refreshedSession.chargeId) {
-    refreshedSession.status = "scheduled";
+  if (!hasActivePartnaPaymentProfile(customer)) {
+    session.status = "pending_verification";
+    session.verificationSnapshot = buildPartnaVerificationSnapshot(input.market);
+    await session.save();
+    return getCheckoutSession(sessionId);
   }
 
-  await refreshedSession.save();
+  await session.save();
 
-  await queueSubscriptionCreatedNotifications({
-    merchantId: merchant._id.toString(),
+  return activateCheckoutSubscription({
+    sessionId,
+    session,
+    merchant,
+    plan,
+    customer,
+    runtimeEnvironment,
+  });
+}
+
+export async function submitCheckoutVerification(
+  sessionId: string,
+  input: SubmitCheckoutVerificationInput
+) {
+  const session = await ensureCheckoutSession(sessionId);
+
+  if (session.expiresAt.getTime() <= Date.now()) {
+    session.status = "expired";
+    await session.save();
+    throw new HttpError(410, "Checkout session has expired.");
+  }
+
+  if (!session.customerId || !session.customerDraft?.email) {
+    throw new HttpError(409, "Customer details must be submitted before verification.");
+  }
+
+  if (
+    session.status === "settled" ||
+    session.status === "failed" ||
+    session.status === "expired"
+  ) {
+    return getCheckoutSession(sessionId);
+  }
+
+  const runtimeEnvironment = session.environment === "live" ? "live" : "test";
+  const [merchant, plan, customer] = await Promise.all([
+    ensureMerchantForCheckout(session.merchantId.toString(), runtimeEnvironment),
+    ensurePlanForCheckout(
+      session.planId.toString(),
+      session.merchantId.toString(),
+      runtimeEnvironment
+    ),
+    CustomerModel.findById(session.customerId).exec(),
+  ]);
+
+  if (!customer) {
+    throw new HttpError(404, "Checkout customer was not found.");
+  }
+
+  session.verificationSnapshot = {
+    provider: "partna",
+    status: "processing",
+    country: (input.country ?? "NG").toUpperCase(),
+    currency: customer.market,
+    instructions: "Creating permanent bank instructions for this customer.",
+    requiredFields: [],
+  };
+  await session.save();
+
+  await ensurePartnaCustomerPaymentProfile({
+    customerId: customer._id.toString(),
     environment: runtimeEnvironment,
-    subscriptionId: subscription._id.toString(),
-  }).catch(() => undefined);
+    verification: input,
+  });
 
-  return getCheckoutSession(sessionId);
+  const refreshedCustomer = (await CustomerModel.findById(customer._id).exec()) ?? customer;
+
+  return activateCheckoutSubscription({
+    sessionId,
+    session,
+    merchant,
+    plan,
+    customer: refreshedCustomer,
+    runtimeEnvironment,
+  });
 }
 
 export async function quoteCheckoutSessionMarket(sessionId: string, market: string) {
@@ -653,26 +815,49 @@ export async function completeCheckoutTestPayment(sessionId: string) {
     throw new HttpError(409, "Checkout session has no pending payment to complete.");
   }
 
-  await processYellowCardWebhook({
-    sequenceId: session.paymentSnapshot.externalChargeId,
-    state: "complete",
-    status: "complete",
-    payload: {
-      updatedAt: new Date().toISOString(),
-    },
+  if (session.paymentSnapshot.provider !== "partna") {
+    throw new HttpError(
+      409,
+      "Sandbox payment completion is only implemented for Partna checkout sessions."
+    );
+  }
+
+  const accountNumber = session.paymentSnapshot.bankTransfer?.accountNumber;
+
+  if (!accountNumber) {
+    throw new HttpError(409, "Checkout session has no static bank instructions.");
+  }
+
+  const provider = getPartnaProvider("test");
+
+  if (!provider.makeMockPayment) {
+    throw new HttpError(500, "Partna sandbox mock payments are unavailable.");
+  }
+
+  const mockResult = await provider.makeMockPayment({
+    accountNumber,
+    paymentAmount: session.paymentSnapshot.localAmount ?? 0,
+    currency: session.paymentSnapshot.billingCurrency ?? "NGN",
+    reference:
+      session.paymentSnapshot.reference ?? session.paymentSnapshot.externalChargeId,
   });
 
-  session.status = "settled";
-  session.completedAt = session.completedAt ?? new Date();
-  if (session.paymentSnapshot) {
-    session.paymentSnapshot.status = "settled";
-  }
-  await session.save();
+  await processPartnaWebhook(
+    {
+      event: "voucher.updated",
+      data: {
+        id: session.paymentSnapshot.externalChargeId,
+        voucherCode: toNullableString((mockResult as Record<string, unknown>).voucherCode),
+        email: session.customerDraft?.email ?? null,
+        fullName: session.customerDraft?.name ?? null,
+        amount: session.paymentSnapshot.localAmount ?? null,
+        currency: session.paymentSnapshot.billingCurrency ?? null,
+        fee: 0,
+        status: "success",
+      },
+    },
+    "test"
+  );
 
-  const [charge, settlement] = await Promise.all([
-    session.chargeId ? ChargeModel.findById(session.chargeId).exec() : Promise.resolve(null),
-    session.settlementId ? SettlementModel.findById(session.settlementId).exec() : Promise.resolve(null),
-  ]);
-
-  return toCheckoutSessionResponse({ session, charge, settlement });
+  return getCheckoutSession(sessionId);
 }

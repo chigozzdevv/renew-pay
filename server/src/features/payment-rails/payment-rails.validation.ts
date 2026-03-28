@@ -75,6 +75,13 @@ export const yellowCardWebhookSchema = z.object({
   collection: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const partnaWebhookSchema = z.object({
+  environment: optionalEnvironmentInputSchema,
+  event: z.string().trim().min(1).optional(),
+  signature: z.string().trim().min(1).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const collectionParamSchema = z.object({
   collectionId: z.string().trim().min(3).max(140),
 });
@@ -85,4 +92,5 @@ export type SyncPaymentRailInput = z.infer<typeof syncPaymentRailSchema>;
 export type CreateWidgetQuoteInput = z.infer<typeof createWidgetQuoteSchema>;
 export type ResolveBankAccountInput = z.infer<typeof resolveBankAccountSchema>;
 export type YellowCardWebhookInput = z.infer<typeof yellowCardWebhookSchema>;
+export type PartnaWebhookInput = z.infer<typeof partnaWebhookSchema>;
 export type CollectionParamInput = z.infer<typeof collectionParamSchema>;

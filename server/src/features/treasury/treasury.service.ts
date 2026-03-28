@@ -208,6 +208,18 @@ async function syncCheckoutSessionWithChargeResult(input: {
         ? new Types.ObjectId(input.chargeResult.settlementId)
         : null;
     session.paymentSnapshot = {
+      provider:
+        "collection" in input.chargeResult
+          ? toNullableString(
+            (input.chargeResult.collection as Record<string, unknown>).provider
+          )
+          : null,
+      kind:
+        "collection" in input.chargeResult
+          ? toNullableString(
+            (input.chargeResult.collection as Record<string, unknown>).kind
+          )
+          : null,
       externalChargeId:
         "externalChargeId" in input.chargeResult
           ? input.chargeResult.externalChargeId ?? null
@@ -221,28 +233,10 @@ async function syncCheckoutSessionWithChargeResult(input: {
         ("collectionStatus" in input.chargeResult
           ? input.chargeResult.collectionStatus ?? "pending"
           : "pending"),
-      collectionId:
-        "collection" in input.chargeResult
-          ? toNullableString(
-            (input.chargeResult.collection as Record<string, unknown>).id
-          )
-          : null,
-      collectionSequenceId:
-        "collection" in input.chargeResult
-          ? toNullableString(
-            (input.chargeResult.collection as Record<string, unknown>).sequenceId
-          )
-          : null,
-      collectionReference:
+      reference:
         "collection" in input.chargeResult
           ? toNullableString(
             (input.chargeResult.collection as Record<string, unknown>).reference
-          )
-          : null,
-      depositId:
-        "collection" in input.chargeResult
-          ? toNullableString(
-            (input.chargeResult.collection as Record<string, unknown>).depositId
           )
           : null,
       expiresAt:
@@ -252,29 +246,47 @@ async function syncCheckoutSessionWithChargeResult(input: {
             (input.chargeResult.collection as Record<string, unknown>).expiresAt as string
           )
           : null,
-      bankInfo:
+      redirectUrl:
+        "collection" in input.chargeResult
+          ? toNullableString(
+            (input.chargeResult.collection as Record<string, unknown>).redirectUrl
+          )
+          : null,
+      bankTransfer:
         "collection" in input.chargeResult &&
-          typeof (input.chargeResult.collection as Record<string, unknown>).bankInfo ===
+          typeof (input.chargeResult.collection as Record<string, unknown>).bankTransfer ===
           "object" &&
-          (input.chargeResult.collection as Record<string, unknown>).bankInfo !== null
+          (input.chargeResult.collection as Record<string, unknown>).bankTransfer !== null
           ? {
-            name: toNullableString(
-              ((input.chargeResult.collection as Record<string, unknown>).bankInfo as Record<
+            bankCode: toNullableString(
+              ((input.chargeResult.collection as Record<string, unknown>).bankTransfer as Record<
                 string,
                 unknown
-              >).name
+              >).bankCode
+            ),
+            bankName: toNullableString(
+              ((input.chargeResult.collection as Record<string, unknown>).bankTransfer as Record<
+                string,
+                unknown
+              >).bankName
             ),
             accountNumber: toNullableString(
-              ((input.chargeResult.collection as Record<string, unknown>).bankInfo as Record<
+              ((input.chargeResult.collection as Record<string, unknown>).bankTransfer as Record<
                 string,
                 unknown
               >).accountNumber
             ),
             accountName: toNullableString(
-              ((input.chargeResult.collection as Record<string, unknown>).bankInfo as Record<
+              ((input.chargeResult.collection as Record<string, unknown>).bankTransfer as Record<
                 string,
                 unknown
               >).accountName
+            ),
+            currency: toNullableString(
+              ((input.chargeResult.collection as Record<string, unknown>).bankTransfer as Record<
+                string,
+                unknown
+              >).currency
             ),
           }
           : null,

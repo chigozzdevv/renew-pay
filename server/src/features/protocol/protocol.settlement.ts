@@ -21,6 +21,7 @@ import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 type ProtocolChargeExecutionInput =
   | {
       mode: "subscription_charge_success";
+      providerRef?: string | null;
       externalChargeId: string;
       protocolSubscriptionId: string;
       billingPeriodStart: Date | string | number;
@@ -31,6 +32,7 @@ type ProtocolChargeExecutionInput =
     }
   | {
       mode: "invoice_settlement";
+      providerRef?: string | null;
       merchantAddress: string;
       externalChargeId: string;
       commercialRef: string;
@@ -74,7 +76,7 @@ export async function executeProtocolSettlement(
         toFixed6Bn(input.localAmount),
         createFxQuoteArgs({
           externalRef: input.externalChargeId,
-          providerRef: "yellow_card",
+          providerRef: input.providerRef ?? "yellow_card",
           fxRate: input.fxRate,
         }),
         toFixed6Bn(input.usageUnits ?? 0),
@@ -130,7 +132,7 @@ export async function executeProtocolSettlement(
       toFixed6Bn(input.localAmount),
       createFxQuoteArgs({
         externalRef: input.externalChargeId,
-        providerRef: "yellow_card",
+        providerRef: input.providerRef ?? "yellow_card",
         fxRate: input.fxRate,
       }),
       toFixed6Bn(input.amountUsdc)

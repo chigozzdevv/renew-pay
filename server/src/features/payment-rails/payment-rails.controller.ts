@@ -2,6 +2,9 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 
 import {
+  getPartnaConfig,
+} from "@/config/partna.config";
+import {
   acceptCollectionRequest,
   createWidgetQuote,
   enqueuePaymentRailSync,
@@ -15,10 +18,15 @@ import {
   syncNetworks,
 } from "@/features/payment-rails/payment-rails.service";
 import {
+  processPartnaWebhook,
+  verifyPartnaWebhookSignature,
+} from "@/features/payment-rails/partna.service";
+import {
   collectionParamSchema,
   createWidgetQuoteSchema,
   listChannelsQuerySchema,
   listNetworksQuerySchema,
+  partnaWebhookSchema,
   resolveBankAccountSchema,
   syncPaymentRailSchema,
   yellowCardWebhookSchema,
@@ -264,6 +272,46 @@ export const processYellowCardWebhookController = asyncHandler(
     response.status(202).json({
       success: true,
       message: "Yellow Card webhook processed.",
+      data: result,
+    });
+  }
+);
+
+export const processPartnaWebhookController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const input = partnaWebhookSchema.parse({
+      ...request.body,
+      environment: resolveEnvironmentScope(request),
+    });
+
+    const candidateModes: RuntimeMode[] = ["test", "live"];
+    const matchedEnvironment =
+      candidateModes.find((mode) => {
+        const publicKey = getPartnaConfig(mode).webhookPublicKey;
+
+        if (!publicKey || !input.signature || !input.data) {
+          return false;
+        }
+
+        return verifyPartnaWebhookSignature({
+          data: input.data,
+          signature: input.signature,
+          publicKey,
+        });
+      }) ?? null;
+
+    if (!matchedEnvironment) {
+      throw new HttpError(401, "Invalid Partna webhook signature.");
+    }
+
+    const result = await processPartnaWebhook(
+      input,
+      matchedEnvironment
+    );
+
+    response.status(202).json({
+      success: true,
+      message: "Partna webhook processed.",
       data: result,
     });
   }

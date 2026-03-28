@@ -1,4 +1,12 @@
-import { InferSchemaType, Model, Schema, Types, model, models } from "mongoose";
+import {
+  HydratedDocument,
+  InferSchemaType,
+  Model,
+  Schema,
+  Types,
+  model,
+  models,
+} from "mongoose";
 
 const subscriptionSchema = new Schema(
   {
@@ -38,6 +46,11 @@ const subscriptionSchema = new Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+    paymentProvider: {
+      type: String,
+      trim: true,
+      default: "yellow_card",
     },
     paymentAccountType: {
       type: String,
@@ -98,6 +111,10 @@ const subscriptionSchema = new Schema(
       trim: true,
       default: null,
     },
+    paymentProfileSnapshot: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -112,7 +129,8 @@ type SubscriptionEntry = InferSchemaType<typeof subscriptionSchema> & {
 };
 
 export type SubscriptionDocument = SubscriptionEntry;
+export type SubscriptionRecord = HydratedDocument<SubscriptionEntry>;
 
 export const SubscriptionModel =
-  (models.Subscription as Model<SubscriptionDocument> | undefined) ??
-  model<SubscriptionDocument>("Subscription", subscriptionSchema);
+  (models.Subscription as Model<SubscriptionRecord> | undefined) ??
+  model<SubscriptionRecord>("Subscription", subscriptionSchema);

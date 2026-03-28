@@ -8,6 +8,7 @@ import {
   getCollectionRequestController,
   listChannelsController,
   listNetworksController,
+  processPartnaWebhookController,
   processYellowCardWebhookController,
   resolveBankAccountController,
   syncChannelsController,
@@ -21,6 +22,7 @@ import {
 const paymentRailRouter = Router();
 
 paymentRailRouter.post("/webhooks/yellow-card", processYellowCardWebhookController);
+paymentRailRouter.post("/webhooks/partna", processPartnaWebhookController);
 
 paymentRailRouter.use(requirePlatformAuth);
 paymentRailRouter.use(

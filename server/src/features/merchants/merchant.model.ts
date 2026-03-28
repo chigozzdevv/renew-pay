@@ -1,4 +1,12 @@
-import { InferSchemaType, Model, Schema, Types, model, models } from "mongoose";
+import {
+  HydratedDocument,
+  InferSchemaType,
+  Model,
+  Schema,
+  Types,
+  model,
+  models,
+} from "mongoose";
 
 const merchantSchema = new Schema(
   {
@@ -104,7 +112,8 @@ type MerchantEntry = InferSchemaType<typeof merchantSchema> & {
 };
 
 export type MerchantDocument = MerchantEntry;
+export type MerchantRecord = HydratedDocument<MerchantEntry>;
 
 export const MerchantModel =
-  (models.Merchant as Model<MerchantDocument> | undefined) ??
-  model<MerchantDocument>("Merchant", merchantSchema);
+  (models.Merchant as Model<MerchantRecord> | undefined) ??
+  model<MerchantRecord>("Merchant", merchantSchema);

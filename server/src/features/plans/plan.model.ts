@@ -1,4 +1,12 @@
-import { InferSchemaType, Model, Schema, Types, model, models } from "mongoose";
+import {
+  HydratedDocument,
+  InferSchemaType,
+  Model,
+  Schema,
+  Types,
+  model,
+  models,
+} from "mongoose";
 
 const planSchema = new Schema(
   {
@@ -107,7 +115,8 @@ type PlanEntry = InferSchemaType<typeof planSchema> & {
 };
 
 export type PlanDocument = PlanEntry;
+export type PlanRecord = HydratedDocument<PlanEntry>;
 
 export const PlanModel =
-  (models.Plan as Model<PlanDocument> | undefined) ??
-  model<PlanDocument>("Plan", planSchema);
+  (models.Plan as Model<PlanRecord> | undefined) ??
+  model<PlanRecord>("Plan", planSchema);

@@ -11,8 +11,8 @@ Renew lets businesses run recurring and usage-based billing in customers’ loca
 - Sandbox Playground: [Renew Sandbox Playground](https://www.renew.sh/playground)
 - Demo Video: [Renew.sh MVP Demo](https://youtu.be/1cq97cRhWww)
 - SDK: [@renew.sh/sdk on npm](https://www.npmjs.com/package/@renew.sh/sdk)
-- Sandbox API: [sandbox.renew.sh](https://sandbox.renew.sh)
-- Live API: [api.renew.sh](https://api.renew.sh)
+- Sandbox API: [staging-pay.renew.sh](https://staging-pay.renew.sh)
+- Live API: [pay.renew.sh](https://pay.renew.sh)
 - Contract Addresses (Fuji): [RenewProtocol](https://testnet.snowtrace.io/address/0x7D6fF5964D1dd7E1cc4614Ed25292142f24e0b9E) and [RenewVault](https://testnet.snowtrace.io/address/0xD118f9Acd6654Ff11543c39264Aa8Fd73923f58A)
 
 ---

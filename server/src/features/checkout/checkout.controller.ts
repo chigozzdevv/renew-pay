@@ -7,12 +7,14 @@ import {
   getCheckoutSession,
   listCheckoutPlans,
   submitCheckoutCustomer,
+  submitCheckoutVerification,
 } from "@/features/checkout/checkout.service";
 import {
   checkoutMarketQuoteQuerySchema,
   checkoutSessionParamSchema,
   createCheckoutSessionSchema,
   submitCheckoutCustomerSchema,
+  submitCheckoutVerificationSchema,
 } from "@/features/checkout/checkout.validation";
 import { HttpError } from "@/shared/errors/http-error";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
@@ -132,6 +134,24 @@ export const submitCheckoutCustomerController = asyncHandler(
     response.status(200).json({
       success: true,
       message: "Checkout customer submitted.",
+      data: session,
+    });
+  }
+);
+
+export const submitCheckoutVerificationController = asyncHandler(
+  async (request: Request, response: Response) => {
+    if (!request.checkoutSessionAuth) {
+      throw new HttpError(401, "Checkout session context is missing.");
+    }
+
+    const params = checkoutSessionParamSchema.parse(request.params);
+    const input = submitCheckoutVerificationSchema.parse(request.body);
+    const session = await submitCheckoutVerification(params.sessionId, input);
+
+    response.status(200).json({
+      success: true,
+      message: "Checkout verification submitted.",
       data: session,
     });
   }

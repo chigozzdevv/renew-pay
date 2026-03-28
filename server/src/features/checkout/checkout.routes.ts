@@ -9,6 +9,7 @@ import {
   listWorkspaceCheckoutPlansController,
   quoteCheckoutSessionMarketController,
   submitCheckoutCustomerController,
+  submitCheckoutVerificationController,
 } from "@/features/checkout/checkout.controller";
 import { requireCheckoutSessionAuth } from "@/shared/middleware/checkout-session-auth";
 import { requireDeveloperKeyAuth } from "@/shared/middleware/developer-key-auth";
@@ -47,6 +48,11 @@ checkoutRouter.post(
   "/sessions/:sessionId/customer",
   requireCheckoutSessionAuth,
   submitCheckoutCustomerController
+);
+checkoutRouter.post(
+  "/sessions/:sessionId/verification",
+  requireCheckoutSessionAuth,
+  submitCheckoutVerificationController
 );
 checkoutRouter.post(
   "/sessions/:sessionId/test-complete",

@@ -28,6 +28,11 @@ const chargeSchema = new Schema(
       trim: true,
       default: null,
     },
+    paymentProvider: {
+      type: String,
+      trim: true,
+      default: "yellow_card",
+    },
     localAmount: {
       type: Number,
       required: true,
@@ -74,6 +79,10 @@ const chargeSchema = new Schema(
       type: String,
       trim: true,
       default: null,
+    },
+    providerMetadata: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
     processedAt: {
       type: Date,
