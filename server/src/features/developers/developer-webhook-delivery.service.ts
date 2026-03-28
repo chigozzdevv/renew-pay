@@ -215,7 +215,9 @@ async function buildChargeWebhookPayload(input: {
       data: {
         charge: {
           id: charge._id.toString(),
-          subscriptionId: charge.subscriptionId.toString(),
+          sourceKind: charge.sourceKind ?? "subscription",
+          subscriptionId: charge.subscriptionId?.toString() ?? null,
+          invoiceId: charge.invoiceId?.toString() ?? null,
           externalChargeId: charge.externalChargeId,
           settlementSource: charge.settlementSource ?? null,
           localAmount: charge.localAmount,

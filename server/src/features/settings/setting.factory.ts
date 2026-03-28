@@ -29,7 +29,7 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
         statementDescriptor: "RENEW",
         brandAccent: "forest-green",
         logoUrl: null,
-        customerDomain: "pay.renew.sh",
+        customerDomain: "app.renew.sh",
         invoiceFooter: "Thanks for billing with Renew.",
       },
       billing: {

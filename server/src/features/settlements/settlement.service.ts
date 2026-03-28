@@ -6,6 +6,7 @@ import { queueNames } from "@/shared/workers/queue-names";
 
 import { ChargeModel } from "@/features/charges/charge.model";
 import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
+import { InvoiceModel } from "@/features/invoices/invoice.model";
 import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
@@ -134,6 +135,27 @@ async function syncLinkedChargeFromSettlement(settlement: {
   charge.processedAt = new Date();
   await charge.save();
 
+  if (charge.invoiceId) {
+    const invoice = await InvoiceModel.findById(charge.invoiceId).exec();
+
+    if (invoice) {
+      if (nextStatus === "settled") {
+        invoice.status = "paid";
+        invoice.paidAt = invoice.paidAt ?? charge.processedAt ?? new Date();
+      } else if (nextStatus === "awaiting_settlement" || nextStatus === "confirming") {
+        invoice.status = "processing";
+      } else if (nextStatus === "failed" || nextStatus === "reversed") {
+        invoice.status = invoice.dueDate.getTime() < Date.now() ? "overdue" : "issued";
+      }
+
+      if (invoice.paymentSnapshot) {
+        invoice.paymentSnapshot.status = charge.status;
+      }
+
+      await invoice.save();
+    }
+  }
+
   await emitChargeWebhookEventForStatusChange({
     previousStatus,
     chargeId: charge._id.toString(),
@@ -202,7 +224,7 @@ export async function createSettlement(input: CreateSettlementInput) {
     environment: input.environment,
     sourceChargeId: input.sourceChargeId ?? null,
     batchRef: input.batchRef,
-    sourceKind: input.sourceChargeId ? "subscription" : (input.sourceKind ?? "invoice"),
+    sourceKind: input.sourceKind ?? (input.sourceChargeId ? "subscription" : "invoice"),
     commercialRef: input.commercialRef ?? null,
     localAmount: input.localAmount ?? null,
     fxRate: input.fxRate ?? null,
@@ -515,7 +537,9 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     merchantId: settlement.merchantId.toString(),
   });
 
-  if (!sourceCharge) {
+  if (!sourceCharge || settlement.sourceKind === "invoice") {
+    const externalChargeId = sourceCharge?.externalChargeId ?? settlement.batchRef;
+
     if (settlement.sourceKind !== "invoice") {
       throw new HttpError(
         409,
@@ -540,9 +564,9 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     const bridgeResult = await executeProtocolSettlement({
       environment: toStoredRuntimeMode(settlement.environment),
       mode: "invoice_settlement",
-      providerRef: "partna",
+      providerRef: sourceCharge?.paymentProvider ?? "partna",
       merchantAddress: protocolMerchantAddress,
-      externalChargeId: settlement.batchRef,
+      externalChargeId,
       commercialRef: settlement.commercialRef,
       localAmount,
       fxRate,
@@ -559,6 +583,14 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     settlement.bridgeAttestedAt = bridgeResult.attestedAt;
     settlement.submittedAt = settlement.submittedAt ?? new Date();
     await settlement.save();
+
+    if (sourceCharge) {
+      sourceCharge.protocolChargeId = bridgeResult.protocolChargeId ?? null;
+      sourceCharge.protocolTxHash = bridgeResult.creditTxHash;
+      sourceCharge.protocolSyncStatus = "executed";
+      await sourceCharge.save();
+      await syncLinkedChargeFromSettlement(settlement);
+    }
 
     console.log(
       `[settlement-bridge] run-complete ${JSON.stringify({

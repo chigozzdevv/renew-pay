@@ -67,7 +67,7 @@ const businessSettingsSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "pay.renew.sh",
+      default: "app.renew.sh",
     },
     invoiceFooter: {
       type: String,

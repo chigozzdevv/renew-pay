@@ -1,6 +1,9 @@
 type NotificationAudience = "customer" | "merchant" | "team";
 
 export const notificationTemplateKeys = [
+  "customer.invoice.issued",
+  "customer.invoice.reminder",
+  "customer.invoice.paid",
   "customer.subscription.created",
   "customer.subscription.renewal_reminder",
   "customer.payment.receipt",
@@ -8,6 +11,7 @@ export const notificationTemplateKeys = [
   "customer.payment.failed",
   "customer.subscription.past_due",
   "customer.subscription.cancelled",
+  "merchant.invoice.paid",
   "merchant.subscription.created",
   "merchant.billing.payment_digest",
   "merchant.billing.payment_failed",
@@ -40,6 +44,21 @@ export const notificationTemplateCatalog: Record<
     audience: NotificationAudience;
   }
 > = {
+  "customer.invoice.issued": {
+    label: "Customer invoice issued",
+    description: "Sent when a one-time invoice is issued and ready for payment.",
+    audience: "customer",
+  },
+  "customer.invoice.reminder": {
+    label: "Customer invoice reminder",
+    description: "Sent when an outstanding invoice needs follow-up.",
+    audience: "customer",
+  },
+  "customer.invoice.paid": {
+    label: "Customer invoice paid",
+    description: "Sent after a one-time invoice payment succeeds.",
+    audience: "customer",
+  },
   "customer.subscription.created": {
     label: "Customer subscription confirmed",
     description: "Sent after a customer starts a subscription or trial.",
@@ -74,6 +93,11 @@ export const notificationTemplateCatalog: Record<
     label: "Customer subscription cancelled",
     description: "Sent when a subscription is cancelled.",
     audience: "customer",
+  },
+  "merchant.invoice.paid": {
+    label: "Merchant invoice paid alert",
+    description: "Sent internally when an invoice is paid successfully.",
+    audience: "merchant",
   },
   "merchant.subscription.created": {
     label: "Merchant new subscription alert",
@@ -263,6 +287,8 @@ function buildTemplateDocument(input: {
   const { branding, payload } = input;
   const merchantName = branding.merchantName;
   const planName = normalizeValue(payload.planName, "Growth plan");
+  const invoiceTitle = normalizeValue(payload.invoiceTitle, "Implementation milestone");
+  const invoiceNumber = normalizeValue(payload.invoiceNumber, "RNL-20260328-A1B2C3");
   const amount = normalizeValue(payload.amount, "NGN 120,000");
   const customerName = normalizeValue(payload.customerName, "Amina Yusuf");
   const operationLabel = normalizeValue(payload.operationLabel, "Treasury payout");
@@ -271,6 +297,7 @@ function buildTemplateDocument(input: {
     normalizeOptionalValue(payload.supportUrl) ??
     buildMailto(branding.supportEmail, `${merchantName} support`);
   const portalUrl = normalizeOptionalValue(payload.portalUrl) ?? supportUrl;
+  const invoiceUrl = normalizeOptionalValue(payload.invoiceUrl) ?? portalUrl;
   const dashboardUrl = normalizeOptionalValue(payload.dashboardUrl) ?? supportUrl;
   const inviteUrl = normalizeOptionalValue(payload.inviteUrl) ?? dashboardUrl;
   const retryAt = toDateLabel(payload.retryAt, "the next retry window");
@@ -296,6 +323,103 @@ function buildTemplateDocument(input: {
   ];
 
   switch (input.templateKey) {
+    case "customer.invoice.issued":
+      return {
+        subject: `Invoice ${invoiceNumber} from ${merchantName}`,
+        eyebrow: "Invoice issued",
+        heading: `Your invoice from ${merchantName} is ready.`,
+        body: [
+          `${invoiceTitle} has been issued for ${amount}.`,
+          `Please complete payment by ${dueDate} using the secure Renew invoice page.`,
+        ],
+        cta: {
+          label: "View invoice",
+          url: invoiceUrl,
+        },
+        secondaryCta: {
+          label: "Contact support",
+          url: supportUrl,
+        },
+        summary: [
+          {
+            label: "Invoice",
+            value: invoiceNumber,
+          },
+          {
+            label: "Due date",
+            value: dueDate,
+          },
+          {
+            label: "Amount",
+            value: amount,
+          },
+        ],
+        footerNote: `Questions about this invoice? Contact ${branding.supportEmail}.`,
+      } satisfies NotificationTemplateDocument;
+    case "customer.invoice.reminder":
+      return {
+        subject: `Reminder: invoice ${invoiceNumber} is due`,
+        eyebrow: "Invoice reminder",
+        heading: `Invoice ${invoiceNumber} is still outstanding.`,
+        body: [
+          `${invoiceTitle} is still awaiting payment.`,
+          `Please complete the payment by ${dueDate} or contact support if you need help.`,
+        ],
+        cta: {
+          label: "Open invoice",
+          url: invoiceUrl,
+        },
+        secondaryCta: {
+          label: "Contact support",
+          url: supportUrl,
+        },
+        summary: [
+          {
+            label: "Invoice",
+            value: invoiceNumber,
+          },
+          {
+            label: "Due date",
+            value: dueDate,
+          },
+          {
+            label: "Amount",
+            value: amount,
+          },
+        ],
+      } satisfies NotificationTemplateDocument;
+    case "customer.invoice.paid":
+      return {
+        subject: `Payment received for invoice ${invoiceNumber}`,
+        eyebrow: "Invoice paid",
+        heading: `We received your invoice payment.`,
+        body: [
+          `${amount} was received for ${invoiceTitle} on ${paidAt}.`,
+          "Thanks for completing this payment through Renew.",
+        ],
+        cta: {
+          label: "Open invoice",
+          url: invoiceUrl,
+        },
+        secondaryCta: {
+          label: "Contact support",
+          url: supportUrl,
+        },
+        summary: [
+          {
+            label: "Invoice",
+            value: invoiceNumber,
+          },
+          {
+            label: "Paid",
+            value: paidAt,
+          },
+          {
+            label: "Amount",
+            value: amount,
+          },
+        ],
+      } satisfies NotificationTemplateDocument;
     case "customer.subscription.created":
       return {
         subject: `Your ${merchantName} subscription is active`,
@@ -510,6 +634,35 @@ function buildTemplateDocument(input: {
           {
             label: "Cancelled",
             value: paidAt,
+          },
+        ],
+      } satisfies NotificationTemplateDocument;
+    case "merchant.invoice.paid":
+      return {
+        subject: `Invoice paid: ${invoiceNumber}`,
+        eyebrow: "Billing alert",
+        heading: `${customerName} paid an invoice.`,
+        body: [
+          `${amount} was received for ${invoiceTitle} on ${paidAt}.`,
+          "Renew has moved the invoice through collection and settlement tracking.",
+        ],
+        cta: {
+          label: "Open invoices",
+          url: dashboardUrl,
+        },
+        summary: [
+          ...summaryCommon,
+          {
+            label: "Invoice",
+            value: invoiceNumber,
+          },
+          {
+            label: "Customer",
+            value: customerName,
+          },
+          {
+            label: "Amount",
+            value: amount,
           },
         ],
       } satisfies NotificationTemplateDocument;
@@ -1096,19 +1249,43 @@ export function buildNotificationTemplatePreviewPayload(
   templateKey: NotificationTemplateKey
 ): NotificationTemplatePayload {
   switch (templateKey) {
+    case "customer.invoice.issued":
+      return {
+        invoiceTitle: "Implementation milestone",
+        invoiceNumber: "RNL-20260328-A1B2C3",
+        amount: "NGN 120,000",
+        dueDate: "2026-04-25T09:00:00.000Z",
+        invoiceUrl: "https://app.renew.sh/invoices/inv_demo_123",
+      };
+    case "customer.invoice.reminder":
+      return {
+        invoiceTitle: "Implementation milestone",
+        invoiceNumber: "RNL-20260328-A1B2C3",
+        amount: "NGN 120,000",
+        dueDate: "2026-04-25T09:00:00.000Z",
+        invoiceUrl: "https://app.renew.sh/invoices/inv_demo_123",
+      };
+    case "customer.invoice.paid":
+      return {
+        invoiceTitle: "Implementation milestone",
+        invoiceNumber: "RNL-20260328-A1B2C3",
+        amount: "NGN 120,000",
+        paidAt: "2026-03-25T11:20:00.000Z",
+        invoiceUrl: "https://app.renew.sh/invoices/inv_demo_123",
+      };
     case "customer.subscription.created":
       return {
         planName: "Growth",
         amount: "NGN 120,000",
         nextChargeAt: "2026-04-25T09:00:00.000Z",
-        portalUrl: "https://pay.renew.sh",
+        portalUrl: "https://app.renew.sh",
       };
     case "customer.subscription.renewal_reminder":
       return {
         planName: "Growth",
         amount: "NGN 120,000",
         nextChargeAt: "2026-04-25T09:00:00.000Z",
-        portalUrl: "https://pay.renew.sh",
+        portalUrl: "https://app.renew.sh",
       };
     case "customer.payment.receipt":
       return {
@@ -1117,39 +1294,48 @@ export function buildNotificationTemplatePreviewPayload(
         nextChargeAt: "2026-05-25T09:00:00.000Z",
         paidAt: "2026-03-25T11:20:00.000Z",
         receiptRef: "RCT-20381",
-        portalUrl: "https://pay.renew.sh",
+        portalUrl: "https://app.renew.sh",
       };
     case "customer.payment.due":
       return {
         planName: "Growth",
         amount: "NGN 120,000",
         dueDate: "2026-04-25T09:00:00.000Z",
-        portalUrl: "https://pay.renew.sh",
+        portalUrl: "https://app.renew.sh",
       };
     case "customer.payment.failed":
       return {
         planName: "Growth",
         amount: "NGN 120,000",
         retryAt: "2026-03-27T09:00:00.000Z",
-        portalUrl: "https://pay.renew.sh",
+        portalUrl: "https://app.renew.sh",
       };
     case "customer.subscription.past_due":
       return {
         planName: "Growth",
         amount: "NGN 120,000",
-        portalUrl: "https://pay.renew.sh",
+        portalUrl: "https://app.renew.sh",
       };
     case "customer.subscription.cancelled":
       return {
         planName: "Growth",
         paidAt: "2026-03-25T11:20:00.000Z",
       };
+    case "merchant.invoice.paid":
+      return {
+        invoiceTitle: "Implementation milestone",
+        invoiceNumber: "RNL-20260328-A1B2C3",
+        customerName: "Amina Yusuf",
+        amount: "NGN 120,000",
+        paidAt: "2026-03-25T11:20:00.000Z",
+        dashboardUrl: "https://app.renew.sh/dashboard/invoices",
+      };
     case "merchant.subscription.created":
       return {
         customerName: "Amina Yusuf",
         planName: "Growth",
         amount: "NGN 120,000",
-        dashboardUrl: "http://localhost:3000/dashboard/subscriptions",
+        dashboardUrl: "https://app.renew.sh/dashboard/subscriptions",
       };
     case "merchant.billing.payment_digest":
       return {
@@ -1158,7 +1344,7 @@ export function buildNotificationTemplatePreviewPayload(
         failedPayments: "2",
         netCollected: "USDC 8,421.22",
         digestMode: "detailed",
-        dashboardUrl: "http://localhost:3000/dashboard/payments",
+        dashboardUrl: "https://app.renew.sh/dashboard/payments",
       };
     case "merchant.billing.payment_failed":
       return {
@@ -1166,45 +1352,45 @@ export function buildNotificationTemplatePreviewPayload(
         planName: "Growth",
         amount: "NGN 120,000",
         retryAt: "2026-03-27T09:00:00.000Z",
-        dashboardUrl: "http://localhost:3000/dashboard/payments",
+        dashboardUrl: "https://app.renew.sh/dashboard/payments",
       };
     case "merchant.treasury.approval_needed":
       return {
         operationLabel: "Payout wallet change",
         approvedCount: "1",
         threshold: "2",
-        dashboardUrl: "http://localhost:3000/dashboard/governance",
+        dashboardUrl: "https://app.renew.sh/dashboard/governance",
       };
     case "merchant.treasury.operation_approved":
       return {
         operationLabel: "Payout wallet change",
         threshold: "2",
-        dashboardUrl: "http://localhost:3000/dashboard/governance",
+        dashboardUrl: "https://app.renew.sh/dashboard/governance",
       };
     case "merchant.treasury.operation_rejected":
       return {
         operationLabel: "Settlement sweep",
         reason: "Incorrect destination wallet selected.",
-        dashboardUrl: "http://localhost:3000/dashboard/governance",
+        dashboardUrl: "https://app.renew.sh/dashboard/governance",
       };
     case "merchant.treasury.operation_executed":
       return {
         operationLabel: "Settlement sweep",
         txHash: "5Yg8...eM7t",
-        dashboardUrl: "http://localhost:3000/dashboard/governance",
+        dashboardUrl: "https://app.renew.sh/dashboard/governance",
       };
     case "merchant.treasury.payout_batch_opened":
       return {
         batchId: "PB-24A7F1",
         netUsdc: "USDC 6,280.41",
         settlementCount: "12",
-        dashboardUrl: "http://localhost:3000/dashboard/treasury",
+        dashboardUrl: "https://app.renew.sh/dashboard/treasury",
       };
     case "merchant.treasury.payout_completed":
       return {
         batchId: "PB-24A7F1",
         txHash: "5Yg8...eM7t",
-        dashboardUrl: "http://localhost:3000/dashboard/treasury",
+        dashboardUrl: "https://app.renew.sh/dashboard/treasury",
       };
     case "merchant.verification.owner_needs_action":
     case "merchant.verification.owner_approved":
@@ -1214,19 +1400,19 @@ export function buildNotificationTemplatePreviewPayload(
     case "merchant.verification.merchant_rejected":
       return {
         statusLabel: "rejected",
-        dashboardUrl: "http://localhost:3000/dashboard",
+        dashboardUrl: "https://app.renew.sh/dashboard",
       };
     case "merchant.governance.enabled":
     case "merchant.governance.disabled":
       return {
-        dashboardUrl: "http://localhost:3000/dashboard/governance",
+        dashboardUrl: "https://app.renew.sh/dashboard/governance",
       };
     case "team.invite.sent":
     case "team.invite.resent":
       return {
         recipientName: "Ifeoma Okafor",
         role: "finance",
-        inviteUrl: "http://localhost:3000/login",
+        inviteUrl: "https://app.renew.sh/login",
       };
   }
 

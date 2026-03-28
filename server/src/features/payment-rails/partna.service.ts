@@ -12,6 +12,7 @@ import type {
 } from "@/features/payment-rails/providers/partna/partna.types";
 import { ChargeModel } from "@/features/charges/charge.model";
 import { CustomerModel } from "@/features/customers/customer.model";
+import { InvoiceModel } from "@/features/invoices/invoice.model";
 import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
 import { queueSettlementBridge } from "@/features/settlements/settlement.service";
@@ -114,11 +115,15 @@ export function hasActivePartnaPaymentProfile(customer: {
       currency?: string | null;
     } | null;
   } | null;
-}) {
+} | null, currency?: string | null) {
   return (
-    customer.paymentProfile?.provider === "partna" &&
-    customer.paymentProfile?.status === "active" &&
-    Boolean(customer.paymentProfile?.bankTransfer?.accountNumber)
+    Boolean(customer) &&
+    customer?.paymentProfile?.provider === "partna" &&
+    customer?.paymentProfile?.status === "active" &&
+    Boolean(customer?.paymentProfile?.bankTransfer?.accountNumber) &&
+    (!currency ||
+      !customer?.paymentProfile?.bankTransfer?.currency ||
+      customer.paymentProfile.bankTransfer.currency === currency)
   );
 }
 
@@ -146,7 +151,7 @@ export async function ensurePartnaCustomerPaymentProfile(input: {
     throw new HttpError(404, "Customer was not found.");
   }
 
-  if (hasActivePartnaPaymentProfile(customer)) {
+  if (hasActivePartnaPaymentProfile(customer, customer.market)) {
     return customer.paymentProfile;
   }
 
@@ -294,7 +299,7 @@ export function verifyPartnaWebhookSignature(input: {
     return false;
   }
 
-  const verifier = createVerify("RSA-SHA512");
+  const verifier = createVerify("sha256");
   verifier.update(JSON.stringify(input.data));
   verifier.end();
 
@@ -433,6 +438,24 @@ export async function processPartnaWebhook(
     };
     await charge.save();
 
+    if (
+      previousChargeStatus !== "settled" &&
+      previousChargeStatus !== "awaiting_settlement"
+    ) {
+      if (charge.sourceKind === "invoice" && charge.invoiceId) {
+        const invoice = await InvoiceModel.findById(charge.invoiceId)
+          .select({ customerId: 1 })
+          .lean()
+          .exec();
+
+        if (invoice?.customerId) {
+          await CustomerModel.findByIdAndUpdate(invoice.customerId, {
+            $inc: { monthlyVolumeUsdc: charge.usdcAmount },
+          }).exec();
+        }
+      }
+    }
+
     if (linkedSettlement) {
       await queueSettlementBridge(linkedSettlement._id.toString(), {
         merchantId: linkedSettlement.merchantId.toString(),
@@ -463,6 +486,32 @@ export async function processPartnaWebhook(
       voucherCode,
     };
     await charge.save();
+  }
+
+  if (charge.invoiceId) {
+    const invoice = await InvoiceModel.findById(charge.invoiceId).exec();
+
+    if (invoice) {
+      invoice.paymentSnapshot = invoice.paymentSnapshot
+        ? {
+            ...invoice.paymentSnapshot,
+            status: charge.status,
+          }
+        : { status: charge.status };
+
+      if (charge.status === "pending") {
+        invoice.status = "pending_payment";
+      } else if (charge.status === "awaiting_settlement") {
+        invoice.status = "processing";
+      } else if (charge.status === "settled") {
+        invoice.status = "paid";
+        invoice.paidAt = invoice.paidAt ?? charge.processedAt ?? new Date();
+      } else if (charge.status === "failed" || charge.status === "reversed") {
+        invoice.status = invoice.dueDate.getTime() < Date.now() ? "overdue" : "issued";
+      }
+
+      await invoice.save();
+    }
   }
 
   await emitChargeWebhookEventForStatusChange({

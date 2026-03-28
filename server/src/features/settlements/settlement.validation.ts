@@ -53,39 +53,39 @@ export const createSettlementSchema = z.object({
   reversedAt: z.coerce.date().nullable().optional(),
   reversalReason: z.string().trim().min(2).max(240).nullable().optional(),
 }).superRefine((input, ctx) => {
-  if (input.sourceChargeId) {
+  if (input.sourceKind === "invoice") {
+    if (!input.commercialRef) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["commercialRef"],
+        message: "Invoice settlements require a commercial reference.",
+      });
+    }
+
+    if (!Number.isFinite(input.localAmount ?? NaN) || (input.localAmount ?? 0) <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["localAmount"],
+        message: "Invoice settlements require a valid local amount.",
+      });
+    }
+
+    if (!Number.isFinite(input.fxRate ?? NaN) || (input.fxRate ?? 0) <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fxRate"],
+        message: "Invoice settlements require a valid FX rate.",
+      });
+    }
+
     return;
   }
 
-  if (input.sourceKind !== "invoice") {
+  if (!input.sourceChargeId) {
     ctx.addIssue({
       code: "custom",
-      path: ["sourceKind"],
-      message: "Invoice settlements must declare sourceKind as invoice.",
-    });
-  }
-
-  if (!input.commercialRef) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["commercialRef"],
-      message: "Invoice settlements require a commercial reference.",
-    });
-  }
-
-  if (!Number.isFinite(input.localAmount ?? NaN) || (input.localAmount ?? 0) <= 0) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["localAmount"],
-      message: "Invoice settlements require a valid local amount.",
-    });
-  }
-
-  if (!Number.isFinite(input.fxRate ?? NaN) || (input.fxRate ?? 0) <= 0) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["fxRate"],
-      message: "Invoice settlements require a valid FX rate.",
+      path: ["sourceChargeId"],
+      message: "Subscription settlements require a source charge.",
     });
   }
 });

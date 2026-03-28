@@ -683,7 +683,7 @@ export async function submitCheckoutCustomer(
   session.customerId = customer._id;
   session.submittedAt = session.submittedAt ?? new Date();
 
-  if (!hasActivePartnaPaymentProfile(customer)) {
+  if (!hasActivePartnaPaymentProfile(customer, input.market)) {
     session.status = "pending_verification";
     session.verificationSnapshot = buildPartnaVerificationSnapshot(input.market);
     await session.save();

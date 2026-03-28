@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "@/config/env.config";
 import { ChargeModel } from "@/features/charges/charge.model";
 import { CustomerModel } from "@/features/customers/customer.model";
+import { InvoiceModel } from "@/features/invoices/invoice.model";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { NotificationModel } from "@/features/notifications/notification.model";
 import {
@@ -432,6 +433,7 @@ async function resolveMerchantRecipients(input: {
       case "billing":
         return (
           ["owner", "admin", "finance", "operations"].includes(member.role) ||
+          permissions.has("invoices") ||
           permissions.has("payments") ||
           permissions.has("subscriptions") ||
           permissions.has("team_admin")
@@ -778,6 +780,201 @@ export async function queueTeamInviteNotification(input: {
   return notification;
 }
 
+export async function queueInvoiceIssuedNotification(input: {
+  invoiceId: string;
+  environment: RuntimeMode;
+}) {
+  const invoice = await InvoiceModel.findById(input.invoiceId).exec();
+
+  if (!invoice) {
+    return null;
+  }
+
+  const setting = await getOrCreateMerchantSetting(invoice.merchantId.toString());
+
+  if (!setting.notifications.customerPaymentFollowUps) {
+    return null;
+  }
+
+  const invoiceUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
+
+  const notification = await createNotificationRecord({
+    merchantId: invoice.merchantId.toString(),
+    environment: input.environment,
+    templateKey: "customer.invoice.issued",
+    audience: "customer",
+    category: "billing",
+    recipient: {
+      email: invoice.customerEmail,
+      name: invoice.customerName,
+    },
+    payload: {
+      customerName: invoice.customerName,
+      invoiceTitle: invoice.title,
+      invoiceNumber: invoice.invoiceNumber,
+      amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
+      dueDate: invoice.dueDate,
+      invoiceUrl: `${invoiceUrl}/invoices/${invoice.publicToken}`,
+    },
+    metadata: {
+      invoiceId: invoice._id.toString(),
+      invoiceNumber: invoice.invoiceNumber,
+    },
+    idempotencyKey: createNotificationIdempotencyKey([
+      "customer-invoice-issued",
+      invoice._id.toString(),
+      invoice.customerEmail,
+      invoice.sentAt?.toISOString() ?? String(Date.now()),
+    ]),
+  });
+
+  if (!notification) {
+    return null;
+  }
+
+  await queueNotificationRecord(notification._id.toString());
+  return notification;
+}
+
+export async function queueInvoiceReminderNotification(input: {
+  invoiceId: string;
+  environment: RuntimeMode;
+}) {
+  const invoice = await InvoiceModel.findById(input.invoiceId).exec();
+
+  if (!invoice) {
+    return null;
+  }
+
+  const setting = await getOrCreateMerchantSetting(invoice.merchantId.toString());
+
+  if (!setting.notifications.customerPaymentFollowUps) {
+    return null;
+  }
+
+  const baseUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
+  const notification = await createNotificationRecord({
+    merchantId: invoice.merchantId.toString(),
+    environment: input.environment,
+    templateKey: "customer.invoice.reminder",
+    audience: "customer",
+    category: "billing",
+    recipient: {
+      email: invoice.customerEmail,
+      name: invoice.customerName,
+    },
+    payload: {
+      customerName: invoice.customerName,
+      invoiceTitle: invoice.title,
+      invoiceNumber: invoice.invoiceNumber,
+      amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
+      dueDate: invoice.dueDate,
+      invoiceUrl: `${baseUrl}/invoices/${invoice.publicToken}`,
+    },
+    metadata: {
+      invoiceId: invoice._id.toString(),
+      invoiceNumber: invoice.invoiceNumber,
+    },
+    idempotencyKey: createNotificationIdempotencyKey([
+      "customer-invoice-reminder",
+      invoice._id.toString(),
+      invoice.customerEmail,
+      invoice.lastRemindedAt?.toISOString() ?? String(Date.now()),
+    ]),
+  });
+
+  await queueNotificationRecord(notification._id.toString());
+  return notification;
+}
+
+export async function queueInvoicePaidNotifications(input: {
+  invoiceId: string;
+  environment: RuntimeMode;
+}) {
+  const invoice = await InvoiceModel.findById(input.invoiceId).exec();
+
+  if (!invoice) {
+    return [];
+  }
+
+  const [setting, recipients] = await Promise.all([
+    getOrCreateMerchantSetting(invoice.merchantId.toString()),
+    resolveMerchantRecipients({
+      merchantId: invoice.merchantId.toString(),
+      group: "billing",
+    }),
+  ]);
+  const notifications = [];
+  const baseUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
+
+  if (setting.notifications.customerReceiptEmails) {
+    const customerNotification = await createNotificationRecord({
+      merchantId: invoice.merchantId.toString(),
+      environment: input.environment,
+      templateKey: "customer.invoice.paid",
+      audience: "customer",
+      category: "billing",
+      recipient: {
+        email: invoice.customerEmail,
+        name: invoice.customerName,
+      },
+      payload: {
+        customerName: invoice.customerName,
+        invoiceTitle: invoice.title,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
+        paidAt: invoice.paidAt ?? new Date(),
+        invoiceUrl: `${baseUrl}/invoices/${invoice.publicToken}`,
+      },
+      metadata: {
+        invoiceId: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber,
+      },
+      idempotencyKey: createNotificationIdempotencyKey([
+        "customer-invoice-paid",
+        invoice._id.toString(),
+        invoice.customerEmail,
+      ]),
+    });
+    await queueNotificationRecord(customerNotification._id.toString());
+    notifications.push(customerNotification);
+  }
+
+  if (setting.notifications.merchantSubscriptionAlerts) {
+    for (const recipient of recipients) {
+      const merchantNotification = await createNotificationRecord({
+        merchantId: invoice.merchantId.toString(),
+        environment: input.environment,
+        templateKey: "merchant.invoice.paid",
+        audience: "merchant",
+        category: "billing",
+        recipient,
+        payload: {
+          customerName: invoice.customerName,
+          invoiceTitle: invoice.title,
+          invoiceNumber: invoice.invoiceNumber,
+          amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
+          paidAt: invoice.paidAt ?? new Date(),
+          dashboardUrl: getDashboardUrl("/dashboard/invoices"),
+        },
+        metadata: {
+          invoiceId: invoice._id.toString(),
+          invoiceNumber: invoice.invoiceNumber,
+        },
+        idempotencyKey: createNotificationIdempotencyKey([
+          "merchant-invoice-paid",
+          invoice._id.toString(),
+          recipient.email,
+        ]),
+      });
+      await queueNotificationRecord(merchantNotification._id.toString());
+      notifications.push(merchantNotification);
+    }
+  }
+
+  return notifications;
+}
+
 export async function queueSubscriptionCreatedNotifications(input: {
   merchantId: string;
   environment: RuntimeMode;
@@ -890,6 +1087,44 @@ export async function queueChargeStatusNotifications(input: {
   const charge = await ChargeModel.findById(input.chargeId).exec();
 
   if (!charge) {
+    return [];
+  }
+
+  if (charge.sourceKind === "invoice" && charge.invoiceId) {
+    const invoice = await InvoiceModel.findById(charge.invoiceId).exec();
+
+    if (!invoice) {
+      return [];
+    }
+
+    if (invoice.paymentSnapshot) {
+      invoice.paymentSnapshot.status = charge.status;
+    }
+
+    if (input.nextStatus === "pending") {
+      invoice.status = "pending_payment";
+    } else if (
+      input.nextStatus === "awaiting_settlement" ||
+      input.nextStatus === "confirming"
+    ) {
+      invoice.status = "processing";
+    } else if (input.nextStatus === "settled") {
+      invoice.status = "paid";
+      invoice.paidAt = invoice.paidAt ?? charge.processedAt ?? new Date();
+      await invoice.save();
+
+      return queueInvoicePaidNotifications({
+        invoiceId: invoice._id.toString(),
+        environment: toEnvironment(charge.environment),
+      });
+    } else if (
+      input.nextStatus === "failed" ||
+      input.nextStatus === "reversed"
+    ) {
+      invoice.status = invoice.dueDate.getTime() < Date.now() ? "overdue" : "issued";
+    }
+
+    await invoice.save();
     return [];
   }
 

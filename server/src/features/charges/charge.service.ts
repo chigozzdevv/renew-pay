@@ -4,6 +4,7 @@ import { queueNames } from "@/shared/workers/queue-names";
 
 import { ChargeModel } from "@/features/charges/charge.model";
 import { CustomerModel } from "@/features/customers/customer.model";
+import { InvoiceModel } from "@/features/invoices/invoice.model";
 import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import type { MerchantRecord } from "@/features/merchants/merchant.model";
@@ -45,7 +46,9 @@ import { normalizeSolanaAddress } from "@/shared/constants/solana";
 function toChargeResponse(document: {
   _id: { toString(): string };
   merchantId: { toString(): string };
-  subscriptionId: { toString(): string };
+  sourceKind?: string | null;
+  subscriptionId?: { toString(): string } | null;
+  invoiceId?: { toString(): string } | null;
   externalChargeId: string;
   settlementSource?: string | null;
   localAmount: number;
@@ -60,12 +63,19 @@ function toChargeResponse(document: {
   processedAt: Date;
   createdAt: Date;
   updatedAt: Date;
-}, subscriptionCustomerName?: string | null) {
+}, context?: {
+  customerName?: string | null;
+  invoiceNumber?: string | null;
+}) {
   return {
     id: document._id.toString(),
     merchantId: document.merchantId.toString(),
-    subscriptionId: document.subscriptionId.toString(),
-    subscriptionCustomerName: subscriptionCustomerName ?? null,
+    sourceKind:
+      document.sourceKind === "invoice" ? "invoice" : "subscription",
+    subscriptionId: document.subscriptionId?.toString() ?? null,
+    invoiceId: document.invoiceId?.toString() ?? null,
+    customerName: context?.customerName ?? null,
+    invoiceNumber: context?.invoiceNumber ?? null,
     externalChargeId: document.externalChargeId,
     settlementSource: document.settlementSource ?? null,
     localAmount: document.localAmount,
@@ -85,25 +95,62 @@ function toChargeResponse(document: {
   };
 }
 
-async function mapChargesWithSubscriptionNames(
+async function mapChargesWithContext(
   charges: Array<Parameters<typeof toChargeResponse>[0]>
 ) {
-  const subscriptionIds = [...new Set(charges.map((charge) => charge.subscriptionId.toString()))];
-  const subscriptions = await SubscriptionModel.find({
-    _id: { $in: subscriptionIds },
-  })
-    .select({ _id: 1, customerName: 1 })
-    .lean()
-    .exec();
+  const subscriptionIds = [
+    ...new Set(
+      charges.flatMap((charge) =>
+        charge.subscriptionId ? [charge.subscriptionId.toString()] : []
+      )
+    ),
+  ];
+  const invoiceIds = [
+    ...new Set(
+      charges.flatMap((charge) => (charge.invoiceId ? [charge.invoiceId.toString()] : []))
+    ),
+  ];
+  const [subscriptions, invoices] = await Promise.all([
+    subscriptionIds.length
+      ? SubscriptionModel.find({
+          _id: { $in: subscriptionIds },
+        })
+          .select({ _id: 1, customerName: 1 })
+          .lean()
+          .exec()
+      : Promise.resolve([]),
+    invoiceIds.length
+      ? InvoiceModel.find({
+          _id: { $in: invoiceIds },
+        })
+          .select({ _id: 1, customerName: 1, invoiceNumber: 1 })
+          .lean()
+          .exec()
+      : Promise.resolve([]),
+  ]);
   const customerNameBySubscriptionId = new Map(
     subscriptions.map((subscription) => [subscription._id.toString(), subscription.customerName])
   );
+  const invoiceContextById = new Map(
+    invoices.map((invoice) => [
+      invoice._id.toString(),
+      {
+        customerName: invoice.customerName,
+        invoiceNumber: invoice.invoiceNumber,
+      },
+    ])
+  );
 
   return charges.map((charge) =>
-    toChargeResponse(
-      charge,
-      customerNameBySubscriptionId.get(charge.subscriptionId.toString()) ?? null
-    )
+    toChargeResponse(charge, charge.sourceKind === "invoice"
+      ? invoiceContextById.get(charge.invoiceId?.toString() ?? "")
+      : {
+          customerName:
+            charge.subscriptionId
+              ? customerNameBySubscriptionId.get(charge.subscriptionId.toString()) ?? null
+              : null,
+          invoiceNumber: null,
+        })
   );
 }
 
@@ -211,7 +258,9 @@ async function runPartnaSubscriptionChargeJob(input: {
   const charge = await ChargeModel.create({
     merchantId: merchant._id,
     environment: input.environment,
+    sourceKind: "subscription",
     subscriptionId: subscription._id,
+    invoiceId: null,
     externalChargeId: voucher.voucherId,
     settlementSource: protocolMerchantAddress,
     paymentProvider: "partna",
@@ -333,7 +382,9 @@ export async function createCharge(input: CreateChargeInput) {
   const charge = await ChargeModel.create({
     merchantId: input.merchantId,
     environment: input.environment,
+    sourceKind: "subscription",
     subscriptionId: input.subscriptionId,
+    invoiceId: null,
     externalChargeId: input.externalChargeId,
     settlementSource: normalizeSolanaAddress(input.settlementSource),
     localAmount: input.localAmount,
@@ -375,6 +426,12 @@ export async function listCharges(query: ListChargesQuery) {
     filters.push(createRuntimeModeCondition("environment", query.environment));
   }
 
+  if (query.sourceKind) {
+    filters.push({
+      sourceKind: query.sourceKind,
+    });
+  }
+
   if (query.subscriptionId) {
     filters.push({
       subscriptionId: query.subscriptionId,
@@ -388,9 +445,36 @@ export async function listCharges(query: ListChargesQuery) {
   }
 
   if (query.search) {
-    const pattern = new RegExp(query.search, "i");
+    const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(escaped, "i");
+    const [matchingSubscriptions, matchingInvoices] = await Promise.all([
+      SubscriptionModel.find({
+        customerName: pattern,
+      })
+        .select({ _id: 1 })
+        .lean()
+        .exec(),
+      InvoiceModel.find({
+        $or: [
+          { invoiceNumber: pattern },
+          { title: pattern },
+          { customerName: pattern },
+          { customerEmail: pattern },
+        ],
+      })
+        .select({ _id: 1 })
+        .lean()
+        .exec(),
+    ]);
+    const subscriptionIds = matchingSubscriptions.map((entry) => entry._id);
+    const invoiceIds = matchingInvoices.map((entry) => entry._id);
+
     filters.push({
-      externalChargeId: pattern,
+      $or: [
+        { externalChargeId: pattern },
+        ...(subscriptionIds.length ? [{ subscriptionId: { $in: subscriptionIds } }] : []),
+        ...(invoiceIds.length ? [{ invoiceId: { $in: invoiceIds } }] : []),
+      ],
     });
   }
 
@@ -409,7 +493,7 @@ export async function listCharges(query: ListChargesQuery) {
       .exec();
 
     return {
-      items: await mapChargesWithSubscriptionNames(charges),
+      items: await mapChargesWithContext(charges),
     } satisfies ListResult<ReturnType<typeof toChargeResponse>>;
   }
 
@@ -423,7 +507,7 @@ export async function listCharges(query: ListChargesQuery) {
   ]);
 
   return {
-    items: await mapChargesWithSubscriptionNames(charges),
+    items: await mapChargesWithContext(charges),
     pagination: buildPagination(pagination.page, pagination.limit, total),
   } satisfies ListResult<ReturnType<typeof toChargeResponse>>;
 }
@@ -434,12 +518,30 @@ export async function getChargeById(
   environment?: RuntimeMode
 ) {
   const charge = await ensureChargeScope(chargeId, merchantId, environment);
-  const subscription = await SubscriptionModel.findById(charge.subscriptionId)
-    .select({ customerName: 1 })
-    .lean()
-    .exec();
+  const [subscription, invoice] = await Promise.all([
+    charge.subscriptionId
+      ? SubscriptionModel.findById(charge.subscriptionId)
+          .select({ customerName: 1 })
+          .lean()
+          .exec()
+      : Promise.resolve(null),
+    charge.invoiceId
+      ? InvoiceModel.findById(charge.invoiceId)
+          .select({ customerName: 1, invoiceNumber: 1 })
+          .lean()
+          .exec()
+      : Promise.resolve(null),
+  ]);
 
-  return toChargeResponse(charge, subscription?.customerName ?? null);
+  return toChargeResponse(charge, charge.sourceKind === "invoice"
+    ? {
+        customerName: invoice?.customerName ?? null,
+        invoiceNumber: invoice?.invoiceNumber ?? null,
+      }
+    : {
+        customerName: subscription?.customerName ?? null,
+        invoiceNumber: null,
+      });
 }
 
 export async function updateCharge(
@@ -482,12 +584,30 @@ export async function updateCharge(
     nextStatus: charge.status,
   }).catch(() => undefined);
 
-  const subscription = await SubscriptionModel.findById(charge.subscriptionId)
-    .select({ customerName: 1 })
-    .lean()
-    .exec();
+  const [subscription, invoice] = await Promise.all([
+    charge.subscriptionId
+      ? SubscriptionModel.findById(charge.subscriptionId)
+          .select({ customerName: 1 })
+          .lean()
+          .exec()
+      : Promise.resolve(null),
+    charge.invoiceId
+      ? InvoiceModel.findById(charge.invoiceId)
+          .select({ customerName: 1, invoiceNumber: 1 })
+          .lean()
+          .exec()
+      : Promise.resolve(null),
+  ]);
 
-  return toChargeResponse(charge, subscription?.customerName ?? null);
+  return toChargeResponse(charge, charge.sourceKind === "invoice"
+    ? {
+        customerName: invoice?.customerName ?? null,
+        invoiceNumber: invoice?.invoiceNumber ?? null,
+      }
+    : {
+        customerName: subscription?.customerName ?? null,
+        invoiceNumber: null,
+      });
 }
 
 export async function queueChargeRetry(
@@ -503,23 +623,36 @@ export async function queueChargeRetry(
     toStoredRuntimeMode(charge.environment)
   );
 
+  if (charge.sourceKind === "invoice") {
+    throw new HttpError(
+      409,
+      "Invoice payment attempts should be retried from the invoice record."
+    );
+  }
+
   if (charge.status === "settled") {
     throw new HttpError(409, "Settled charges cannot be retried.");
   }
 
+  if (!charge.subscriptionId) {
+    throw new HttpError(409, "Charge is missing its source subscription.");
+  }
+
+  const subscriptionId = charge.subscriptionId.toString();
+
   const result = await enqueueQueueJob(
     queueNames.subscriptionCharge,
     "subscription-charge-retry",
-    { subscriptionId: charge.subscriptionId.toString() },
+    { subscriptionId },
     {
       attempts: 5,
-      jobId: `subscription-charge-retry-${charge.subscriptionId.toString()}-${Date.now()}`,
+      jobId: `subscription-charge-retry-${subscriptionId}-${Date.now()}`,
     }
   );
 
   if (!result) {
     const inlineResult = await runSubscriptionChargeJob({
-      subscriptionId: charge.subscriptionId.toString(),
+      subscriptionId,
     });
 
     return {
@@ -737,7 +870,9 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     const failedCharge = await ChargeModel.create({
       merchantId: merchant._id,
       environment,
+      sourceKind: "subscription",
       subscriptionId: subscription._id,
+      invoiceId: null,
       externalChargeId,
       settlementSource: protocolMerchantAddress,
       localAmount,
@@ -806,21 +941,23 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
   const charge = await ChargeModel.create({
     merchantId: merchant._id,
     environment,
+    sourceKind: "subscription",
     subscriptionId: subscription._id,
+    invoiceId: null,
     externalChargeId,
     settlementSource: protocolMerchantAddress,
     paymentProvider: "yellow_card",
     localAmount,
     fxRate,
     usdcAmount,
-      feeAmount,
-      status: "pending",
-      failureCode: null,
-      protocolChargeId: null,
-      protocolSyncStatus: "pending_execution",
-      protocolTxHash: null,
-      processedAt: now,
-    });
+    feeAmount,
+    status: "pending",
+    failureCode: null,
+    protocolChargeId: null,
+    protocolSyncStatus: "pending_execution",
+    protocolTxHash: null,
+    processedAt: now,
+  });
 
   const settlement = await createSettlement({
     merchantId: merchant._id.toString(),
