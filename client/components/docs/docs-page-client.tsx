@@ -122,7 +122,7 @@ function renderInlineCode(text: string) {
       return (
         <code
           key={`${part}-${index}`}
-          className="rounded-md border border-black/8 bg-black/[0.045] px-1.5 py-0.5 font-mono text-[0.92em] text-[color:var(--ink)]"
+          className="docs-inline-code rounded-md border border-black/8 bg-black/[0.045] px-1.5 py-0.5 font-mono text-[0.92em] text-[color:var(--ink)]"
         >
           {part.slice(1, -1)}
         </code>
@@ -135,7 +135,7 @@ function renderInlineCode(text: string) {
 
 function ReferenceCard({ reference }: { reference: DocsReference }) {
   return (
-    <div className="rounded-[1.25rem] border border-black/6 bg-white/82 p-4">
+    <div className="docs-card rounded-[1.25rem] border border-black/6 bg-white/82 p-4">
       <div className="flex flex-wrap items-start gap-3">
         <span
           className={cn(
@@ -159,6 +159,27 @@ function ReferenceCard({ reference }: { reference: DocsReference }) {
   );
 }
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      className={cn(
+        "h-4 w-4 shrink-0 text-[color:var(--muted)] transition-transform duration-200",
+        open && "rotate-90",
+      )}
+    >
+      <path
+        d="M6 4L10 8L6 12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function DocsPageClient() {
   const pathname = usePathname();
   const router = useRouter();
@@ -170,6 +191,11 @@ export function DocsPageClient() {
   const [expandedStepSections, setExpandedStepSections] = useState<
     Record<string, boolean>
   >({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const observerPausedUntil = useRef(0);
 
   const requestedPage = getDocsPage(searchParams.get("page"));
   const requestedCategory = searchParams.get("category");
@@ -254,37 +280,28 @@ export function DocsPageClient() {
       return;
     }
 
-    const elements = selectedPage.sections
-      .map((section) => document.getElementById(section.id))
-      .filter((element): element is HTMLElement => element !== null);
+    const handleScroll = () => {
+      if (Date.now() < observerPausedUntil.current) {
+        return;
+      }
 
-    if (elements.length === 0) {
-      return;
-    }
+      const scrollY = window.scrollY + 120;
+      let current = selectedPage.sections[0]?.id ?? "";
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const nextActive = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((entryA, entryB) => entryB.intersectionRatio - entryA.intersectionRatio)[0];
-
-        if (!nextActive) {
-          return;
+      for (const section of selectedPage.sections) {
+        const el = document.getElementById(section.id);
+        if (el && el.offsetTop <= scrollY) {
+          current = section.id;
         }
+      }
 
-        setActiveSectionId(nextActive.target.id);
-      },
-      {
-        rootMargin: "-18% 0px -60% 0px",
-        threshold: [0.18, 0.35, 0.55, 0.8],
-      },
-    );
+      setActiveSectionId(current);
+    };
 
-    for (const element of elements) {
-      observer.observe(element);
-    }
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
-    return () => observer.disconnect();
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [selectedPage]);
 
   function navigateToPage(pageId: string, clearSearch = false) {
@@ -298,6 +315,7 @@ export function DocsPageClient() {
       setSearchQuery("");
     }
 
+    setMobileNavOpen(false);
     router.replace(`${pathname}?category=${page.category}&page=${page.id}`, {
       scroll: false,
     });
@@ -336,6 +354,13 @@ export function DocsPageClient() {
     }));
   }
 
+  function toggleGroup(groupLabel: string) {
+    setCollapsedGroups((current) => ({
+      ...current,
+      [groupLabel]: !current[groupLabel],
+    }));
+  }
+
   function handleSearchSubmit() {
     const firstMatch = sidebarGroups[0]?.pages[0];
 
@@ -351,44 +376,69 @@ export function DocsPageClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#ffffff_78%,#fbfcfa_100%)]">
-      <div className="sticky top-0 z-20 border-b border-black/6 bg-[rgba(255,255,255,0.98)] backdrop-blur-xl">
-        <div className="px-4 py-4 sm:px-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                aria-label="Renew home"
-                className="inline-flex items-center gap-3"
-              >
-                <Logo size="compact" />
-                <span className="rounded-full border border-black/6 bg-white/88 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--brand)]">
-                  Docs
-                </span>
-              </Link>
-            </div>
+    <div className={cn("min-h-screen", darkMode ? "docs-dark bg-[#111111]" : "bg-white")}>
+      <div className={cn("lg:hidden sticky top-0 z-30 flex items-center justify-between border-b px-4 py-3 backdrop-blur-xl", darkMode ? "border-white/8 bg-[#111111]/98" : "border-black/6 bg-white/98")}>
+        <Link href="/" aria-label="Renew home">
+          <Logo size="compact" />
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(!mobileNavOpen)}
+          className="rounded-lg p-2 text-[color:var(--muted)] hover:bg-black/4"
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+            {mobileNavOpen ? (
+              <path d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" />
+            ) : (
+              <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+            )}
+          </svg>
+        </button>
+      </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative min-w-0 sm:w-[24rem] lg:w-[29rem]">
+      <div
+        className={cn(
+          "grid",
+          sidebarCollapsed
+            ? "lg:grid-cols-[minmax(0,1fr)_14rem] xl:grid-cols-[minmax(0,1fr)_15rem]"
+            : "lg:grid-cols-[16rem_minmax(0,1fr)_14rem] xl:grid-cols-[18rem_minmax(0,1fr)_15rem]",
+        )}
+      >
+        <aside
+          className={cn(
+            cn("fixed inset-y-0 left-0 z-20 w-[18rem] overflow-y-auto border-r lg:sticky lg:top-0 lg:z-auto lg:h-screen", darkMode ? "border-white/8 bg-[#161616]" : "border-black/6 bg-white"),
+            mobileNavOpen ? "block" : "hidden lg:block",
+            sidebarCollapsed && "lg:hidden",
+          )}
+        >
+          <div className="flex h-full flex-col px-5 pb-6">
+            <div className={cn("sticky top-0 z-10 pb-2 pt-6", darkMode ? "bg-[#161616]" : "bg-white")}>
+              <div className="hidden lg:flex items-center justify-between">
+                <Link href="/" aria-label="Renew home">
+                  <Logo size="compact" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="rounded-md p-1.5 text-[color:var(--muted)] transition-colors hover:bg-black/4 hover:text-[color:var(--ink)]"
+                  aria-label="Collapse sidebar"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                    <rect x="1" y="1" width="14" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
+                    <line x1="6" y1="1" x2="6" y2="15" stroke="currentColor" strokeWidth="1.3" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="relative mt-5">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 20 20"
-                  className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted)]"
+                  className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted)]"
                   fill="none"
                 >
-                  <circle
-                    cx="9"
-                    cy="9"
-                    r="5.5"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                  />
-                  <path
-                    d="M13 13L16.5 16.5"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                  />
+                  <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.7" />
+                  <path d="M13 13L16.5 16.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
                 </svg>
                 <input
                   ref={searchInputRef}
@@ -400,131 +450,169 @@ export function DocsPageClient() {
                     }
                   }}
                   type="search"
-                  placeholder="Search guides, APIs, and SDK..."
-                  className="h-12 w-full rounded-[1.05rem] border border-black/8 bg-white/88 pl-11 pr-16 text-sm text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#0c4a27]/25"
+                  placeholder="Search..."
+                  className="h-9 w-full rounded-lg border border-black/8 bg-black/[0.02] pl-9 pr-14 text-[13px] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#0c4a27]/25 focus:bg-white"
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-black/6 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted)]">
-                  Cmd/Ctrl K
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-black/8 bg-white px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--muted)]">
+                  ⌘K
                 </span>
               </div>
 
-              <a
-                href="mailto:hello@renew.sh"
-                className="px-1 text-sm font-semibold tracking-[-0.02em] text-[color:var(--muted)] transition-colors hover:text-[color:var(--ink)]"
-              >
-                Support
-              </a>
-
-              <button
-                type="button"
-                onClick={() => navigateToPage(defaultPageId, true)}
-                className="inline-flex items-center justify-center rounded-full bg-[#0c4a27] px-5 py-3 text-sm font-semibold tracking-[-0.02em] text-[#d9f6bc] transition-colors hover:bg-[#093a1e]"
-              >
-                Quickstart
-              </button>
+              <div className={cn("mt-4 flex gap-1 rounded-lg border p-1", darkMode ? "border-white/10 bg-white/[0.04]" : "border-black/6 bg-black/[0.02]")}>
+                {docsCategories.map((category) => {
+                  const isActive = category.id === selectedCategory;
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => handleCategoryChange(category.id)}
+                      className={cn(
+                        "flex-1 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all",
+                        isActive
+                          ? darkMode ? "bg-white/10 text-[color:var(--ink)] shadow-sm" : "bg-white text-[color:var(--ink)] shadow-sm"
+                          : "text-[color:var(--muted)] hover:text-[color:var(--ink)]",
+                      )}
+                    >
+                      {category.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 flex gap-6 overflow-x-auto border-t border-black/6 pt-3 lg:pl-[2.75rem]">
-            {docsCategories.map((category) => {
-              const isActive = category.id === selectedCategory;
-
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  onClick={() => handleCategoryChange(category.id)}
-                  className={cn(
-                    "relative whitespace-nowrap pb-3 text-sm font-semibold tracking-[-0.02em] transition-colors",
-                    isActive
-                      ? "text-[color:var(--ink)]"
-                      : "text-[color:var(--muted)] hover:text-[color:var(--ink)]",
-                  )}
-                >
-                  {category.label}
-                  <span
-                    className={cn(
-                      "absolute inset-x-0 bottom-0 h-[2px] rounded-full transition-opacity",
-                      isActive
-                        ? "bg-[#0c4a27] opacity-100"
-                        : "bg-transparent opacity-0",
-                    )}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-[18rem_minmax(0,1fr)_16rem]">
-        <aside className="border-b border-black/6 lg:border-b-0 lg:border-r lg:border-black/6">
-          <div className="px-4 pb-5 pt-8 sm:px-6 lg:pb-5 lg:pt-8 lg:sticky lg:top-[7.75rem] lg:max-h-[calc(100vh-8.5rem)] lg:overflow-auto">
-            {sidebarGroups.length === 0 ? (
-              <div className="rounded-[1.25rem] border border-dashed border-black/8 bg-white/70 px-4 py-5">
-                <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                  No matches
+            <nav className="mt-4 flex-1 space-y-1">
+              {sidebarGroups.length === 0 ? (
+                <p className="px-2 py-4 text-[13px] text-[color:var(--muted)]">
+                  No results found.
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                  Try a different search term or switch to another docs section.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {sidebarGroups.map((group) => (
-                  <div key={group.label}>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--brand)]">
-                      {group.label}
-                    </p>
-                    <div className="mt-2 space-y-1.5">
-                      {group.pages.map((page) => {
-                        const isActive = page.id === selectedPage.id;
-
-                        return (
-                          <button
-                            key={page.id}
-                            type="button"
-                            onClick={() => navigateToPage(page.id, true)}
-                            className={cn(
-                              "block w-full rounded-[1rem] border px-4 py-3 text-left transition-colors",
-                              isActive
-                                ? "border-[#0c4a27]/12 bg-[#0c4a27]/8"
-                                : "border-transparent hover:border-black/6 hover:bg-white/70",
-                            )}
-                          >
-                            <p
-                              className={cn(
-                                "text-sm font-semibold leading-5 tracking-[-0.02em]",
-                                isActive
-                                  ? "text-[color:var(--ink)]"
-                                  : "text-[color:var(--muted)]",
-                              )}
-                            >
-                              {page.navTitle}
-                            </p>
-                          </button>
-                        );
-                      })}
+              ) : (
+                sidebarGroups.map((group) => {
+                  const isCollapsed = collapsedGroups[group.label] ?? false;
+                  return (
+                    <div key={group.label}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.label)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--muted)] transition-colors hover:text-[color:var(--ink)]"
+                      >
+                        <ChevronIcon open={!isCollapsed} />
+                        {group.label}
+                      </button>
+                      {!isCollapsed && (
+                        <div className="ml-3 space-y-0.5 border-l border-black/6 pl-3">
+                          {group.pages.map((page) => {
+                            const isActive = page.id === selectedPage.id;
+                            return (
+                              <button
+                                key={page.id}
+                                type="button"
+                                onClick={() => navigateToPage(page.id, true)}
+                                className={cn(
+                                  "block w-full rounded-md px-3 py-1.5 text-left text-[13px] transition-colors",
+                                  isActive
+                                    ? "bg-[#0c4a27]/8 font-semibold text-[color:var(--ink)]"
+                                    : "text-[color:var(--muted)] hover:bg-black/[0.03] hover:text-[color:var(--ink)]",
+                                )}
+                              >
+                                {page.navTitle}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })
+              )}
+            </nav>
+
+            <div className="mt-auto border-t border-black/6 pt-4">
+              <div className="flex items-center justify-between px-2">
+                <a
+                  href="mailto:hello@renew.sh"
+                  className="rounded-md p-1.5 text-[color:var(--muted)] transition-colors hover:text-[color:var(--ink)]"
+                  aria-label="Support"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-5 w-5">
+                    <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M5.5 6.5a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    <circle cx="8" cy="12" r="0.75" fill="currentColor" />
+                  </svg>
+                </a>
+
+                <div className={cn(
+                  "flex items-center rounded-full border p-0.5",
+                  darkMode ? "border-white/12 bg-white/6" : "border-black/10 bg-black/[0.03]",
+                )}>
+                  <button
+                    type="button"
+                    onClick={() => setDarkMode(false)}
+                    className={cn(
+                      "rounded-full p-1.5 transition-colors",
+                      !darkMode ? "bg-white text-[#7c6ae8] shadow-sm" : "text-[color:var(--muted)] hover:text-[color:var(--ink)]",
+                    )}
+                    aria-label="Light mode"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.3" />
+                      <path d="M8 2V3M8 13V14M2 8H3M13 8H14M4.2 4.2L4.9 4.9M11.1 11.1L11.8 11.8M11.8 4.2L11.1 4.9M4.9 11.1L4.2 11.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDarkMode(true)}
+                    className={cn(
+                      "rounded-full p-1.5 transition-colors",
+                      darkMode ? "bg-[#2a2a2a] text-white shadow-sm" : "text-[color:var(--muted)] hover:text-[color:var(--ink)]",
+                    )}
+                    aria-label="Dark mode"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                      <path d="M13.5 9.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </aside>
 
-        <main className="border-b border-black/6 lg:border-b-0 lg:border-r lg:border-black/6">
+        {mobileNavOpen && (
+          <div
+            className="fixed inset-0 z-10 bg-black/20 lg:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+
+        <main className="min-h-screen border-r border-black/0 lg:border-black/6">
+          {sidebarCollapsed && (
+            <div className={cn("hidden lg:block sticky top-0 z-10 border-b px-4 py-2.5 backdrop-blur-xl", darkMode ? "border-white/8 bg-[#111111]/98" : "border-black/6 bg-white/98")}>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="rounded-md p-1.5 text-[color:var(--muted)] transition-colors hover:bg-black/4 hover:text-[color:var(--ink)]"
+                  aria-label="Expand sidebar"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                    <rect x="1" y="1" width="14" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
+                    <line x1="6" y1="1" x2="6" y2="15" stroke="currentColor" strokeWidth="1.3" />
+                  </svg>
+                </button>
+                <Link href="/" aria-label="Renew home">
+                  <Logo size="compact" />
+                </Link>
+              </div>
+            </div>
+          )}
           <article className="px-5 py-6 sm:px-7 sm:py-7 lg:px-10 lg:py-9">
             <div className="border-b border-black/6 pb-6">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">
-                    <span>{selectedPage.group}</span>
-                  </div>
-                  <h1 className="mt-4 max-w-[16ch] font-display text-[clamp(2.8rem,5vw,4.6rem)] leading-[0.94] tracking-[-0.08em] text-[color:var(--ink)]">
+                  <h1 className="max-w-[16ch] font-display text-[clamp(2rem,4vw,3rem)] leading-[1] tracking-[-0.05em] text-[color:var(--ink)]">
                     {selectedPage.title}
                   </h1>
-                  <p className="mt-4 max-w-3xl text-base leading-8 text-[color:var(--muted)] sm:text-lg">
+                  <p className="mt-4 max-w-3xl text-[15px] leading-7 text-[color:var(--muted)]">
                     {selectedPage.description}
                   </p>
                 </div>
@@ -533,9 +621,9 @@ export function DocsPageClient() {
                   <button
                     type="button"
                     onClick={handleCopyPage}
-                    className="inline-flex items-center justify-center rounded-full border border-black/8 bg-white/88 px-4 py-2.5 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)] transition-colors hover:bg-white"
+                    className="docs-btn inline-flex items-center justify-center rounded-full border border-black/8 bg-white/88 px-4 py-2 text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--ink)] transition-colors hover:bg-white"
                   >
-                    {copiedPage ? "Copied" : "Copy page"}
+                    {copiedPage ? "Copied" : "Copy link"}
                   </button>
                 </div>
               </div>
@@ -543,7 +631,7 @@ export function DocsPageClient() {
 
             <div className="mt-8 space-y-10">
               {selectedPage.sections.map((section) => (
-                <section key={section.id} id={section.id} className="scroll-mt-40">
+                <section key={section.id} id={section.id} className="scroll-mt-24">
                   {(() => {
                     const stepCount = section.steps?.length ?? 0;
                     const collapsedStepCount = Math.ceil(stepCount / 2);
@@ -556,7 +644,7 @@ export function DocsPageClient() {
 
                     return (
                       <>
-                        <h2 className="text-[1.85rem] font-semibold leading-[1.02] tracking-[-0.05em] text-[color:var(--ink)] sm:text-[2.2rem]">
+                        <h2 className="text-[1.5rem] font-semibold leading-[1.1] tracking-[-0.04em] text-[color:var(--ink)] sm:text-[1.75rem]">
                           {section.title}
                         </h2>
 
@@ -564,7 +652,7 @@ export function DocsPageClient() {
                           {section.paragraphs.map((paragraph) => (
                             <p
                               key={`${section.id}-${paragraph}`}
-                              className="max-w-3xl text-sm leading-7 text-[color:var(--muted)] sm:text-[15px]"
+                              className="max-w-3xl text-[15px] leading-7 text-[color:var(--muted)]"
                             >
                               {renderInlineCode(paragraph)}
                             </p>
@@ -572,14 +660,14 @@ export function DocsPageClient() {
                         </div>
 
                         {section.bullets?.length ? (
-                          <ul className="mt-5 grid gap-3">
+                          <ul className="mt-5 grid gap-2">
                             {section.bullets.map((bullet) => (
                               <li
                                 key={`${section.id}-${bullet}`}
-                                className="flex items-start gap-3 rounded-[1.1rem] border border-black/6 bg-white/76 px-4 py-3"
+                                className="docs-card-alt flex items-start gap-3 rounded-lg border border-black/6 bg-black/[0.015] px-4 py-3"
                               >
-                                <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#0c4a27]" />
-                                <span className="text-sm leading-6 text-[color:var(--ink)]">
+                                <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#0c4a27]" />
+                                <span className="text-[14px] leading-6 text-[color:var(--ink)]">
                                   {renderInlineCode(bullet)}
                                 </span>
                               </li>
@@ -588,16 +676,16 @@ export function DocsPageClient() {
                         ) : null}
 
                         {visibleSteps?.length ? (
-                          <ol className="mt-5 space-y-3">
+                          <ol className="mt-5 space-y-2">
                             {visibleSteps.map((step, index) => (
                               <li
                                 key={`${section.id}-${step}`}
-                                className="flex items-start gap-4 rounded-[1.1rem] border border-black/6 bg-white/76 px-4 py-3"
+                                className="docs-card-alt flex items-start gap-3 rounded-lg border border-black/6 bg-black/[0.015] px-4 py-3"
                               >
-                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0c4a27] text-xs font-semibold text-white">
+                                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0c4a27] text-[11px] font-semibold text-white">
                                   {index + 1}
                                 </span>
-                                <span className="pt-0.5 text-sm leading-6 text-[color:var(--ink)]">
+                                <span className="pt-0.5 text-[14px] leading-6 text-[color:var(--ink)]">
                                   {renderInlineCode(step)}
                                 </span>
                               </li>
@@ -606,11 +694,11 @@ export function DocsPageClient() {
                         ) : null}
 
                         {canToggleSteps ? (
-                          <div className="mt-4">
+                          <div className="mt-3">
                             <button
                               type="button"
                               onClick={() => toggleSectionSteps(section.id)}
-                              className="inline-flex items-center rounded-full border border-black/8 bg-white/88 px-4 py-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)] transition-colors hover:bg-white"
+                              className="docs-btn inline-flex items-center rounded-lg border border-black/8 bg-white px-3 py-1.5 text-[13px] font-semibold text-[color:var(--ink)] transition-colors hover:bg-black/[0.02]"
                             >
                               {isExpanded ? "Show less" : "View all"}
                             </button>
@@ -618,8 +706,8 @@ export function DocsPageClient() {
                         ) : null}
 
                         {section.note ? (
-                          <div className="mt-5 rounded-[1.2rem] border border-[#0c4a27]/10 bg-[#0c4a27]/8 px-4 py-3">
-                            <p className="text-sm leading-6 text-[color:var(--ink)]">
+                          <div className="docs-note mt-5 rounded-lg border border-[#0c4a27]/10 bg-[#0c4a27]/[0.04] px-4 py-3">
+                            <p className="text-[14px] leading-6 text-[color:var(--ink)]">
                               {renderInlineCode(section.note)}
                             </p>
                           </div>
@@ -643,7 +731,7 @@ export function DocsPageClient() {
                                 key={`${section.id}-${sample.label}-${sample.filename ?? "sample"}`}
                                 className="space-y-2"
                               >
-                                <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                                <p className="text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
                                   {sample.label}
                                 </p>
                                 <CodeBlock
@@ -657,7 +745,7 @@ export function DocsPageClient() {
                           </div>
                         ) : section.sample ? (
                           <div className="mt-6 space-y-2">
-                            <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                            <p className="text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
                               {section.sample.label}
                             </p>
                             <CodeBlock
@@ -678,11 +766,14 @@ export function DocsPageClient() {
         </main>
 
         <aside className="hidden lg:block">
-          <div className="sticky top-[7.75rem] max-h-[calc(100vh-8.5rem)] overflow-auto px-4 pb-5 pt-8 lg:pb-5 lg:pt-8">
-            <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+          <div className="sticky top-0 max-h-screen overflow-auto px-4 pb-6 pt-8">
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-[color:var(--ink)]">
+              <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4 text-[color:var(--muted)]">
+                <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
               On this page
-            </p>
-            <div className="mt-4 space-y-1.5">
+            </div>
+            <div className="mt-3 space-y-0.5 border-l border-black/6 pl-3">
               {selectedPage.sections.map((section) => {
                 const isActive = section.id === activeSectionId;
 
@@ -690,11 +781,15 @@ export function DocsPageClient() {
                   <a
                     key={section.id}
                     href={`#${section.id}`}
+                    onClick={() => {
+                      observerPausedUntil.current = Date.now() + 1000;
+                      setActiveSectionId(section.id);
+                    }}
                     className={cn(
-                      "block rounded-[0.95rem] px-3 py-2 text-sm leading-5 transition-colors",
+                      "block rounded-md px-2.5 py-1.5 text-[13px] leading-5 transition-colors",
                       isActive
-                        ? "bg-[#0c4a27]/8 text-[color:var(--ink)]"
-                        : "text-[color:var(--muted)] hover:bg-white/70 hover:text-[color:var(--ink)]",
+                        ? "bg-[#0c4a27]/8 font-medium text-[color:var(--ink)]"
+                        : "text-[color:var(--muted)] hover:text-[color:var(--ink)]",
                     )}
                   >
                     {section.title}

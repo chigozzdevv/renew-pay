@@ -58,6 +58,46 @@ a {
   isolation: isolate;
 }
 
+.docs-dark {
+  color-scheme: dark;
+  --page-bg: #111111;
+  --ink: #e5e7eb;
+  --muted: #9ca3af;
+  --brand: #e5e7eb;
+  --line: rgba(255, 255, 255, 0.08);
+}
+
+.docs-dark ::selection {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.docs-dark .docs-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.docs-dark .docs-card-alt {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.docs-dark .docs-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+
+.docs-dark .docs-note {
+  background: rgba(22, 163, 74, 0.1);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+.docs-dark .docs-inline-code {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .docs-token-plain {
   color: #e8f5df;
 }
