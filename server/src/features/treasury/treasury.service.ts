@@ -12,6 +12,7 @@ import {
   addSquadsGovernanceMember,
   changeSquadsGovernanceThreshold,
   createSquadsGovernanceVault,
+  createSquadsOperatorVault,
   loadSquadsGovernanceSnapshot,
   removeSquadsGovernanceMember,
 } from "@/features/governance/squads.service";
@@ -59,7 +60,10 @@ import {
   fromUsdcBaseUnits,
   toUsdcBaseUnits,
 } from "@/features/treasury/treasury.protocol";
-import { TreasuryAccountModel } from "@/features/treasury/treasury-account.model";
+import {
+  TreasuryAccountModel,
+  type TreasuryAccountDocument,
+} from "@/features/treasury/treasury-account.model";
 import { TreasuryOperationModel } from "@/features/treasury/treasury-operation.model";
 import { PayoutBatchModel } from "@/features/treasury/payout-batch.model";
 import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
@@ -110,6 +114,31 @@ function toNullableString(value: unknown) {
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function getOperatorVaultContext(treasuryAccount: TreasuryAccountDocument) {
+  const operatorMultisigAddress = treasuryAccount.operatorMultisigAddress?.trim();
+  const operatorVaultAddress = treasuryAccount.operatorVaultAddress?.trim();
+  const operatorVaultIndex = treasuryAccount.operatorVaultIndex;
+
+  if (
+    !operatorMultisigAddress ||
+    !operatorVaultAddress ||
+    typeof operatorVaultIndex !== "number" ||
+    !Number.isInteger(operatorVaultIndex) ||
+    operatorVaultIndex < 0
+  ) {
+    throw new HttpError(
+      409,
+      "Treasury operator vault is not configured for this merchant yet."
+    );
+  }
+
+  return {
+    operatorMultisigAddress,
+    operatorVaultAddress,
+    operatorVaultIndex,
+  };
 }
 
 function getProtocolProgramAddress(environment: RuntimeMode) {
@@ -523,11 +552,14 @@ function toTreasuryAccountResponse(document: {
   custodyModel: string;
   governanceMultisigAddress: string;
   governanceVaultAddress: string;
+  operatorMultisigAddress?: string | null;
+  operatorVaultAddress?: string | null;
   payoutWallet: string;
   reserveWallet?: string | null;
   ownerAddresses: string[];
   threshold: number;
   governanceVaultIndex: number;
+  operatorVaultIndex?: number | null;
   network: string;
   gasPolicy: string;
   status: string;
@@ -543,11 +575,14 @@ function toTreasuryAccountResponse(document: {
     custodyModel: document.custodyModel,
     governanceMultisigAddress: document.governanceMultisigAddress,
     governanceVaultAddress: document.governanceVaultAddress,
+    operatorMultisigAddress: document.operatorMultisigAddress ?? null,
+    operatorVaultAddress: document.operatorVaultAddress ?? null,
     payoutWallet: document.payoutWallet,
     reserveWallet: document.reserveWallet ?? null,
     ownerAddresses: document.ownerAddresses,
     threshold: document.threshold,
     governanceVaultIndex: document.governanceVaultIndex,
+    operatorVaultIndex: document.operatorVaultIndex ?? null,
     network: document.network,
     gasPolicy: document.gasPolicy,
     status: document.status,
@@ -848,6 +883,9 @@ async function createTreasuryAccountFromGovernanceVault(input: {
   governanceMultisigAddress: string;
   governanceVaultAddress: string;
   governanceVaultIndex: number;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
   owners: string[];
   threshold: number;
   payoutWallet: string;
@@ -859,6 +897,8 @@ async function createTreasuryAccountFromGovernanceVault(input: {
     custodyModel: "squads",
     governanceMultisigAddress: normalizeAddress(input.governanceMultisigAddress),
     governanceVaultAddress: normalizeAddress(input.governanceVaultAddress),
+    operatorMultisigAddress: normalizeAddress(input.operatorMultisigAddress),
+    operatorVaultAddress: normalizeAddress(input.operatorVaultAddress),
     payoutWallet: normalizeAddress(input.payoutWallet),
     reserveWallet: input.reserveWallet
       ? normalizeAddress(input.reserveWallet)
@@ -866,6 +906,7 @@ async function createTreasuryAccountFromGovernanceVault(input: {
     ownerAddresses: input.owners.map(normalizeAddress),
     threshold: input.threshold,
     governanceVaultIndex: input.governanceVaultIndex,
+    operatorVaultIndex: input.operatorVaultIndex,
     network: "solana",
     gasPolicy: "sponsored",
     status: "active",
@@ -892,6 +933,32 @@ async function ensureTreasuryAccount(
     409,
     "Treasury governance vault is not configured for this merchant yet."
   );
+}
+
+async function ensureProtocolOperatorVault(
+  merchantId: string,
+  environment: RuntimeMode
+) {
+  const treasuryAccount = await ensureTreasuryAccount(merchantId, environment);
+
+  if (
+    treasuryAccount.operatorMultisigAddress?.trim() &&
+    treasuryAccount.operatorVaultAddress?.trim()
+  ) {
+    return treasuryAccount;
+  }
+
+  const operator = await createSquadsOperatorVault({ environment });
+
+  treasuryAccount.operatorMultisigAddress = normalizeAddress(
+    operator.operatorMultisigAddress
+  );
+  treasuryAccount.operatorVaultAddress = normalizeAddress(operator.operatorVaultAddress);
+  treasuryAccount.operatorVaultIndex = operator.operatorVaultIndex;
+  treasuryAccount.lastSyncedAt = new Date();
+  await treasuryAccount.save();
+
+  return treasuryAccount;
 }
 
 async function syncTreasuryAccountOwners(
@@ -1783,10 +1850,16 @@ export async function withdrawPayoutBatch(input: {
       }).catch(() => undefined);
     }
   } else {
+    const treasuryAccount = await ensureProtocolOperatorVault(
+      input.merchantId,
+      input.environment
+    );
+    const operatorVault = getOperatorVaultContext(treasuryAccount);
     const withdrawResult = await withdrawProtocolMerchantBalance({
       environment: input.environment,
       merchantId: input.merchantId,
       amountUsdc: totals.netUsdc,
+      ...operatorVault,
     });
     batch.status = "executed";
     batch.txHash = withdrawResult.txHash;
@@ -2043,6 +2116,13 @@ export async function bootstrapTreasuryAccount(input: {
       threshold: number;
     }
     | undefined;
+  let operator:
+    | {
+      operatorMultisigAddress: string;
+      operatorVaultAddress: string;
+      operatorVaultIndex: number;
+    }
+    | null = null;
 
   if (input.payload.mode === "create") {
     const ownerIds = [...new Set(input.payload.ownerTeamMemberIds)];
@@ -2128,6 +2208,16 @@ export async function bootstrapTreasuryAccount(input: {
     ...createRuntimeModeCondition("environment", input.payload.environment),
   }).exec();
 
+  if (
+    !treasuryAccount ||
+    !treasuryAccount.operatorMultisigAddress?.trim() ||
+    !treasuryAccount.operatorVaultAddress?.trim()
+  ) {
+    operator = await createSquadsOperatorVault({
+      environment: input.payload.environment,
+    });
+  }
+
   if (!treasuryAccount) {
     treasuryAccount = await createTreasuryAccountFromGovernanceVault({
       merchantId: input.merchantId,
@@ -2135,6 +2225,9 @@ export async function bootstrapTreasuryAccount(input: {
       governanceMultisigAddress: governance.governanceMultisigAddress,
       governanceVaultAddress: governance.governanceVaultAddress,
       governanceVaultIndex: governance.governanceVaultIndex,
+      operatorMultisigAddress: operator!.operatorMultisigAddress,
+      operatorVaultAddress: operator!.operatorVaultAddress,
+      operatorVaultIndex: operator!.operatorVaultIndex,
       owners: governance.ownerAddresses,
       threshold: governance.threshold,
       payoutWallet: merchant.payoutWallet,
@@ -2148,6 +2241,15 @@ export async function bootstrapTreasuryAccount(input: {
       governance.governanceVaultAddress
     );
     treasuryAccount.governanceVaultIndex = governance.governanceVaultIndex;
+    if (operator) {
+      treasuryAccount.operatorMultisigAddress = normalizeAddress(
+        operator.operatorMultisigAddress
+      );
+      treasuryAccount.operatorVaultAddress = normalizeAddress(
+        operator.operatorVaultAddress
+      );
+      treasuryAccount.operatorVaultIndex = operator.operatorVaultIndex;
+    }
     treasuryAccount.ownerAddresses = governance.ownerAddresses.map(normalizeAddress);
     treasuryAccount.threshold = governance.threshold;
     treasuryAccount.network = "solana";
@@ -2609,7 +2711,7 @@ async function ensureProtocolMerchantReady(input: {
   environment: RuntimeMode;
 }) {
   try {
-    const treasuryAccount = await ensureTreasuryAccount(
+    const treasuryAccount = await ensureProtocolOperatorVault(
       input.merchantId,
       input.environment
     );
@@ -2887,6 +2989,7 @@ export async function queueSubscriptionProtocolCreate(input: {
     nextChargeAt: subscription.nextChargeAt,
     localAmount: subscription.localAmount,
     mandateHash,
+    ...getOperatorVaultContext(readiness.treasuryAccount),
   });
 
   if (!createdOnchain.protocolSubscriptionId) {
@@ -2987,27 +3090,32 @@ async function queueSubscriptionProtocolOperation(input: {
     paymentAccountNumber: subscription.paymentAccountNumber ?? null,
     paymentNetworkId: subscription.paymentNetworkId ?? null,
   });
+  const operatorVault = getOperatorVaultContext(readiness.treasuryAccount);
   const execution =
     input.kind === "subscription_pause"
       ? await pauseProtocolSubscription({
         environment: input.environment,
         protocolSubscriptionId: subscription.protocolSubscriptionId,
+        ...operatorVault,
       })
       : input.kind === "subscription_resume"
         ? await resumeProtocolSubscription({
           environment: input.environment,
           protocolSubscriptionId: subscription.protocolSubscriptionId,
           nextChargeAt: subscription.nextChargeAt,
+          ...operatorVault,
         })
         : input.kind === "subscription_cancel"
           ? await cancelProtocolSubscription({
             environment: input.environment,
             protocolSubscriptionId: subscription.protocolSubscriptionId,
+            ...operatorVault,
           })
           : await updateProtocolSubscriptionMandate({
             environment: input.environment,
             protocolSubscriptionId: subscription.protocolSubscriptionId,
             mandateHash,
+            ...operatorVault,
           });
 
   subscription.protocolOperationId = null;
@@ -3531,12 +3639,18 @@ export async function executeTreasuryOperation(input: {
 
   const metadata = (operation.metadata ?? {}) as Record<string, unknown>;
   const environment = toStoredRuntimeMode(treasuryAccount.environment);
-  let executionTxHash: string | null = null;
   const governanceKinds = new Set([
     "governance_owner_add",
     "governance_owner_remove",
     "governance_threshold_change",
   ]);
+  const merchantAuthorityTreasuryAccount = governanceKinds.has(operation.kind)
+    ? treasuryAccount
+    : await ensureProtocolOperatorVault(input.merchantId, environment);
+  const operatorVault = governanceKinds.has(operation.kind)
+    ? null
+    : getOperatorVaultContext(merchantAuthorityTreasuryAccount);
+  let executionTxHash: string | null = null;
 
   if (operation.kind === "governance_owner_add") {
     const ownerAddress = String(metadata.walletAddress ?? "").trim();
@@ -3582,8 +3696,9 @@ export async function executeTreasuryOperation(input: {
     const result = await createProtocolMerchant({
       environment,
       merchantId: input.merchantId,
-      payoutWallet: treasuryAccount.payoutWallet,
+      payoutWallet: merchantAuthorityTreasuryAccount.payoutWallet,
       metadataHash: merchant.metadataHash,
+      ...operatorVault!,
     });
     executionTxHash = result.txHash;
   } else if (operation.kind === "plan_create") {
@@ -3605,6 +3720,7 @@ export async function executeTreasuryOperation(input: {
       maxRetryCount: Number(metadata.maxRetryCount ?? 0),
       billingMode: plan.billingMode,
       usageRate: plan.usageRate ?? null,
+      ...operatorVault!,
     });
     executionTxHash = result.txHash;
   } else if (operation.kind === "plan_update") {
@@ -3628,6 +3744,7 @@ export async function executeTreasuryOperation(input: {
       billingMode: plan.billingMode,
       usageRate: plan.usageRate ?? null,
       active: targetStatus === "active",
+      ...operatorVault!,
     });
     executionTxHash = result.txHash;
   } else if (operation.kind === "payout_wallet_change_request") {
@@ -3641,12 +3758,14 @@ export async function executeTreasuryOperation(input: {
       environment,
       merchantId: input.merchantId,
       payoutWallet: nextWallet,
+      ...operatorVault!,
     });
     executionTxHash = result.txHash;
   } else if (operation.kind === "payout_wallet_change_confirm") {
     const result = await confirmProtocolPayoutDestinationUpdate({
       environment,
       merchantId: input.merchantId,
+      ...operatorVault!,
     });
     executionTxHash = result.txHash;
   } else if (
@@ -3663,6 +3782,7 @@ export async function executeTreasuryOperation(input: {
       environment,
       merchantId: input.merchantId,
       amountUsdc,
+      ...operatorVault!,
     });
     executionTxHash = result.txHash;
   } else if (

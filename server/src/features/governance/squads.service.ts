@@ -3,9 +3,16 @@ import {
   getMultisigPda,
   getVaultPda,
   instructions as squadsInstructions,
+  rpc as squadsRpc,
   types as squadsTypes,
 } from "@sqds/multisig";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionMessage,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 
 import { getProtocolRuntimeConfig } from "@/config/protocol.config";
 import { getSquadsConfig } from "@/config/squads.config";
@@ -20,6 +27,12 @@ type GovernanceSnapshot = {
   governanceVaultIndex: number;
   ownerAddresses: string[];
   threshold: number;
+};
+
+type OperatorSnapshot = {
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 };
 
 function getConnection(mode: RuntimeMode) {
@@ -46,6 +59,10 @@ function servicePermissions() {
   ]);
 }
 
+function operatorPermissions() {
+  return squadsTypes.Permissions.all();
+}
+
 function deriveVaultAddresses(multisigAddress: PublicKey) {
   const vaultIndex = getSquadsConfig().defaultVaultIndex;
   const governanceVaultAddress = getVaultPda({
@@ -67,6 +84,10 @@ function mapVoteMembers(multisig: Awaited<
       squadsTypes.Permissions.has(entry.permissions, squadsTypes.Permission.Vote)
     )
     .map((entry) => entry.key.toBase58());
+}
+
+async function confirmSignature(connection: Connection, signature: string) {
+  await connection.confirmTransaction(signature, "confirmed");
 }
 
 export async function loadSquadsGovernanceSnapshot(input: {
@@ -144,6 +165,114 @@ export async function createSquadsGovernanceVault(input: {
     })),
     txHash: execution.signature,
     governanceVaultIndex,
+  };
+}
+
+export async function createSquadsOperatorVault(input: {
+  environment: RuntimeMode;
+}): Promise<OperatorSnapshot & { txHash: string }> {
+  const connection = getConnection(input.environment);
+  const admin = getSolanaAdminKeypair(input.environment);
+  const createKey = Keypair.generate();
+  const multisigAddress = getMultisigPda({
+    createKey: createKey.publicKey,
+  })[0];
+  const { governanceVaultAddress, governanceVaultIndex } =
+    deriveVaultAddresses(multisigAddress);
+
+  const txHash = await squadsRpc.multisigCreateV2({
+    connection,
+    treasury: governanceVaultAddress,
+    createKey,
+    creator: admin,
+    multisigPda: multisigAddress,
+    configAuthority: admin.publicKey,
+    threshold: 1,
+    members: [
+      {
+        key: admin.publicKey,
+        permissions: operatorPermissions(),
+      },
+    ],
+    timeLock: 0,
+    rentCollector: null,
+    memo: "renew:merchant-operator-bootstrap",
+  });
+
+  await confirmSignature(connection, txHash);
+
+  return {
+    operatorMultisigAddress: multisigAddress.toBase58(),
+    operatorVaultAddress: governanceVaultAddress.toBase58(),
+    operatorVaultIndex: governanceVaultIndex,
+    txHash,
+  };
+}
+
+export async function executeSquadsVaultInstructions(input: {
+  environment: RuntimeMode;
+  multisigAddress: string;
+  vaultIndex: number;
+  instructions: TransactionInstruction[];
+}) {
+  const connection = getConnection(input.environment);
+  const admin = getSolanaAdminKeypair(input.environment);
+  const multisigPda = toPublicKey(input.multisigAddress, "Squads multisig address");
+  const multisig = await squadsAccounts.Multisig.fromAccountAddress(
+    connection,
+    multisigPda
+  );
+  const transactionIndex = BigInt(multisig.transactionIndex.toString());
+  const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+  const transactionMessage = new TransactionMessage({
+    payerKey: admin.publicKey,
+    recentBlockhash: latestBlockhash.blockhash,
+    instructions: input.instructions,
+  });
+
+  const createTxHash = await squadsRpc.vaultTransactionCreate({
+    connection,
+    feePayer: admin,
+    multisigPda,
+    transactionIndex,
+    creator: admin.publicKey,
+    vaultIndex: input.vaultIndex,
+    ephemeralSigners: 0,
+    transactionMessage,
+  });
+  await confirmSignature(connection, createTxHash);
+
+  const proposalTxHash = await squadsRpc.proposalCreate({
+    connection,
+    feePayer: admin,
+    creator: admin,
+    multisigPda,
+    transactionIndex,
+  });
+  await confirmSignature(connection, proposalTxHash);
+
+  const approveTxHash = await squadsRpc.proposalApprove({
+    connection,
+    feePayer: admin,
+    member: admin,
+    multisigPda,
+    transactionIndex,
+    memo: "renew:merchant-operator-approve",
+  });
+  await confirmSignature(connection, approveTxHash);
+
+  const executeTxHash = await squadsRpc.vaultTransactionExecute({
+    connection,
+    feePayer: admin,
+    multisigPda,
+    transactionIndex,
+    member: admin.publicKey,
+  });
+  await confirmSignature(connection, executeTxHash);
+
+  return {
+    signature: executeTxHash,
+    transactionIndex: transactionIndex.toString(),
   };
 }
 

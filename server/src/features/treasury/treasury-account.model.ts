@@ -29,6 +29,16 @@ const treasuryAccountSchema = new Schema(
       required: true,
       trim: true,
     },
+    operatorMultisigAddress: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    operatorVaultAddress: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     payoutWallet: {
       type: String,
       required: true,
@@ -55,6 +65,11 @@ const treasuryAccountSchema = new Schema(
       required: true,
       min: 0,
       default: 0,
+    },
+    operatorVaultIndex: {
+      type: Number,
+      min: 0,
+      default: null,
     },
     network: {
       type: String,
@@ -102,6 +117,24 @@ treasuryAccountSchema.index(
 treasuryAccountSchema.index(
   { governanceVaultAddress: 1, environment: 1 },
   { unique: true }
+);
+treasuryAccountSchema.index(
+  { operatorMultisigAddress: 1, environment: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      operatorMultisigAddress: { $type: "string" },
+    },
+  }
+);
+treasuryAccountSchema.index(
+  { operatorVaultAddress: 1, environment: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      operatorVaultAddress: { $type: "string" },
+    },
+  }
 );
 
 type TreasuryAccountEntry = InferSchemaType<typeof treasuryAccountSchema> & {

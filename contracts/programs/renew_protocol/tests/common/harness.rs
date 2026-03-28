@@ -140,6 +140,7 @@ impl Harness {
             accounts: accounts::CreateMerchant {
                 config: self.config_pda,
                 authority: self.merchant_authority.pubkey(),
+                payer: self.merchant_authority.pubkey(),
                 settlement_mint: self.mint,
                 payout_token_account: self.payout_ata,
                 merchant: self.merchant_pda,
@@ -188,6 +189,7 @@ impl Harness {
             program_id: renew_protocol::ID,
             accounts: accounts::CreatePlan {
                 authority: self.merchant_authority.pubkey(),
+                payer: self.merchant_authority.pubkey(),
                 merchant: self.merchant_pda,
                 plan: self.plan_pda,
                 system_program: system_program::id(),
@@ -208,6 +210,7 @@ impl Harness {
             program_id: renew_protocol::ID,
             accounts: accounts::CreateSubscription {
                 authority: self.merchant_authority.pubkey(),
+                payer: self.merchant_authority.pubkey(),
                 merchant: self.merchant_pda,
                 plan: self.plan_pda,
                 subscription: self.subscription_pda,

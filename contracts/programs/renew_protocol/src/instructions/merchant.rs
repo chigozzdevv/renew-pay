@@ -24,7 +24,7 @@ pub fn create_merchant(
     require!(is_nonzero_id(&merchant_id), RenewError::InvalidIdentifier);
 
     create_program_token_account(
-        ctx.accounts.authority.to_account_info(),
+        ctx.accounts.payer.to_account_info(),
         ctx.accounts.merchant_vault.to_account_info(),
         ctx.accounts.settlement_mint.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
@@ -164,8 +164,9 @@ pub fn confirm_payout_destination_update(ctx: Context<MerchantAuthorityOnly>) ->
 pub struct CreateMerchant<'info> {
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
-    #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(address = config.settlement_mint @ RenewError::SettlementMintMismatch)]
     pub settlement_mint: Account<'info, Mint>,
     #[account(
@@ -175,7 +176,7 @@ pub struct CreateMerchant<'info> {
     pub payout_token_account: Account<'info, TokenAccount>,
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + Merchant::LEN,
         seeds = [MERCHANT_SEED, merchant_id.as_ref()],
         bump
@@ -183,7 +184,7 @@ pub struct CreateMerchant<'info> {
     pub merchant: Account<'info, Merchant>,
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + MerchantLedger::LEN,
         seeds = [LEDGER_SEED, merchant_id.as_ref()],
         bump

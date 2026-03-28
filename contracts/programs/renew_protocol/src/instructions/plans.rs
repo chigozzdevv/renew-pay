@@ -80,8 +80,9 @@ pub fn update_plan(ctx: Context<UpdatePlan>, args: PlanTermsArgs, active: bool) 
 #[derive(Accounts)]
 #[instruction(plan_code_hash: [u8; 32])]
 pub struct CreatePlan<'info> {
-    #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(
         seeds = [MERCHANT_SEED, merchant.merchant_id.as_ref()],
         bump = merchant.bump,
@@ -90,7 +91,7 @@ pub struct CreatePlan<'info> {
     pub merchant: Account<'info, Merchant>,
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + Plan::LEN,
         seeds = [PLAN_SEED, merchant.merchant_id.as_ref(), plan_code_hash.as_ref()],
         bump

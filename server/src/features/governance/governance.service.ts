@@ -3,6 +3,7 @@ import type { EnableGovernanceInput } from "@/features/governance/governance.val
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueGovernanceToggleNotification } from "@/features/notifications/notification.service";
 import { TeamMemberModel } from "@/features/teams/team.model";
+import { TreasuryAccountModel } from "@/features/treasury/treasury-account.model";
 import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
@@ -19,16 +20,22 @@ async function getMerchantOrThrow(merchantId: string) {
 
 export async function getGovernanceState(
   merchantId: string,
-  _environment: RuntimeMode = "test"
+  environment: RuntimeMode = "test"
 ) {
   const merchant = await getMerchantOrThrow(merchantId);
-  const [signers, teamMembers] = await Promise.all([
+  const [signers, teamMembers, treasuryAccount] = await Promise.all([
     TreasurySignerModel.find({ merchantId })
       .sort({ createdAt: 1 })
       .lean()
       .exec(),
     TeamMemberModel.find({ merchantId })
       .sort({ createdAt: 1 })
+      .lean()
+      .exec(),
+    TreasuryAccountModel.findOne({
+      merchantId,
+      environment,
+    })
       .lean()
       .exec(),
   ]);
@@ -62,7 +69,11 @@ export async function getGovernanceState(
       merchant.governanceEnabled && activeApprovers.length > 1
         ? ("multisig" as const)
         : ("single_owner" as const),
-    controllerWalletAddress: merchant.operatorSmartAccountAddress ?? null,
+    controllerWalletAddress:
+      treasuryAccount?.operatorVaultAddress ??
+      treasuryAccount?.governanceVaultAddress ??
+      merchant.operatorSmartAccountAddress ??
+      null,
     payoutWallet: merchant.payoutWallet,
     activeSignerCount: activeApprovers.length,
     threshold,

@@ -144,8 +144,9 @@ pub fn cancel_subscription(ctx: Context<MerchantSubscriptionAuthority>) -> Resul
 #[derive(Accounts)]
 #[instruction(subscription_ref_hash: [u8; 32])]
 pub struct CreateSubscription<'info> {
-    #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(
         seeds = [MERCHANT_SEED, merchant.merchant_id.as_ref()],
         bump = merchant.bump,
@@ -160,7 +161,7 @@ pub struct CreateSubscription<'info> {
     pub plan: Account<'info, Plan>,
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + Subscription::LEN,
         seeds = [
             SUBSCRIPTION_SEED,

@@ -5,10 +5,16 @@ import {
   getAccount,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { PublicKey, SystemProgram, type TransactionInstruction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
+import { executeSquadsVaultInstructions } from "@/features/governance/squads.service";
 import { normalizeSolanaAddress } from "@/shared/constants/solana";
 import { getSolanaAdminKeypair } from "@/features/solana/solana-keypair.service";
 import {
@@ -105,6 +111,71 @@ async function resolveSettlementTokenAccount(input: {
             input.runtime.settlementMint
           ),
         ],
+  };
+}
+
+function toOperatorVaultContext(input: {
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
+}) {
+  return {
+    operatorMultisig: toPublicKey(input.operatorMultisigAddress, "Operator multisig"),
+    operatorVault: toPublicKey(input.operatorVaultAddress, "Operator vault"),
+    operatorVaultIndex: input.operatorVaultIndex,
+  };
+}
+
+async function ensureProtocolMerchantAuthority(input: {
+  environment: RuntimeMode;
+  runtime: Runtime;
+  admin: Keypair;
+  merchantIdBytes: Uint8Array;
+  operator: ReturnType<typeof toOperatorVaultContext>;
+  merchantAddress?: PublicKey;
+}) {
+  const merchantAddress =
+    input.merchantAddress ??
+    findMerchantPda(input.runtime.programId, input.merchantIdBytes);
+  const accounts = input.runtime.program.account as unknown as Record<
+    string,
+    {
+      fetch(address: PublicKey): Promise<unknown>;
+    }
+  >;
+  const merchant = await accounts.merchant.fetch(merchantAddress);
+  const currentAuthority = (merchant as { authority: PublicKey }).authority;
+
+  if (currentAuthority.equals(input.operator.operatorVault)) {
+    return {
+      merchantAddress,
+      txHash: null,
+    };
+  }
+
+  if (!currentAuthority.equals(input.admin.publicKey)) {
+    throw new HttpError(
+      409,
+      "Protocol merchant authority is not controlled by the configured operator vault."
+    );
+  }
+
+  const instruction = await input.runtime.program.methods
+    .updateMerchantAuthority(input.operator.operatorVault)
+    .accounts({
+      authority: input.admin.publicKey,
+      merchant: merchantAddress,
+    })
+    .instruction();
+  const execution = await sendSponsoredTransaction({
+    mode: input.environment,
+    authority: input.admin,
+    instructions: [instruction],
+  });
+
+  return {
+    merchantAddress,
+    txHash: execution.signature,
   };
 }
 
@@ -289,17 +360,30 @@ export async function createProtocolMerchant(input: {
   merchantId: string;
   payoutWallet: string;
   metadataHash: string;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
   const merchantAddress = findMerchantPda(runtime.programId, merchantIdBytes);
   const existingMerchant = await runtime.connection.getAccountInfo(merchantAddress);
 
   if (existingMerchant) {
+    const migration = await ensureProtocolMerchantAuthority({
+      environment: input.environment,
+      runtime,
+      admin,
+      merchantIdBytes,
+      operator,
+      merchantAddress,
+    });
+
     return {
       merchantAddress: merchantAddress.toBase58(),
-      txHash: null,
+      txHash: migration.txHash,
     };
   }
 
@@ -321,7 +405,8 @@ export async function createProtocolMerchant(input: {
     )
     .accounts({
       config: findConfigPda(runtime.programId),
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
+      payer: admin.publicKey,
       settlementMint: runtime.settlementMint,
       payoutTokenAccount: payout.tokenAccount,
       merchant: merchantAddress,
@@ -332,9 +417,10 @@ export async function createProtocolMerchant(input: {
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [...payout.preInstructions, instruction],
   });
 
@@ -355,25 +441,38 @@ export async function createProtocolPlan(input: {
   maxRetryCount: number;
   billingMode: string;
   usageRate?: number | null;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime,
+    admin,
+    merchantIdBytes,
+    operator,
+  });
   const planCodeHash = hashProgramIdentifier(input.planCode, "plan_code");
   const planAddress = findPlanPda(runtime.programId, merchantIdBytes, planCodeHash);
   const instruction = await runtime.program.methods
     .createPlan(Array.from(planCodeHash), buildPlanTermsArgs(input))
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
+      payer: admin.publicKey,
       merchant: findMerchantPda(runtime.programId, merchantIdBytes),
       plan: planAddress,
       systemProgram: SystemProgram.programId,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -395,23 +494,35 @@ export async function updateProtocolPlan(input: {
   billingMode: string;
   usageRate?: number | null;
   active: boolean;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime,
+    admin,
+    merchantIdBytes,
+    operator,
+  });
   const planCodeHash = hashProgramIdentifier(input.planCode, "plan_code");
   const instruction = await runtime.program.methods
     .updatePlan(buildPlanTermsArgs(input), input.active)
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: findMerchantPda(runtime.programId, merchantIdBytes),
       plan: findPlanPda(runtime.programId, merchantIdBytes, planCodeHash),
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -430,10 +541,21 @@ export async function createProtocolSubscriptionForMerchant(input: {
   nextChargeAt: Date | string;
   localAmount: number;
   mandateHash: number[];
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime,
+    admin,
+    merchantIdBytes,
+    operator,
+  });
   const subscriptionRefHash = hashProgramIdentifier(
     input.subscriptionRef,
     "subscription"
@@ -455,7 +577,8 @@ export async function createProtocolSubscriptionForMerchant(input: {
       })
     )
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
+      payer: admin.publicKey,
       merchant: findMerchantPda(runtime.programId, merchantIdBytes),
       plan: new PublicKey(input.protocolPlanId),
       subscription: subscriptionAddress,
@@ -463,9 +586,10 @@ export async function createProtocolSubscriptionForMerchant(input: {
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -479,25 +603,38 @@ export async function updateProtocolSubscriptionMandate(input: {
   environment: RuntimeMode;
   protocolSubscriptionId: string;
   mandateHash: number[];
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
+  const operator = toOperatorVaultContext(input);
   const context = await loadSubscriptionContext(
     input.environment,
     admin,
     input.protocolSubscriptionId
   );
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime: context.runtime,
+    admin,
+    merchantIdBytes: context.merchantId,
+    operator,
+    merchantAddress: context.merchantAddress,
+  });
   const instruction = await context.runtime.program.methods
     .updateSubscriptionMandate(input.mandateHash)
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: context.merchantAddress,
       subscription: context.subscriptionAddress,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -509,25 +646,38 @@ export async function updateProtocolSubscriptionMandate(input: {
 export async function pauseProtocolSubscription(input: {
   environment: RuntimeMode;
   protocolSubscriptionId: string;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
+  const operator = toOperatorVaultContext(input);
   const context = await loadSubscriptionContext(
     input.environment,
     admin,
     input.protocolSubscriptionId
   );
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime: context.runtime,
+    admin,
+    merchantIdBytes: context.merchantId,
+    operator,
+    merchantAddress: context.merchantAddress,
+  });
   const instruction = await context.runtime.program.methods
     .pauseSubscription()
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: context.merchantAddress,
       subscription: context.subscriptionAddress,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -540,27 +690,40 @@ export async function resumeProtocolSubscription(input: {
   environment: RuntimeMode;
   protocolSubscriptionId: string;
   nextChargeAt: Date | string | null | undefined;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
+  const operator = toOperatorVaultContext(input);
   const context = await loadSubscriptionContext(
     input.environment,
     admin,
     input.protocolSubscriptionId
   );
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime: context.runtime,
+    admin,
+    merchantIdBytes: context.merchantId,
+    operator,
+    merchantAddress: context.merchantAddress,
+  });
   const instruction = await context.runtime.program.methods
     .resumeSubscription(
       input.nextChargeAt ? new BN(toUnixSeconds(input.nextChargeAt)) : null
     )
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: context.merchantAddress,
       subscription: context.subscriptionAddress,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -572,25 +735,38 @@ export async function resumeProtocolSubscription(input: {
 export async function cancelProtocolSubscription(input: {
   environment: RuntimeMode;
   protocolSubscriptionId: string;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
+  const operator = toOperatorVaultContext(input);
   const context = await loadSubscriptionContext(
     input.environment,
     admin,
     input.protocolSubscriptionId
   );
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime: context.runtime,
+    admin,
+    merchantIdBytes: context.merchantId,
+    operator,
+    merchantAddress: context.merchantAddress,
+  });
   const instruction = await context.runtime.program.methods
     .cancelSubscription()
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: context.merchantAddress,
       subscription: context.subscriptionAddress,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -603,11 +779,23 @@ export async function requestProtocolPayoutDestinationUpdate(input: {
   environment: RuntimeMode;
   merchantId: string;
   payoutWallet: string;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
   const merchantAddress = findMerchantPda(runtime.programId, merchantIdBytes);
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime,
+    admin,
+    merchantIdBytes,
+    operator,
+    merchantAddress,
+  });
   const sponsorshipContext = await getServerSponsoredTransactionContext({
     mode: input.environment,
     serverFeePayer: admin.publicKey,
@@ -621,15 +809,16 @@ export async function requestProtocolPayoutDestinationUpdate(input: {
     .requestPayoutDestinationUpdate()
     .accounts({
       config: findConfigPda(runtime.programId),
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: merchantAddress,
       newPayoutTokenAccount: payout.tokenAccount,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [...payout.preInstructions, instruction],
   });
 
@@ -641,21 +830,33 @@ export async function requestProtocolPayoutDestinationUpdate(input: {
 export async function confirmProtocolPayoutDestinationUpdate(input: {
   environment: RuntimeMode;
   merchantId: string;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime,
+    admin,
+    merchantIdBytes,
+    operator,
+  });
   const instruction = await runtime.program.methods
     .confirmPayoutDestinationUpdate()
     .accounts({
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: findMerchantPda(runtime.programId, merchantIdBytes),
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
@@ -668,26 +869,39 @@ export async function withdrawProtocolMerchantBalance(input: {
   environment: RuntimeMode;
   merchantId: string;
   amountUsdc: number;
+  operatorMultisigAddress: string;
+  operatorVaultAddress: string;
+  operatorVaultIndex: number;
 }) {
   const admin = getSolanaAdminKeypair(input.environment);
   const runtime = getRenewProgramRuntime(input.environment, admin);
+  const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
   const merchantAddress = findMerchantPda(runtime.programId, merchantIdBytes);
+  await ensureProtocolMerchantAuthority({
+    environment: input.environment,
+    runtime,
+    admin,
+    merchantIdBytes,
+    operator,
+    merchantAddress,
+  });
   const merchantVault = findMerchantVaultPda(runtime.programId, merchantIdBytes);
   const instruction = await runtime.program.methods
     .withdraw(toFixed6Bn(input.amountUsdc))
     .accounts({
       config: findConfigPda(runtime.programId),
-      authority: admin.publicKey,
+      authority: operator.operatorVault,
       merchant: merchantAddress,
       ledger: findLedgerPda(runtime.programId, merchantIdBytes),
       merchantVault,
     })
     .instruction();
 
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: admin,
+  const execution = await executeSquadsVaultInstructions({
+    environment: input.environment,
+    multisigAddress: operator.operatorMultisig.toBase58(),
+    vaultIndex: operator.operatorVaultIndex,
     instructions: [instruction],
   });
 
