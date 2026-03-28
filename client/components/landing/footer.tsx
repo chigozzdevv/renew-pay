@@ -2,10 +2,22 @@ import Link from "next/link";
 
 import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/shared/logo";
+import { cn } from "@/lib/utils";
 
-export function Footer() {
+type FooterProps = {
+  className?: string;
+  tone?: "default" | "hero";
+};
+
+export function Footer({ className, tone = "default" }: FooterProps = {}) {
   return (
-    <footer className="bg-[#f7f9fc] pb-6 pt-2">
+    <footer
+      className={cn(
+        tone === "hero" ? "bg-[#e8f5e9]" : "bg-[#f7f9fc]",
+        "pb-6 pt-2",
+        className
+      )}
+    >
       <Container>
         <div className="flex items-center justify-between border-t border-black/6 pt-4">
           <div className="flex items-center gap-2.5">

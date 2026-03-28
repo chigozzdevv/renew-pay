@@ -38,7 +38,6 @@ a {
 
 ::selection {
   background: rgba(0, 0, 0, 0.15);
-  color: #111111;
 }
 
 @keyframes hero-caret {
@@ -69,7 +68,6 @@ a {
 
 .docs-dark ::selection {
   background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
 }
 
 .docs-dark .docs-card {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { usePrivy } from "@privy-io/react-auth";
 import {
@@ -44,6 +44,95 @@ type RegisterCardState = {
   signerNote: string;
   onRegister?: () => void;
 };
+
+type VerificationSubject = "owner_kyc" | "merchant_kyb";
+
+type SumsubLaunchState = {
+  subject: VerificationSubject;
+  accessToken: string;
+  title: string;
+};
+
+type SumsubSdkInstance = {
+  launch(target: string | HTMLElement): void;
+  destroy?: () => void;
+};
+
+type SumsubSdkChain = {
+  withConf(config: Record<string, unknown>): SumsubSdkChain;
+  withOptions(options: Record<string, unknown>): SumsubSdkChain;
+  on(event: string, handler: (payload: unknown) => void): SumsubSdkChain;
+  onMessage(handler: (type: string, payload: unknown) => void): SumsubSdkChain;
+  build(): SumsubSdkInstance;
+};
+
+type SumsubSdkBuilder = {
+  init(accessToken: string, refreshAccessToken: () => Promise<string>): SumsubSdkChain;
+};
+
+declare global {
+  interface Window {
+    snsWebSdk?: SumsubSdkBuilder;
+  }
+}
+
+let sumsubScriptPromise: Promise<SumsubSdkBuilder> | null = null;
+
+function loadSumsubWebSdk() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Sumsub WebSDK can only load in the browser."));
+  }
+
+  if (window.snsWebSdk) {
+    return Promise.resolve(window.snsWebSdk);
+  }
+
+  if (sumsubScriptPromise) {
+    return sumsubScriptPromise;
+  }
+
+  sumsubScriptPromise = new Promise<SumsubSdkBuilder>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-sumsub-websdk="true"]'
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => {
+        if (window.snsWebSdk) {
+          resolve(window.snsWebSdk);
+          return;
+        }
+
+        reject(new Error("Sumsub WebSDK did not initialize correctly."));
+      });
+      existingScript.addEventListener("error", () => {
+        reject(new Error("Failed to load Sumsub WebSDK."));
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://static.sumsub.com/idensic/static/sns-websdk-builder.js";
+    script.async = true;
+    script.dataset.sumsubWebsdk = "true";
+    script.onload = () => {
+      if (window.snsWebSdk) {
+        resolve(window.snsWebSdk);
+        return;
+      }
+
+      sumsubScriptPromise = null;
+      reject(new Error("Sumsub WebSDK did not initialize correctly."));
+    };
+    script.onerror = () => {
+      sumsubScriptPromise = null;
+      reject(new Error("Failed to load Sumsub WebSDK."));
+    };
+    document.head.appendChild(script);
+  });
+
+  return sumsubScriptPromise;
+}
 
 function toErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
@@ -231,6 +320,131 @@ function OnboardingContent(input: {
     setPayoutWallet,
     runAction,
   } = input.state;
+  const [sumsubLaunch, setSumsubLaunch] = useState<SumsubLaunchState | null>(null);
+  const [sumsubError, setSumsubError] = useState<string | null>(null);
+  const sumsubContainerRef = useRef<HTMLDivElement | null>(null);
+  const sumsubInstanceRef = useRef<{ destroy?: () => void } | null>(null);
+
+  async function refreshSumsubAccessToken(subject: VerificationSubject) {
+    if (!token) {
+      throw new Error("Dashboard session is missing.");
+    }
+
+    const nextSession = await startOnboardingVerification({
+      token,
+      environment: mode,
+      subject,
+    });
+    const nextToken = nextSession.sdkAccessToken?.trim();
+
+    if (!nextToken) {
+      throw new Error("Sumsub did not return a WebSDK access token.");
+    }
+
+    return nextToken;
+  }
+
+  useEffect(() => {
+    if (!sumsubLaunch) {
+      if (sumsubInstanceRef.current?.destroy) {
+        sumsubInstanceRef.current.destroy();
+      }
+      sumsubInstanceRef.current = null;
+      if (sumsubContainerRef.current) {
+        sumsubContainerRef.current.innerHTML = "";
+      }
+      return;
+    }
+
+    let cancelled = false;
+    setSumsubError(null);
+
+    void loadSumsubWebSdk()
+      .then((sdk) => {
+        if (cancelled || !sumsubContainerRef.current) {
+          return;
+        }
+
+        sumsubContainerRef.current.innerHTML = "";
+
+        const builder = sdk
+          .init(sumsubLaunch.accessToken, () => refreshSumsubAccessToken(sumsubLaunch.subject))
+          .withConf({
+            lang: "en",
+            theme: "light",
+          });
+
+        const instance = builder
+          .withOptions({
+            addViewportTag: false,
+            adaptIframeHeight: true,
+          })
+          .on("idCheck.onApplicantSubmitted", () => {
+            void reload();
+            setSumsubLaunch(null);
+          })
+          .on("idCheck.onApplicantVerificationCompleted", () => {
+            void reload();
+            setSumsubLaunch(null);
+          })
+          .on("idCheck.onApplicantStatusChanged", () => {
+            void reload();
+          })
+          .on("idCheck.onError", (sdkError) => {
+            const code =
+              typeof sdkError === "object" &&
+              sdkError !== null &&
+              "error" in sdkError &&
+              typeof sdkError.error === "string"
+                ? sdkError.error
+                : "Verification could not continue.";
+            setSumsubError(code);
+          })
+          .onMessage((type, payload) => {
+            if (
+              type === "idCheck.onApplicantSubmitted" ||
+              type === "idCheck.onApplicantVerificationCompleted"
+            ) {
+              void reload();
+              setSumsubLaunch(null);
+              return;
+            }
+
+            if (type === "idCheck.onError") {
+              const message =
+                typeof payload === "object" &&
+                payload !== null &&
+                "error" in payload &&
+                typeof payload.error === "string"
+                  ? payload.error
+                  : "Verification could not continue.";
+              setSumsubError(message);
+            }
+          })
+          .build();
+
+        sumsubInstanceRef.current = instance;
+        instance.launch(sumsubContainerRef.current);
+      })
+      .catch((launchError) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSumsubError(toErrorMessage(launchError));
+      });
+
+    return () => {
+      cancelled = true;
+      if (sumsubInstanceRef.current?.destroy) {
+        sumsubInstanceRef.current.destroy();
+      }
+      sumsubInstanceRef.current = null;
+      if (sumsubContainerRef.current) {
+        sumsubContainerRef.current.innerHTML = "";
+      }
+    };
+  }, [mode, reload, sumsubLaunch, token]);
 
   if (isLoading || !businessDraft || !data || !token) {
     return (
@@ -372,7 +586,11 @@ function OnboardingContent(input: {
 
         <Card
           title="Verification"
-          description={mode === "live" ? "KYC first, then KYB." : "KYC first."}
+          description={
+            mode === "live"
+              ? "KYC first, then KYB before registration."
+              : "KYC only in test mode. KYB is required in live."
+          }
         >
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
@@ -382,23 +600,40 @@ function OnboardingContent(input: {
                   {data.verification.ownerKyc.status.replace(/_/g, " ")}
                 </Badge>
               </div>
-              <Button
-                type="button"
-                disabled={busyAction === "owner-kyc"}
-                onClick={() =>
-                  void runAction("owner-kyc", async () => {
-                    await startOnboardingVerification({
-                      token,
-                      environment: mode,
-                      subject: "owner_kyc",
-                    });
-                    return "Owner KYC started.";
-                  })
-                }
-              >
+                <Button
+                  type="button"
+                  disabled={busyAction === "owner-kyc"}
+                  onClick={() =>
+                    void runAction("owner-kyc", async () => {
+                      const result = await startOnboardingVerification({
+                        token,
+                        environment: mode,
+                        subject: "owner_kyc",
+                      });
+                      const accessToken = result.sdkAccessToken?.trim();
+
+                      if (!accessToken) {
+                        throw new Error("Sumsub did not return a WebSDK access token.");
+                      }
+
+                      setSumsubLaunch({
+                        subject: "owner_kyc",
+                        accessToken,
+                        title: "Owner KYC",
+                      });
+                      return "Owner KYC started.";
+                    })
+                  }
+                >
                 {busyAction === "owner-kyc" ? "Starting..." : "Start KYC"}
               </Button>
             </div>
+
+            {mode !== "live" ? (
+              <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
+                KYB is only required when you switch this workspace to live mode.
+              </div>
+            ) : null}
 
             {mode === "live" ? (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
@@ -413,10 +648,21 @@ function OnboardingContent(input: {
                   disabled={busyAction === "merchant-kyb"}
                   onClick={() =>
                     void runAction("merchant-kyb", async () => {
-                      await startOnboardingVerification({
+                      const result = await startOnboardingVerification({
                         token,
                         environment: mode,
                         subject: "merchant_kyb",
+                      });
+                      const accessToken = result.sdkAccessToken?.trim();
+
+                      if (!accessToken) {
+                        throw new Error("Sumsub did not return a WebSDK access token.");
+                      }
+
+                      setSumsubLaunch({
+                        subject: "merchant_kyb",
+                        accessToken,
+                        title: "Merchant KYB",
                       });
                       return "Merchant KYB started.";
                     })
@@ -493,6 +739,42 @@ function OnboardingContent(input: {
           </div>
         </Card>
       </div>
+
+      {sumsubLaunch ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,12,8,0.58)] p-4">
+          <div className="flex h-[min(92vh,860px)] w-[min(100%,1080px)] flex-col overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-white shadow-[0_40px_140px_rgba(4,12,8,0.28)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] px-5 py-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+                  Sumsub verification
+                </p>
+                <h2 className="mt-1 font-display text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+                  {sumsubLaunch.title}
+                </h2>
+                <p className="mt-2 text-sm leading-7 text-[color:var(--muted)]">
+                  Complete the verification flow here, then return to onboarding.
+                </p>
+              </div>
+              <Button type="button" onClick={() => setSumsubLaunch(null)}>
+                Close
+              </Button>
+            </div>
+
+            {sumsubError ? (
+              <div className="border-b border-[#ecd0cc] bg-[#fff6f5] px-5 py-3 text-sm text-[#9b3d31]">
+                {sumsubError}
+              </div>
+            ) : null}
+
+            <div className="min-h-0 flex-1 overflow-auto bg-[#f7faf6] p-4">
+              <div
+                ref={sumsubContainerRef}
+                className="min-h-full rounded-[1.6rem] border border-[color:var(--line)] bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
