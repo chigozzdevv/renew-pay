@@ -2,10 +2,10 @@
 
 import type { ReactNode } from "react";
 
-import { OnboardingSurface } from "@/components/dashboard/onboarding-surface";
+import OnboardingPage from "@/app/dashboard/onboarding/page";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 
-export function DashboardWorkspaceAccessBoundary({
+export function DashboardAccessGate({
   children,
 }: {
   children: ReactNode;
@@ -13,7 +13,7 @@ export function DashboardWorkspaceAccessBoundary({
   const { user } = useDashboardSession();
 
   if (user?.onboardingStatus !== "workspace_active") {
-    return <OnboardingSurface />;
+    return <OnboardingPage />;
   }
 
   return <>{children}</>;

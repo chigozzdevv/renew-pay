@@ -12,7 +12,7 @@ type ResourceState<T> = {
   reload: () => Promise<void>;
 };
 
-export function useAuthedResource<T>(
+export function useResource<T>(
   loader: (input: { token: string; merchantId: string }) => Promise<T>,
   deps: readonly unknown[] = []
 ): ResourceState<T> {

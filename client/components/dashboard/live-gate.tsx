@@ -5,7 +5,7 @@ import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { Badge, Button } from "@/components/dashboard/ui";
 
 
-export function LiveOnboardingGate() {
+export function LiveGate() {
   const { user } = useDashboardSession();
   const { isUpdating, setMode } = useWorkspaceMode();
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? null;

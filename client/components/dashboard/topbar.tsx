@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
-import { useAuthedResource } from "@/components/dashboard/use-authed-resource";
+import { useResource } from "@/components/dashboard/use-resource";
 import { Badge } from "@/components/dashboard/ui";
 import { loadWorkspaceSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const { data: settingsData, reload: reloadSettings } = useAuthedResource(
+  const { data: settingsData, reload: reloadSettings } = useResource(
     ({ token, merchantId }) =>
       loadWorkspaceSettings({ token, merchantId, environment: mode }),
     [mode]
@@ -238,7 +238,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
               className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[color:var(--line)] bg-white/82 px-3 transition-colors hover:bg-white"
-              aria-label="Open workspace profile"
+              aria-label="Open account menu"
               aria-expanded={profileOpen}
             >
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#0c4a27] text-xs font-semibold text-[#d9f6bc]">

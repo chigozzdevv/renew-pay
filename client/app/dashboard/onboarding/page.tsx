@@ -11,7 +11,7 @@ import {
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
-import { useAuthedResource } from "@/components/dashboard/use-authed-resource";
+import { useResource } from "@/components/dashboard/use-resource";
 import { Badge, Button, Card, Input, PageState } from "@/components/dashboard/ui";
 import { ApiError } from "@/lib/api";
 import {
@@ -132,7 +132,7 @@ function formatAddress(value: string | null) {
 function useOnboardingWorkspace() {
   const { token, refresh: refreshSession, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
-  const { data, isLoading, error, reload } = useAuthedResource(
+  const { data, isLoading, error, reload } = useResource(
     async ({ token }) =>
       loadOnboardingState({
         token,
@@ -627,7 +627,7 @@ function FallbackOnboardingSurface() {
   );
 }
 
-export function OnboardingSurface() {
+export default function OnboardingPage() {
   if (!PRIVY_APP_ID) {
     return <FallbackOnboardingSurface />;
   }
