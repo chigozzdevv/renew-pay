@@ -52,7 +52,15 @@ function getReferenceBadgeClassName(label: string) {
     return "bg-[#ffd9d2] text-[#8f2612]";
   }
 
-  return "bg-black/6 text-[color:var(--brand)]";
+  if (normalized === "SANDBOX" || normalized === "LIVE") {
+    return "bg-[#e8f0e4] text-[#0c4a27]";
+  }
+
+  if (normalized === "HEADER") {
+    return "bg-[#f0edf7] text-[#4a3b6d]";
+  }
+
+  return "bg-black/6 text-[#6b7280]";
 }
 
 function matchesSearch(page: DocsPage, query: string) {

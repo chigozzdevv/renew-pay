@@ -147,7 +147,7 @@ export function Header() {
         aria-current={isActive ? "page" : undefined}
         className={cn(
           "text-[15px] font-light tracking-[-0.01em] transition-colors",
-          isActive ? "text-[#1f1a16]" : "text-[#4b5563] hover:text-[#1f1a16]",
+          isActive ? "text-[#1f1a16] border-b-2 border-[#1f1a16] pb-0.5" : "text-[#4b5563] hover:text-[#1f1a16]",
         )}
       >
         {item.label}

@@ -264,12 +264,10 @@ export function HowItWorksSection() {
             </Reveal>
           </Container>
 
-          {/* Phone + cards area */}
           <div
             className="relative mt-10 flex w-full flex-1 items-start justify-center sm:mt-14"
             style={{ minHeight: PHONE_H + 40 }}
           >
-            {/* ── Card strip — one continuous row, all cards always visible ── */}
             <motion.div
               className="absolute flex items-start"
               style={{
@@ -325,7 +323,6 @@ export function HowItWorksSection() {
               </motion.div>
             </motion.div>
 
-            {/* ── Phone frame overlay — border only, transparent center ── */}
             <motion.div
               className="pointer-events-none relative z-20 rounded-t-[2.8rem] border-[6px] border-b-0 border-[#1a1a1a]"
               style={{
@@ -336,7 +333,6 @@ export function HowItWorksSection() {
                 scale: frameScale,
               }}
             >
-              {/* Dynamic island */}
               <div className="absolute left-1/2 top-[8px] z-30 -translate-x-1/2">
                 <div className="h-[1.5rem] w-[5.5rem] rounded-full bg-[#1a1a1a]" />
               </div>
