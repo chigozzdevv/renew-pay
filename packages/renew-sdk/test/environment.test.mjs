@@ -9,8 +9,8 @@ import {
 } from "../dist/core/index.js";
 
 test("resolves known Renew API origins", () => {
-  assert.equal(getRenewApiOrigin("sandbox"), "https://sandbox.renew.sh");
-  assert.equal(getRenewApiOrigin("live"), "https://api.renew.sh");
+  assert.equal(getRenewApiOrigin("sandbox"), "https://staging-pay.renew.sh");
+  assert.equal(getRenewApiOrigin("live"), "https://pay.renew.sh");
 });
 
 test("infers environment from secret key prefix", () => {
@@ -20,11 +20,11 @@ test("infers environment from secret key prefix", () => {
 
 test("infers environment from known API origins", () => {
   assert.equal(
-    inferRenewEnvironmentFromApiOrigin("https://sandbox.renew.sh/v1"),
+    inferRenewEnvironmentFromApiOrigin("https://staging-pay.renew.sh/v1"),
     "sandbox"
   );
   assert.equal(
-    inferRenewEnvironmentFromApiOrigin("https://api.renew.sh/v1"),
+    inferRenewEnvironmentFromApiOrigin("https://pay.renew.sh/v1"),
     "live"
   );
 });
@@ -33,7 +33,7 @@ test("rejects mismatched API origin and environment", () => {
   assert.throws(
     () =>
       validateRenewApiEnvironment({
-        apiOrigin: "https://api.renew.sh",
+        apiOrigin: "https://pay.renew.sh",
         environment: "sandbox",
       }),
     /does not match sandbox mode/

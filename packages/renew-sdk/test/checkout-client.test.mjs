@@ -22,7 +22,7 @@ test("uses secret key headers for plan discovery", async () => {
 
   await client.listPlans({ secretKey: "rw_test_example" });
 
-  assert.equal(captured.url, "https://sandbox.renew.sh/v1/checkout/plans");
+  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/checkout/plans");
   assert.equal(captured.init.method, "GET");
   assert.equal(captured.init.headers["x-renew-secret-key"], "rw_test_example");
 });
@@ -82,7 +82,7 @@ test("uses client secret headers for session fetch", async () => {
 
   assert.equal(
     captured.url,
-    "https://sandbox.renew.sh/v1/checkout/sessions/chk_123"
+    "https://staging-pay.renew.sh/v1/checkout/sessions/chk_123"
   );
   assert.equal(captured.init.headers["x-renew-client-secret"], "cs_test_123");
 });

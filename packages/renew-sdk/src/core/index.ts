@@ -56,7 +56,9 @@ export type {
   RenewCheckoutSessionCustomer,
   RenewCheckoutSessionPlan,
   RenewCheckoutSessionSettlement,
+  RenewCheckoutVerification,
   RenewCheckoutStatus,
   RenewEnvironment,
   SubmitCheckoutCustomerInput,
+  SubmitCheckoutVerificationInput,
 } from "../types/checkout.js";

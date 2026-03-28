@@ -24,7 +24,7 @@
     "checkout",
     "billing",
     "subscriptions",
-    "avalanche",
+    "solana",
     "usdc"
   ],
   "engines": {

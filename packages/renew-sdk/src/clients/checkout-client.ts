@@ -6,6 +6,7 @@ import type {
   RenewCheckoutMarketQuote,
   RenewCheckoutSession,
   SubmitCheckoutCustomerInput,
+  SubmitCheckoutVerificationInput,
 } from "../types/checkout.js";
 import { resolveRenewApiOrigin } from "../shared/environment.js";
 
@@ -132,6 +133,11 @@ export type RenewCheckoutClient = {
     input: SubmitCheckoutCustomerInput,
     options: ClientSecretOptions
   ): Promise<RenewCheckoutSession>;
+  submitVerification(
+    sessionId: string,
+    input: SubmitCheckoutVerificationInput,
+    options: ClientSecretOptions
+  ): Promise<RenewCheckoutSession>;
   completeTestPayment(
     sessionId: string,
     options: ClientSecretOptions
@@ -193,6 +199,17 @@ export function createRenewCheckoutClient(
     async submitCustomer(sessionId, input, options) {
       return request<RenewCheckoutSession>(fetchImplementation, {
         url: `${apiOrigin}/v1/checkout/sessions/${sessionId}/customer`,
+        method: "POST",
+        headers: {
+          "x-renew-client-secret": resolveClientSecret(options),
+        },
+        body: input,
+      });
+    },
+
+    async submitVerification(sessionId, input, options) {
+      return request<RenewCheckoutSession>(fetchImplementation, {
+        url: `${apiOrigin}/v1/checkout/sessions/${sessionId}/verification`,
         method: "POST",
         headers: {
           "x-renew-client-secret": resolveClientSecret(options),

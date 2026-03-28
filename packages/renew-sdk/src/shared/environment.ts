@@ -11,8 +11,8 @@ function normalizeApiOrigin(value: string) {
 
 export function getRenewApiOrigin(environment: RenewEnvironment) {
   return environment === "live"
-    ? "https://api.renew.sh"
-    : "https://sandbox.renew.sh";
+    ? "https://pay.renew.sh"
+    : "https://staging-pay.renew.sh";
 }
 
 export function inferRenewEnvironmentFromSecretKey(secretKey: string): RenewEnvironment {
@@ -34,11 +34,11 @@ export function inferRenewEnvironmentFromApiOrigin(
 ): RenewEnvironment | null {
   const normalized = normalizeApiOrigin(apiOrigin);
 
-  if (normalized === "https://api.renew.sh") {
+  if (normalized === "https://pay.renew.sh") {
     return "live";
   }
 
-  if (normalized === "https://sandbox.renew.sh") {
+  if (normalized === "https://staging-pay.renew.sh") {
     return "sandbox";
   }
 

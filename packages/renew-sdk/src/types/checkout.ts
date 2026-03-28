@@ -2,6 +2,7 @@ export type RenewEnvironment = "sandbox" | "live";
 
 export type RenewCheckoutStatus =
   | "open"
+  | "pending_verification"
   | "scheduled"
   | "pending_payment"
   | "processing"
@@ -11,10 +12,12 @@ export type RenewCheckoutStatus =
 
 export type RenewCheckoutNextAction =
   | "submit_customer"
+  | "complete_verification"
   | "wait_for_charge"
-  | "complete_test_payment"
-  | "wait_for_provider"
+  | "show_payment_instructions"
+  | "redirect_to_provider"
   | "wait_for_settlement"
+  | "complete_test_payment"
   | "none";
 
 export type RenewCheckoutSessionPlan = {
@@ -33,9 +36,15 @@ export type RenewCheckoutSessionCustomer = {
   readonly name: string;
   readonly email: string;
   readonly market: string;
-  readonly paymentAccountType: string;
-  readonly paymentAccountNumber: string | null;
-  readonly paymentNetworkId: string | null;
+};
+
+export type RenewCheckoutVerification = {
+  readonly provider: "partna" | "yellow_card" | null;
+  readonly status: string | null;
+  readonly country: string | null;
+  readonly currency: string | null;
+  readonly instructions: string | null;
+  readonly requiredFields: readonly string[];
 };
 
 export type RenewCheckoutSessionCharge = {
@@ -61,21 +70,23 @@ export type RenewCheckoutSessionSettlement = {
 };
 
 export type RenewCheckoutPaymentInstructions = {
+  readonly provider: "partna" | "yellow_card" | null;
+  readonly kind: "bank_transfer" | "redirect" | null;
   readonly externalChargeId: string | null;
   readonly billingCurrency: string | null;
   readonly localAmount: number | null;
   readonly usdcAmount: number | null;
   readonly feeAmount: number | null;
   readonly status: string | null;
-  readonly collectionId: string | null;
-  readonly collectionSequenceId: string | null;
   readonly reference: string | null;
-  readonly depositId: string | null;
   readonly expiresAt: string | Date | null;
-  readonly bankInfo: {
-    readonly name: string | null;
+  readonly redirectUrl: string | null;
+  readonly bankTransfer: {
+    readonly bankCode: string | null;
+    readonly bankName: string | null;
     readonly accountNumber: string | null;
     readonly accountName: string | null;
+    readonly currency: string | null;
   } | null;
 };
 
@@ -87,7 +98,7 @@ export type RenewCheckoutMarketQuote = {
   readonly feeAmount: number;
   readonly expiresAt: string | Date | null;
   readonly settlementAsset: "USDC";
-  readonly settlementNetwork: "AVALANCHE";
+  readonly settlementNetwork: "SOLANA";
   readonly channel: {
     readonly externalId: string;
     readonly country: string;
@@ -114,6 +125,7 @@ export type RenewCheckoutSession = {
   readonly nextAction: RenewCheckoutNextAction;
   readonly plan: RenewCheckoutSessionPlan;
   readonly customer: RenewCheckoutSessionCustomer | null;
+  readonly verification: RenewCheckoutVerification | null;
   readonly charge: RenewCheckoutSessionCharge | null;
   readonly settlement: RenewCheckoutSessionSettlement | null;
   readonly paymentInstructions: RenewCheckoutPaymentInstructions | null;
@@ -152,8 +164,20 @@ export type SubmitCheckoutCustomerInput = {
   readonly name: string;
   readonly email: string;
   readonly market: string;
-  readonly paymentAccountType?: "bank" | "momo";
-  readonly paymentAccountNumber?: string;
-  readonly paymentNetworkId?: string;
   readonly metadata?: Record<string, unknown>;
+};
+
+export type SubmitCheckoutVerificationInput = {
+  readonly phoneNumber: string;
+  readonly dateOfBirth: string;
+  readonly bvn: string;
+  readonly stateOfOrigin: string;
+  readonly stateOfResidence: string;
+  readonly lgaOfOrigin: string;
+  readonly lgaOfResidence: string;
+  readonly addressLine1: string;
+  readonly addressLine2?: string;
+  readonly addressLine3?: string;
+  readonly middleName?: string;
+  readonly country?: string;
 };

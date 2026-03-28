@@ -6,6 +6,7 @@ import type { RenewCheckoutClient } from "../clients/checkout-client.js";
 import type {
   RenewCheckoutSession,
   SubmitCheckoutCustomerInput,
+  SubmitCheckoutVerificationInput,
 } from "../types/checkout.js";
 
 type RenewCheckoutSessionEventHandler = (
@@ -46,6 +47,7 @@ export function useRenewCheckoutSession(
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
   const [isCompletingTestPayment, setIsCompletingTestPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastEmittedStatusRef = useRef<string | null>(options.initialSession?.status ?? null);
@@ -136,6 +138,33 @@ export function useRenewCheckoutSession(
     }
   };
 
+  const submitVerification = async (input: SubmitCheckoutVerificationInput) => {
+    const clientSecret = getClientSecret(options);
+
+    if (!session || !clientSecret) {
+      throw new Error("Checkout session is not ready.");
+    }
+
+    setIsSubmittingVerification(true);
+
+    try {
+      const nextSession = await options.client.submitVerification(session.id, input, {
+        clientSecret,
+      });
+
+      return await commitSession(nextSession);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to submit checkout verification."
+      );
+      throw nextError;
+    } finally {
+      setIsSubmittingVerification(false);
+    }
+  };
+
   const completeTestPayment = async () => {
     const clientSecret = getClientSecret(options);
 
@@ -196,9 +225,11 @@ export function useRenewCheckoutSession(
       Boolean(session) &&
       POLLABLE_STATUSES.has(session?.status ?? ""),
     isSubmittingCustomer,
+    isSubmittingVerification,
     isCompletingTestPayment,
     refresh,
     submitCustomer,
+    submitVerification,
     completeTestPayment,
   };
 }
