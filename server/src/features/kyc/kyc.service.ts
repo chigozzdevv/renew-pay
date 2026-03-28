@@ -681,10 +681,10 @@ export async function processSumsubWebhook(input: {
     assertLiveOnboardingEnabled("processing Sumsub webhooks");
   }
 
-  const mode: RuntimeMode = "live";
-  const liveConfig = getSumsubConfig(mode);
+  const mode: RuntimeMode = requestedMode;
+  const config = getSumsubConfig(mode);
   const sumsubProvider = getSumsubProvider(mode);
-  const hasConfiguredWebhookSecret = liveConfig.webhookSecret.length > 0;
+  const hasConfiguredWebhookSecret = config.webhookSecret.length > 0;
   const digestMatches = sumsubProvider.verifyWebhookDigest({
     rawBody: input.rawBody,
     digest: input.digestHeader,
@@ -810,7 +810,9 @@ export async function processSumsubWebhook(input: {
     subjectType: record.subjectType,
     status: record.status,
     reviewAnswer: record.reviewAnswer ?? null,
-  }).catch(() => undefined);
+  }).catch((notificationError) => {
+    console.error("[sumsub-webhook] Failed to queue verification notification:", notificationError);
+  });
 
   const result = {
     processed: true,
