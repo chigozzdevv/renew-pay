@@ -657,6 +657,37 @@ function assertMultiOwnerThreshold(input: {
   }
 }
 
+async function ensureApprovalWorkflowTreasuryAccount(
+  merchantId: string,
+  environment: RuntimeMode
+) {
+  const [activeOwnerCount, treasuryAccount] = await Promise.all([
+    countActiveOwnerMembers(merchantId),
+    ensureTreasuryAccount(merchantId, environment),
+  ]);
+
+  if (activeOwnerCount > 1) {
+    if (treasuryAccount.ownerAddresses.length < 2) {
+      throw new HttpError(
+        409,
+        "Multi-owner workspaces must bind at least two owner signer wallets to treasury approvals."
+      );
+    }
+
+    assertMultiOwnerThreshold({
+      ownerCount: treasuryAccount.ownerAddresses.length,
+      threshold: treasuryAccount.threshold,
+      message:
+        "Multi-owner workspaces must require at least two treasury approvals.",
+    });
+  }
+
+  return {
+    activeOwnerCount,
+    treasuryAccount,
+  };
+}
+
 function listRuntimeModes(values: string[]) {
   return [...new Set(values.map((value) => (value === "live" ? "live" : "test")))] as RuntimeMode[];
 }
@@ -1696,43 +1727,15 @@ export async function withdrawPayoutBatch(input: {
     throw new HttpError(404, "Merchant was not found.");
   }
 
-  if (input.environment === "live" && !merchant.governanceEnabled) {
-    const activeOwnerCount = await countActiveOwnerMembers(input.merchantId);
-
-    if (activeOwnerCount > 1) {
-      throw new HttpError(
-        409,
-        "Live withdrawals require treasury governance when the workspace has multiple owners."
-      );
-    }
-  }
-
-  if (input.environment === "live" && merchant.governanceEnabled) {
-    const [activeOwnerCount, treasuryAccount] = await Promise.all([
-      countActiveOwnerMembers(input.merchantId),
-      ensureTreasuryAccount(input.merchantId, input.environment),
-    ]);
-
-    if (activeOwnerCount > 1) {
-      if (treasuryAccount.ownerAddresses.length < 2) {
-        throw new HttpError(
-          409,
-          "Live multi-owner workspaces must bind at least two owner signer wallets to treasury governance."
-        );
-      }
-
-      assertMultiOwnerThreshold({
-        ownerCount: treasuryAccount.ownerAddresses.length,
-        threshold: treasuryAccount.threshold,
-        message:
-          "Live multi-owner workspaces must require at least two treasury approvals.",
-      });
-    }
-  }
-
   if (!preview.preview || !preview.preview.settlementIds.length) {
     throw new HttpError(409, "There are no eligible settlements to withdraw.");
   }
+
+  const { treasuryAccount, activeOwnerCount } =
+    await ensureApprovalWorkflowTreasuryAccount(
+      input.merchantId,
+      input.environment
+    );
 
   const existingBatch =
     preview.preview.id &&
@@ -1760,7 +1763,7 @@ export async function withdrawPayoutBatch(input: {
       merchantId: new Types.ObjectId(input.merchantId),
       environment: input.environment,
       destinationWallet: merchant.payoutWallet,
-      status: merchant.governanceEnabled ? "pending_governance" : "open",
+      status: "pending_governance",
       trigger: input.payload.trigger,
       settlementIds: settlements.map((entry) => entry._id),
       grossUsdc: totals.grossUsdc,
@@ -1795,80 +1798,47 @@ export async function withdrawPayoutBatch(input: {
     }
   }
 
-  if (merchant.governanceEnabled) {
-    const treasuryAccount = await ensureTreasuryAccount(input.merchantId, input.environment).catch(
-      () => null
-    );
+  const existingOperation = await TreasuryOperationModel.findOne({
+    merchantId: input.merchantId,
+    kind: "payout_batch_withdraw",
+    status: { $in: ["pending_signatures", "approved", "executed"] },
+    "metadata.batchId": batch._id.toString(),
+    ...createRuntimeModeCondition("environment", input.environment),
+  }).exec();
 
-    if (!treasuryAccount) {
-      throw new HttpError(
-        409,
-        "Governance is enabled but a governance vault has not been configured yet."
-      );
-    }
-
-    const existingOperation = await TreasuryOperationModel.findOne({
-      merchantId: input.merchantId,
-      kind: "payout_batch_withdraw",
-      status: { $in: ["pending_signatures", "approved", "executed"] },
-      "metadata.batchId": batch._id.toString(),
-      ...createRuntimeModeCondition("environment", input.environment),
-    }).exec();
-
-    if (!existingOperation) {
-      const operation = await TreasuryOperationModel.create({
-        merchantId: new Types.ObjectId(input.merchantId),
-        environment: input.environment,
-        treasuryAccountId: treasuryAccount._id,
-        settlementId: null,
-        kind: "payout_batch_withdraw",
-        status: "pending_signatures",
-        governanceMultisigAddress: treasuryAccount.governanceMultisigAddress,
-        governanceVaultAddress: treasuryAccount.governanceVaultAddress,
-        threshold: treasuryAccount.threshold,
-        targetAddress: getProtocolProgramAddress(input.environment),
-        value: "0",
-        data: encodeWithdrawCallBaseUnits(totals.withdrawBaseUnits),
-        origin: `payout-batch:${batch._id.toString()}`,
-        createdBy: input.actor,
-        signatures: [],
-        metadata: {
-          batchId: batch._id.toString(),
-          settlementIds: settlements.map((entry) => entry._id.toString()),
-          destinationWallet: merchant.payoutWallet,
-          grossSettlementUsdc: totals.grossUsdc,
-          protocolFeeBps: Number(protocolFeeBps),
-          protocolFeeUsdc: totals.feeUsdc,
-          netUsdc: totals.netUsdc,
-        },
-      });
-
-      await queueTreasuryApprovalNeededNotification({
-        merchantId: input.merchantId,
-        environment: input.environment,
-        operationId: operation._id.toString(),
-      }).catch(() => undefined);
-    }
-  } else {
-    const treasuryAccount = await ensureProtocolOperatorVault(
-      input.merchantId,
-      input.environment
-    );
-    const operatorVault = getOperatorVaultContext(treasuryAccount);
-    const withdrawResult = await withdrawProtocolMerchantBalance({
+  if (!existingOperation) {
+    const operation = await TreasuryOperationModel.create({
+      merchantId: new Types.ObjectId(input.merchantId),
       environment: input.environment,
+      treasuryAccountId: treasuryAccount._id,
+      settlementId: null,
+      kind: "payout_batch_withdraw",
+      status: "pending_signatures",
+      governanceMultisigAddress: treasuryAccount.governanceMultisigAddress,
+      governanceVaultAddress: treasuryAccount.governanceVaultAddress,
+      threshold: treasuryAccount.threshold,
+      targetAddress: getProtocolProgramAddress(input.environment),
+      value: "0",
+      data: encodeWithdrawCallBaseUnits(totals.withdrawBaseUnits),
+      origin: `payout-batch:${batch._id.toString()}`,
+      createdBy: input.actor,
+      signatures: [],
+      metadata: {
+        batchId: batch._id.toString(),
+        settlementIds: settlements.map((entry) => entry._id.toString()),
+        destinationWallet: merchant.payoutWallet,
+        grossSettlementUsdc: totals.grossUsdc,
+        protocolFeeBps: Number(protocolFeeBps),
+        protocolFeeUsdc: totals.feeUsdc,
+        netUsdc: totals.netUsdc,
+      },
+    });
+
+    await queueTreasuryApprovalNeededNotification({
       merchantId: input.merchantId,
-      amountUsdc: totals.netUsdc,
-      ...operatorVault,
-    });
-    batch.status = "executed";
-    batch.txHash = withdrawResult.txHash;
-    batch.executedAt = new Date();
-    await batch.save();
-    await syncPayoutBatchSettlements({
-      batchId: batch._id.toString(),
-      txHash: withdrawResult.txHash,
-    });
+      environment: input.environment,
+      operationId: operation._id.toString(),
+    }).catch(() => undefined);
   }
 
   await appendAuditLog({
@@ -1878,15 +1848,17 @@ export async function withdrawPayoutBatch(input: {
     category: "treasury",
     status: "ok",
     target: batch._id.toString(),
-    detail: merchant.governanceEnabled
-      ? "Payout batch queued for governance approval."
-      : "Payout batch withdrawn to the approved payout wallet.",
+    detail:
+      activeOwnerCount > 1
+        ? "Payout batch queued for owner approvals."
+        : "Payout batch queued for owner approval.",
     metadata: {
       batchId: batch._id.toString(),
       trigger: input.payload.trigger,
       settlementCount: settlements.length,
       netUsdc: totals.netUsdc,
-      governanceEnabled: merchant.governanceEnabled,
+      approvalMode: activeOwnerCount > 1 ? "multisig" : "single_owner",
+      governanceEnabled: true,
     },
     ipAddress: null,
     userAgent: null,
@@ -2608,7 +2580,7 @@ async function createWalletOperation(input: {
   data: string;
   metadata?: Record<string, unknown>;
 }) {
-  const treasuryAccount = await ensureTreasuryAccount(
+  const { treasuryAccount } = await ensureApprovalWorkflowTreasuryAccount(
     input.merchantId,
     input.environment
   );

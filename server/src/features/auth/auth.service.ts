@@ -53,7 +53,7 @@ function toAuthenticatedUser(
     authProvider: merchant?.authProvider ?? "privy",
     operatorWalletAddress: merchant?.operatorSmartAccountAddress ?? null,
     onboardingStatus: merchant?.onboardingStatus ?? "workspace_active",
-    governanceEnabled: merchant?.governanceEnabled ?? false,
+    governanceEnabled: true,
   };
 }
 
@@ -266,7 +266,7 @@ export async function signupWithPassword(input: SignupInput) {
     authProviderUserId: null,
     operatorSmartAccountAddress: null,
     onboardingStatus: "identity_complete",
-    governanceEnabled: false,
+    governanceEnabled: true,
   });
 
   try {
@@ -536,7 +536,7 @@ export async function exchangePrivySession(input: PrivySessionInput) {
         operatorSmartAccountAddress:
           normalizeSolanaAddress(input.operatorWalletAddress),
         onboardingStatus: "identity_complete",
-        governanceEnabled: false,
+        governanceEnabled: true,
       });
 
       const permissions = getPermissionsForRole("owner");

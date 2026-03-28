@@ -177,7 +177,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
       autoPayoutThresholdUsdc: input.setting.autoPayoutThresholdUsdc,
     },
     governance: {
-      enabled: input.merchant.governanceEnabled,
+      enabled: true,
     },
   };
 }
@@ -347,23 +347,21 @@ export async function updateOnboardingGovernance(input: {
   payload: OnboardingGovernanceInput;
 }) {
   const merchant = await getMerchantOrThrow(input.merchantId);
-  merchant.governanceEnabled = input.payload.enabled;
+  merchant.governanceEnabled = true;
   await merchant.save();
 
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: input.payload.enabled
-      ? "Enabled advanced governance"
-      : "Skipped advanced governance",
+    action: "Configured workspace approvals",
     category: "security",
     status: "ok",
     target: merchant.name,
-    detail: input.payload.enabled
-      ? "Advanced governance was enabled during onboarding."
-      : "Workspace stayed in single-owner mode during onboarding.",
+    detail:
+      "Workspace approvals stay enabled; multi-owner workspaces automatically use multisig.",
     metadata: {
-      governanceEnabled: input.payload.enabled,
+      governanceEnabled: true,
+      requestedEnabled: input.payload.enabled,
     },
     ipAddress: null,
     userAgent: null,
@@ -405,7 +403,7 @@ export async function completeOnboarding(input: {
     detail: "Workspace onboarding was completed.",
     metadata: {
       environment: input.payload.environment,
-      governanceEnabled: state.merchant.governanceEnabled,
+      governanceEnabled: true,
     },
     ipAddress: null,
     userAgent: null,

@@ -41,6 +41,9 @@ export async function getGovernanceState(
   ]);
 
   const memberMap = new Map(teamMembers.map((member) => [member._id.toString(), member]));
+  const activeOwners = teamMembers.filter(
+    (member) => member.role === "owner" && member.status === "active"
+  );
   const approvers = signers.map((signer) => {
     const member = memberMap.get(signer.teamMemberId.toString());
 
@@ -59,14 +62,15 @@ export async function getGovernanceState(
 
   const activeApprovers = approvers.filter((entry) => entry.status === "active");
   const threshold =
-    activeApprovers.length <= 1 ? 1 : Math.min(2, activeApprovers.length);
+    treasuryAccount?.threshold ??
+    (activeOwners.length <= 1 ? 1 : Math.min(2, activeOwners.length));
 
   return {
     merchantId,
-    enabled: merchant.governanceEnabled,
+    enabled: true,
     onboardingStatus: merchant.onboardingStatus,
     mode:
-      merchant.governanceEnabled && activeApprovers.length > 1
+      activeOwners.length > 1
         ? ("multisig" as const)
         : ("single_owner" as const),
     controllerWalletAddress:
@@ -87,22 +91,22 @@ export async function enableGovernance(input: {
   payload: EnableGovernanceInput;
 }) {
   const merchant = await getMerchantOrThrow(input.merchantId);
-  merchant.governanceEnabled = input.payload.enabled;
+  merchant.governanceEnabled = true;
   await merchant.save();
 
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: input.payload.enabled ? "Enabled governance" : "Disabled governance",
+    action: "Configured workspace approvals",
     category: "security",
     status: "ok",
     target: merchant.name,
-    detail: input.payload.enabled
-      ? "Advanced governance controls were enabled."
-      : "Advanced governance controls were disabled.",
+    detail:
+      "Workspace approvals stay enabled; multi-owner workspaces automatically use multisig.",
     metadata: {
       environment: input.payload.environment,
-      enabled: input.payload.enabled,
+      enabled: true,
+      requestedEnabled: input.payload.enabled,
     },
     ipAddress: null,
     userAgent: null,
@@ -111,7 +115,7 @@ export async function enableGovernance(input: {
   await queueGovernanceToggleNotification({
     merchantId: input.merchantId,
     environment: input.payload.environment,
-    enabled: input.payload.enabled,
+    enabled: true,
   }).catch(() => undefined);
 
   return getGovernanceState(input.merchantId, input.payload.environment);

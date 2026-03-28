@@ -76,7 +76,7 @@ const merchantSchema = new Schema(
     governanceEnabled: {
       type: Boolean,
       required: true,
-      default: false,
+      default: true,
     },
   },
   {
