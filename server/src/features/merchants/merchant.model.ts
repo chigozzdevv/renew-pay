@@ -62,7 +62,7 @@ const merchantSchema = new Schema(
       trim: true,
       default: null,
     },
-    operatorSmartAccountAddress: {
+    operatorWalletAddress: {
       type: String,
       trim: true,
       default: null,
@@ -71,7 +71,7 @@ const merchantSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "workspace_active",
+      default: "business",
     },
     governanceEnabled: {
       type: Boolean,

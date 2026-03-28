@@ -10,7 +10,7 @@ import { PaymentRailEventModel } from "@/features/payment-rails/payment-rail-eve
 import { ChannelModel } from "@/features/payment-rails/channel.model";
 import { NetworkModel } from "@/features/payment-rails/network.model";
 import { PlanModel } from "@/features/plans/plan.model";
-import { recordProtocolChargeFailure } from "@/features/settlements/protocol-execution.service";
+import { recordProtocolChargeFailure } from "@/features/protocol/protocol.settlement";
 import { SettlementModel } from "@/features/settlements/settlement.model";
 import { queueSettlementBridge } from "@/features/settlements/settlement.service";
 import { SubscriptionModel } from "@/features/subscriptions/subscription.model";

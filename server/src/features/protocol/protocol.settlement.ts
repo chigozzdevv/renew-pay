@@ -1,11 +1,11 @@
 import { BN } from "@coral-xyz/anchor";
-import { SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { SystemProgram } from "@solana/web3.js";
 
 import {
   createFxQuoteArgs,
-  findConfigPda,
   findChargeReceiptPda,
+  findConfigPda,
   findCycleMarkerPda,
   findLedgerPda,
   hashProgramIdentifier,
@@ -39,9 +39,11 @@ type ProtocolChargeExecutionInput =
       amountUsdc: number;
     };
 
-export async function executeProtocolSettlement(input: ProtocolChargeExecutionInput & {
-  environment: RuntimeMode;
-}) {
+export async function executeProtocolSettlement(
+  input: ProtocolChargeExecutionInput & {
+    environment: RuntimeMode;
+  }
+) {
   const settlementAuthority = getSolanaSettlementAuthorityKeypair(input.environment);
 
   if (input.mode === "subscription_charge_success") {
@@ -65,35 +67,34 @@ export async function executeProtocolSettlement(input: ProtocolChargeExecutionIn
       context.subscriptionRefHash,
       billingPeriodStart
     );
-    const instruction =
-      await context.runtime.program.methods
-        .recordSubscriptionChargeSuccess(
-          Array.from(externalChargeRefHash),
-          new BN(billingPeriodStart),
-          toFixed6Bn(input.localAmount),
-          createFxQuoteArgs({
-            externalRef: input.externalChargeId,
-            providerRef: "yellow_card",
-            fxRate: input.fxRate,
-          }),
-          toFixed6Bn(input.usageUnits ?? 0),
-          toFixed6Bn(input.usdcAmount)
-        )
-        .accounts({
-          config: findConfigPda(context.runtime.programId),
-          settlementAuthority: settlementAuthority.publicKey,
-          merchant: context.merchantAddress,
-          ledger: findLedgerPda(context.runtime.programId, context.merchantId),
-          subscription: context.subscriptionAddress,
-          chargeReceipt: chargeReceiptAddress,
-          cycleMarker: cycleMarkerAddress,
-          merchantVault: context.merchantVault,
-          feeVault: context.feeVault,
-          settlementSourceTokenAccount: context.settlementSourceTokenAccount,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-        })
-        .instruction();
+    const instruction = await context.runtime.program.methods
+      .recordSubscriptionChargeSuccess(
+        Array.from(externalChargeRefHash),
+        new BN(billingPeriodStart),
+        toFixed6Bn(input.localAmount),
+        createFxQuoteArgs({
+          externalRef: input.externalChargeId,
+          providerRef: "yellow_card",
+          fxRate: input.fxRate,
+        }),
+        toFixed6Bn(input.usageUnits ?? 0),
+        toFixed6Bn(input.usdcAmount)
+      )
+      .accounts({
+        config: findConfigPda(context.runtime.programId),
+        settlementAuthority: settlementAuthority.publicKey,
+        merchant: context.merchantAddress,
+        ledger: findLedgerPda(context.runtime.programId, context.merchantId),
+        subscription: context.subscriptionAddress,
+        chargeReceipt: chargeReceiptAddress,
+        cycleMarker: cycleMarkerAddress,
+        merchantVault: context.merchantVault,
+        feeVault: context.feeVault,
+        settlementSourceTokenAccount: context.settlementSourceTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
 
     const execution = await sendSponsoredTransaction({
       mode: input.environment,

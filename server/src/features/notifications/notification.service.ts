@@ -406,9 +406,9 @@ async function loadMerchantBranding(merchantId: string) {
     setting,
     branding: {
       merchantName: merchant.name,
-      supportEmail: setting.supportEmail,
-      brandAccent: setting.brandAccent,
-      emailLogoUrl: setting.emailLogoUrl ?? null,
+      supportEmail: setting.business.supportEmail,
+      brandAccent: setting.business.brandAccent,
+      emailLogoUrl: setting.business.logoUrl ?? null,
     } satisfies NotificationTemplateBranding,
   };
 }
@@ -662,7 +662,7 @@ export async function runNotificationDeliveryJob(input: {
       subject: notification.subject,
       html: notification.html,
       text: notification.text,
-      replyToEmail: setting.supportEmail,
+      replyToEmail: setting.business.supportEmail,
     });
 
     notification.status = "sent";
@@ -730,7 +730,7 @@ export async function queueTeamInviteNotification(input: {
 }) {
   const { merchant, setting } = await loadMerchantBranding(input.merchantId);
 
-  if (!setting.teamInviteEmails) {
+  if (!setting.notifications.teamInviteEmails) {
     return null;
   }
 
@@ -759,7 +759,7 @@ export async function queueTeamInviteNotification(input: {
       recipientName: member.name,
       role: member.role,
       inviteUrl: `${getAppBaseUrl()}/login`,
-      supportUrl: createSupportMailto(setting.supportEmail, merchant.name),
+      supportUrl: createSupportMailto(setting.business.supportEmail, merchant.name),
     },
     metadata: {
       teamMemberId: member._id.toString(),
@@ -811,9 +811,9 @@ export async function queueSubscriptionCreatedNotifications(input: {
   }
 
   const notifications = [];
-  const portalUrl = getCustomerPortalBaseUrl(setting.customerDomain);
+  const portalUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
 
-  if (customer?.email && setting.customerSubscriptionEmails) {
+  if (customer?.email && setting.notifications.customerSubscriptionEmails) {
     const notification = await createNotificationRecord({
       merchantId: input.merchantId,
       environment: input.environment,
@@ -845,7 +845,7 @@ export async function queueSubscriptionCreatedNotifications(input: {
     notifications.push(notification);
   }
 
-  if (setting.merchantSubscriptionAlerts) {
+  if (setting.notifications.merchantSubscriptionAlerts) {
     const recipients = await resolveMerchantRecipients({
       merchantId: input.merchantId,
       group: "billing",
@@ -923,14 +923,14 @@ export async function queueChargeStatusNotifications(input: {
 
   const notifications = [];
   const amount = `${subscription.billingCurrency} ${charge.localAmount.toLocaleString()}`;
-  const portalUrl = getCustomerPortalBaseUrl(setting.customerDomain);
+  const portalUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
 
   const sendReceipt =
     (input.nextStatus === "awaiting_settlement" || input.nextStatus === "settled") &&
     input.previousStatus !== "awaiting_settlement" &&
     input.previousStatus !== "settled";
 
-  if (sendReceipt && customer?.email && setting.customerReceiptEmails) {
+  if (sendReceipt && customer?.email && setting.notifications.customerReceiptEmails) {
     const notification = await createNotificationRecord({
       merchantId: charge.merchantId.toString(),
       environment,
@@ -968,7 +968,7 @@ export async function queueChargeStatusNotifications(input: {
     input.nextStatus === "failed" && input.previousStatus !== "failed";
 
   if (sendFailedNotice) {
-    if (customer?.email && setting.customerPaymentFollowUps) {
+    if (customer?.email && setting.notifications.customerPaymentFollowUps) {
       const customerNotification = await createNotificationRecord({
         merchantId: charge.merchantId.toString(),
         environment,
@@ -1003,7 +1003,7 @@ export async function queueChargeStatusNotifications(input: {
       notifications.push(customerNotification);
     }
 
-    const shouldAlertMerchant = setting.merchantSubscriptionAlerts;
+    const shouldAlertMerchant = setting.notifications.merchantSubscriptionAlerts;
 
     if (shouldAlertMerchant) {
       const recipients = await resolveMerchantRecipients({
@@ -1054,7 +1054,7 @@ export async function queueVerificationNotification(input: {
 }) {
   const setting = await getOrCreateMerchantSetting(input.merchantId);
 
-  if (!setting.verificationAlerts) {
+  if (!setting.notifications.verificationAlerts) {
     return [];
   }
 
@@ -1118,7 +1118,7 @@ export async function queueTreasuryApprovalNeededNotification(input: {
     TreasuryOperationModel.findById(input.operationId).exec(),
   ]);
 
-  if (!setting.governanceAlerts || !operation) {
+  if (!setting.notifications.governanceAlerts || !operation) {
     return [];
   }
 
@@ -1171,7 +1171,7 @@ export async function queueTreasuryOperationStatusNotification(input: {
     TreasuryOperationModel.findById(input.operationId).exec(),
   ]);
 
-  if (!setting.treasuryAlerts || !operation) {
+  if (!setting.notifications.treasuryAlerts || !operation) {
     return [];
   }
 
@@ -1234,7 +1234,7 @@ export async function queuePayoutBatchNotification(input: {
     PayoutBatchModel.findById(input.batchId).exec(),
   ]);
 
-  if (!setting.treasuryAlerts || !batch) {
+  if (!setting.notifications.treasuryAlerts || !batch) {
     return [];
   }
 
@@ -1284,7 +1284,7 @@ export async function queueGovernanceToggleNotification(input: {
 }) {
   const setting = await getOrCreateMerchantSetting(input.merchantId);
 
-  if (!setting.governanceAlerts) {
+  if (!setting.notifications.governanceAlerts) {
     return [];
   }
 

@@ -6,7 +6,7 @@ import { appendAuditLog } from "@/features/audit/audit.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
-import { SettingModel } from "@/features/settings/setting.model";
+import type { SettingDocument } from "@/features/settings/setting.model";
 import {
   createPayoutWalletConfirmOperation,
   createReserveClearOperation,
@@ -20,117 +20,80 @@ import type {
   WalletActionInput,
 } from "@/features/settings/setting.validation";
 
-function toSettingResponse(document: {
-  _id: { toString(): string };
-  merchantId: { toString(): string };
-  businessName: string;
-  supportEmail: string;
-  defaultMarket: string;
-  invoicePrefix: string;
-  billingTimezone: string;
-  billingDisplay: string;
-  fallbackCurrency: string;
-  statementDescriptor: string;
-  brandAccent: string;
-  emailLogoUrl?: string | null;
-  customerDomain: string;
-  invoiceFooter: string;
-  retryPolicy: string;
-  invoiceGraceDays: number;
-  autoRetries: boolean;
-  meterApproval: boolean;
-  primaryWallet: string;
-  reserveWallet?: string | null;
-  walletAlerts: boolean;
-  financeDigest: boolean;
-  developerAlerts: boolean;
-  loginAlerts: boolean;
-  customerSubscriptionEmails?: boolean;
-  customerReceiptEmails?: boolean;
-  customerPaymentFollowUps?: boolean;
-  merchantSubscriptionAlerts?: boolean;
-  merchantPaymentDigestFrequency?: string;
-  merchantPaymentDigestMode?: string;
-  teamInviteEmails?: boolean;
-  governanceAlerts?: boolean;
-  treasuryAlerts?: boolean;
-  verificationAlerts?: boolean;
-  securityAlerts?: boolean;
-  sessionTimeout: string;
-  inviteDomainPolicy: string;
-  enforceTwoFactor: boolean;
-  restrictInviteDomains: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-},
-treasury?: {
-  account: {
-    governanceVaultAddress: string;
-    payoutWallet: string;
-    reserveWallet?: string | null;
-    threshold: number;
-    pendingPayoutWallet?: string | null;
-    payoutWalletChangeReadyAt?: Date | null;
-  } | null;
-  operations: Array<{
-    id: string;
-    kind: string;
-    status: string;
-  }>;
-}) {
+function toSettingResponse(
+  document: SettingDocument,
+  treasury?: {
+    account: {
+      governanceVaultAddress: string;
+      payoutWallet: string;
+      reserveWallet?: string | null;
+      threshold: number;
+      pendingPayoutWallet?: string | null;
+      payoutWalletChangeReadyAt?: Date | null;
+    } | null;
+    operations: Array<{
+      id: string;
+      kind: string;
+      status: string;
+    }>;
+  }
+) {
   return {
     id: document._id.toString(),
     merchantId: document.merchantId.toString(),
-    profile: {
-      businessName: document.businessName,
-      supportEmail: document.supportEmail,
-      defaultMarket: document.defaultMarket,
-      invoicePrefix: document.invoicePrefix,
-      billingTimezone: document.billingTimezone,
-      billingDisplay: document.billingDisplay,
-      fallbackCurrency: document.fallbackCurrency,
-      statementDescriptor: document.statementDescriptor,
-      brandAccent: document.brandAccent,
-      emailLogoUrl: document.emailLogoUrl ?? null,
-      customerDomain: document.customerDomain,
-      invoiceFooter: document.invoiceFooter,
+    business: {
+      name: document.business.name,
+      supportEmail: document.business.supportEmail,
+      defaultMarket: document.business.defaultMarket,
+      invoicePrefix: document.business.invoicePrefix,
+      billingTimezone: document.business.billingTimezone,
+      billingDisplay: document.business.billingDisplay,
+      fallbackCurrency: document.business.fallbackCurrency,
+      statementDescriptor: document.business.statementDescriptor,
+      brandAccent: document.business.brandAccent,
+      logoUrl: document.business.logoUrl ?? null,
+      customerDomain: document.business.customerDomain,
+      invoiceFooter: document.business.invoiceFooter,
     },
     billing: {
-      retryPolicy: document.retryPolicy,
-      invoiceGraceDays: document.invoiceGraceDays,
-      autoRetries: document.autoRetries,
-      meterApproval: document.meterApproval,
+      retryPolicy: document.billing.retryPolicy,
+      invoiceGraceDays: document.billing.invoiceGraceDays,
+      autoRetries: document.billing.autoRetries,
+      meterApproval: document.billing.meterApproval,
     },
     wallets: {
-      primaryWallet: treasury?.account?.payoutWallet ?? document.primaryWallet,
-      reserveWallet: treasury?.account?.reserveWallet ?? document.reserveWallet ?? null,
-      walletAlerts: document.walletAlerts,
+      primaryWallet: treasury?.account?.payoutWallet ?? document.wallets.primaryWallet,
+      reserveWallet: treasury?.account?.reserveWallet ?? document.wallets.reserveWallet ?? null,
+      walletAlerts: document.wallets.walletAlerts,
       governanceVaultAddress: treasury?.account?.governanceVaultAddress ?? null,
       pendingPayoutWallet: treasury?.account?.pendingPayoutWallet ?? null,
-      payoutWalletChangeReadyAt:
-        treasury?.account?.payoutWalletChangeReadyAt ?? null,
+      payoutWalletChangeReadyAt: treasury?.account?.payoutWalletChangeReadyAt ?? null,
     },
     notifications: {
-      customerSubscriptionEmails: document.customerSubscriptionEmails ?? true,
-      customerReceiptEmails: document.customerReceiptEmails ?? true,
-      customerPaymentFollowUps: document.customerPaymentFollowUps ?? true,
-      merchantSubscriptionAlerts: document.merchantSubscriptionAlerts ?? true,
+      customerSubscriptionEmails: document.notifications.customerSubscriptionEmails,
+      customerReceiptEmails: document.notifications.customerReceiptEmails,
+      customerPaymentFollowUps: document.notifications.customerPaymentFollowUps,
+      merchantSubscriptionAlerts: document.notifications.merchantSubscriptionAlerts,
       merchantPaymentDigestFrequency:
-        document.merchantPaymentDigestFrequency ??
-        (document.financeDigest === false ? "off" : "daily"),
-      merchantPaymentDigestMode: document.merchantPaymentDigestMode ?? "counts",
-      teamInviteEmails: document.teamInviteEmails ?? true,
-      governanceAlerts: document.governanceAlerts ?? true,
-      treasuryAlerts: document.treasuryAlerts ?? true,
-      verificationAlerts: document.verificationAlerts ?? true,
-      developerAlerts: document.developerAlerts,
-      securityAlerts: document.securityAlerts ?? document.loginAlerts ?? true,
+        document.notifications.merchantPaymentDigestFrequency ??
+        (document.notifications.financeDigest === false ? "off" : "daily"),
+      merchantPaymentDigestMode:
+        document.notifications.merchantPaymentDigestMode ?? "counts",
+      teamInviteEmails: document.notifications.teamInviteEmails,
+      governanceAlerts: document.notifications.governanceAlerts,
+      treasuryAlerts: document.notifications.treasuryAlerts,
+      verificationAlerts: document.notifications.verificationAlerts,
+      developerAlerts: document.notifications.developerAlerts,
+      securityAlerts:
+        document.notifications.securityAlerts ??
+        document.notifications.loginAlerts ??
+        true,
     },
     security: {
-      sessionTimeout: document.sessionTimeout,
-      inviteDomainPolicy: document.inviteDomainPolicy,
-      enforceTwoFactor: document.enforceTwoFactor,
-      restrictInviteDomains: document.restrictInviteDomains,
+      sessionTimeout: document.security.sessionTimeout,
+      inviteDomainPolicy: document.security.inviteDomainPolicy,
+      enforceTwoFactor: document.security.enforceTwoFactor,
+      restrictInviteDomains: document.security.restrictInviteDomains,
     },
     treasury: {
       threshold: treasury?.account?.threshold ?? 0,
@@ -209,157 +172,162 @@ export async function updateSettingsByMerchantId(
     );
   }
 
-  if (input.profile) {
-    if (input.profile.businessName !== undefined) {
-      setting.businessName = input.profile.businessName;
-      merchant.name = input.profile.businessName;
+  if (input.business) {
+    if (input.business.name !== undefined) {
+      setting.business.name = input.business.name;
+      merchant.name = input.business.name;
     }
 
-    if (input.profile.supportEmail !== undefined) {
-      setting.supportEmail = input.profile.supportEmail;
-      merchant.supportEmail = input.profile.supportEmail;
+    if (input.business.supportEmail !== undefined) {
+      setting.business.supportEmail = input.business.supportEmail;
+      merchant.supportEmail = input.business.supportEmail;
     }
 
-    if (input.profile.defaultMarket !== undefined) {
-      if (!merchant.supportedMarkets.includes(input.profile.defaultMarket)) {
+    if (input.business.defaultMarket !== undefined) {
+      if (!merchant.supportedMarkets.includes(input.business.defaultMarket)) {
         throw new HttpError(
           409,
-          `Default market ${input.profile.defaultMarket} is not enabled for this merchant.`
+          `Default market ${input.business.defaultMarket} is not enabled for this merchant.`
         );
       }
-      setting.defaultMarket = input.profile.defaultMarket;
+      setting.business.defaultMarket = input.business.defaultMarket;
     }
 
-    if (input.profile.invoicePrefix !== undefined) {
-      setting.invoicePrefix = input.profile.invoicePrefix;
+    if (input.business.invoicePrefix !== undefined) {
+      setting.business.invoicePrefix = input.business.invoicePrefix;
     }
 
-    if (input.profile.billingTimezone !== undefined) {
-      setting.billingTimezone = input.profile.billingTimezone;
-      merchant.billingTimezone = input.profile.billingTimezone;
+    if (input.business.billingTimezone !== undefined) {
+      setting.business.billingTimezone = input.business.billingTimezone;
+      merchant.billingTimezone = input.business.billingTimezone;
     }
 
-    if (input.profile.billingDisplay !== undefined) {
-      setting.billingDisplay = input.profile.billingDisplay;
+    if (input.business.billingDisplay !== undefined) {
+      setting.business.billingDisplay = input.business.billingDisplay;
     }
 
-    if (input.profile.fallbackCurrency !== undefined) {
-      setting.fallbackCurrency = input.profile.fallbackCurrency;
+    if (input.business.fallbackCurrency !== undefined) {
+      setting.business.fallbackCurrency = input.business.fallbackCurrency;
     }
 
-    if (input.profile.statementDescriptor !== undefined) {
-      setting.statementDescriptor = input.profile.statementDescriptor;
+    if (input.business.statementDescriptor !== undefined) {
+      setting.business.statementDescriptor = input.business.statementDescriptor;
     }
 
-    if (input.profile.brandAccent !== undefined) {
-      setting.brandAccent = input.profile.brandAccent;
+    if (input.business.brandAccent !== undefined) {
+      setting.business.brandAccent = input.business.brandAccent;
     }
 
-    if (input.profile.emailLogoUrl !== undefined) {
-      setting.emailLogoUrl = input.profile.emailLogoUrl;
+    if (input.business.logoUrl !== undefined) {
+      setting.business.logoUrl = input.business.logoUrl;
     }
 
-    if (input.profile.customerDomain !== undefined) {
-      setting.customerDomain = input.profile.customerDomain;
+    if (input.business.customerDomain !== undefined) {
+      setting.business.customerDomain = input.business.customerDomain;
     }
 
-    if (input.profile.invoiceFooter !== undefined) {
-      setting.invoiceFooter = input.profile.invoiceFooter;
+    if (input.business.invoiceFooter !== undefined) {
+      setting.business.invoiceFooter = input.business.invoiceFooter;
     }
   }
 
   if (input.billing) {
     if (input.billing.retryPolicy !== undefined) {
-      setting.retryPolicy = input.billing.retryPolicy;
+      setting.billing.retryPolicy = input.billing.retryPolicy;
     }
 
     if (input.billing.invoiceGraceDays !== undefined) {
-      setting.invoiceGraceDays = input.billing.invoiceGraceDays;
+      setting.billing.invoiceGraceDays = input.billing.invoiceGraceDays;
     }
 
     if (input.billing.autoRetries !== undefined) {
-      setting.autoRetries = input.billing.autoRetries;
+      setting.billing.autoRetries = input.billing.autoRetries;
     }
 
     if (input.billing.meterApproval !== undefined) {
-      setting.meterApproval = input.billing.meterApproval;
+      setting.billing.meterApproval = input.billing.meterApproval;
     }
   }
 
-  if (input.wallets) {
-    if (input.wallets.walletAlerts !== undefined) {
-      setting.walletAlerts = input.wallets.walletAlerts;
-    }
+  if (input.wallets && input.wallets.walletAlerts !== undefined) {
+    setting.wallets.walletAlerts = input.wallets.walletAlerts;
   }
 
   if (input.notifications) {
     if (input.notifications.customerSubscriptionEmails !== undefined) {
-      setting.customerSubscriptionEmails = input.notifications.customerSubscriptionEmails;
+      setting.notifications.customerSubscriptionEmails =
+        input.notifications.customerSubscriptionEmails;
     }
 
     if (input.notifications.customerReceiptEmails !== undefined) {
-      setting.customerReceiptEmails = input.notifications.customerReceiptEmails;
+      setting.notifications.customerReceiptEmails =
+        input.notifications.customerReceiptEmails;
     }
 
     if (input.notifications.customerPaymentFollowUps !== undefined) {
-      setting.customerPaymentFollowUps = input.notifications.customerPaymentFollowUps;
+      setting.notifications.customerPaymentFollowUps =
+        input.notifications.customerPaymentFollowUps;
     }
 
     if (input.notifications.merchantSubscriptionAlerts !== undefined) {
-      setting.merchantSubscriptionAlerts = input.notifications.merchantSubscriptionAlerts;
+      setting.notifications.merchantSubscriptionAlerts =
+        input.notifications.merchantSubscriptionAlerts;
     }
 
     if (input.notifications.merchantPaymentDigestFrequency !== undefined) {
-      setting.merchantPaymentDigestFrequency =
+      setting.notifications.merchantPaymentDigestFrequency =
         input.notifications.merchantPaymentDigestFrequency;
-      setting.financeDigest = input.notifications.merchantPaymentDigestFrequency !== "off";
+      setting.notifications.financeDigest =
+        input.notifications.merchantPaymentDigestFrequency !== "off";
     }
 
     if (input.notifications.merchantPaymentDigestMode !== undefined) {
-      setting.merchantPaymentDigestMode = input.notifications.merchantPaymentDigestMode;
+      setting.notifications.merchantPaymentDigestMode =
+        input.notifications.merchantPaymentDigestMode;
     }
 
     if (input.notifications.teamInviteEmails !== undefined) {
-      setting.teamInviteEmails = input.notifications.teamInviteEmails;
+      setting.notifications.teamInviteEmails = input.notifications.teamInviteEmails;
     }
 
     if (input.notifications.governanceAlerts !== undefined) {
-      setting.governanceAlerts = input.notifications.governanceAlerts;
+      setting.notifications.governanceAlerts = input.notifications.governanceAlerts;
     }
 
     if (input.notifications.treasuryAlerts !== undefined) {
-      setting.treasuryAlerts = input.notifications.treasuryAlerts;
+      setting.notifications.treasuryAlerts = input.notifications.treasuryAlerts;
     }
 
     if (input.notifications.verificationAlerts !== undefined) {
-      setting.verificationAlerts = input.notifications.verificationAlerts;
+      setting.notifications.verificationAlerts =
+        input.notifications.verificationAlerts;
     }
 
     if (input.notifications.developerAlerts !== undefined) {
-      setting.developerAlerts = input.notifications.developerAlerts;
+      setting.notifications.developerAlerts = input.notifications.developerAlerts;
     }
 
     if (input.notifications.securityAlerts !== undefined) {
-      setting.securityAlerts = input.notifications.securityAlerts;
-      setting.loginAlerts = input.notifications.securityAlerts;
+      setting.notifications.securityAlerts = input.notifications.securityAlerts;
+      setting.notifications.loginAlerts = input.notifications.securityAlerts;
     }
   }
 
   if (input.security) {
     if (input.security.sessionTimeout !== undefined) {
-      setting.sessionTimeout = input.security.sessionTimeout;
+      setting.security.sessionTimeout = input.security.sessionTimeout;
     }
 
     if (input.security.inviteDomainPolicy !== undefined) {
-      setting.inviteDomainPolicy = input.security.inviteDomainPolicy;
+      setting.security.inviteDomainPolicy = input.security.inviteDomainPolicy;
     }
 
     if (input.security.enforceTwoFactor !== undefined) {
-      setting.enforceTwoFactor = input.security.enforceTwoFactor;
+      setting.security.enforceTwoFactor = input.security.enforceTwoFactor;
     }
 
     if (input.security.restrictInviteDomains !== undefined) {
-      setting.restrictInviteDomains = input.security.restrictInviteDomains;
+      setting.security.restrictInviteDomains = input.security.restrictInviteDomains;
     }
   }
 
@@ -374,7 +342,7 @@ export async function updateSettingsByMerchantId(
     target: merchant.supportEmail,
     detail: "Workspace settings were updated.",
     metadata: {
-      profile: Boolean(input.profile),
+      business: Boolean(input.business),
       billing: Boolean(input.billing),
       wallets: Boolean(input.wallets),
       notifications: Boolean(input.notifications),
@@ -400,7 +368,7 @@ export async function saveWalletSettings(
   const { setting } = await getOrCreateSetting(merchantId);
 
   if (input.walletAlerts !== undefined) {
-    setting.walletAlerts = input.walletAlerts;
+    setting.wallets.walletAlerts = input.walletAlerts;
   }
   await setting.save();
 

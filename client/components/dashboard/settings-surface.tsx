@@ -42,7 +42,7 @@ type SettingsTabKey =
   | "notifications"
   | "access";
 
-type ProfileDraft = WorkspaceSettings["profile"];
+type BusinessDraft = WorkspaceSettings["business"];
 type BillingDraft = WorkspaceSettings["billing"];
 type NotificationsDraft = WorkspaceSettings["notifications"];
 type SecurityDraft = WorkspaceSettings["security"];
@@ -158,7 +158,7 @@ export function SettingsPageSurface() {
     "customer.payment.receipt"
   );
 
-  const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
+  const [businessDraft, setBusinessDraft] = useState<BusinessDraft | null>(null);
   const [billingDraft, setBillingDraft] = useState<BillingDraft | null>(null);
   const [notificationsDraft, setNotificationsDraft] = useState<NotificationsDraft | null>(null);
   const [securityDraft, setSecurityDraft] = useState<SecurityDraft | null>(null);
@@ -174,7 +174,7 @@ export function SettingsPageSurface() {
       return;
     }
 
-    setProfileDraft(data.profile);
+    setBusinessDraft(data.business);
     setBillingDraft(data.billing);
     setNotificationsDraft(data.notifications);
     setSecurityDraft(data.security);
@@ -240,7 +240,7 @@ export function SettingsPageSurface() {
   const tabs = useMemo(
     () =>
       [
-        { key: "workspace", label: "Workspace" },
+        { key: "workspace", label: "Business" },
         { key: "billing", label: "Billing" },
         { key: "wallets", label: "Wallets" },
         { key: "notifications", label: "Notifications" },
@@ -264,13 +264,13 @@ export function SettingsPageSurface() {
     }
   }
 
-  function patchProfile<K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) {
-    setProfileDraft((current) => (current ? { ...current, [key]: value } : current));
+  function patchBusiness<K extends keyof BusinessDraft>(key: K, value: BusinessDraft[K]) {
+    setBusinessDraft((current) => (current ? { ...current, [key]: value } : current));
   }
 
   function patchSupportedMarkets(nextMarkets: string[]) {
     setSupportedMarketsDraft(nextMarkets);
-    setProfileDraft((current) => {
+    setBusinessDraft((current) => {
       if (!current) {
         return current;
       }
@@ -300,7 +300,7 @@ export function SettingsPageSurface() {
   }
 
   async function handleWorkspaceSave() {
-    if (!token || !user?.merchantId || !profileDraft || supportedMarketsDraft.length === 0) {
+    if (!token || !user?.merchantId || !businessDraft || supportedMarketsDraft.length === 0) {
       return;
     }
 
@@ -314,7 +314,7 @@ export function SettingsPageSurface() {
         token,
         merchantId: user.merchantId,
         environment: mode,
-        payload: { profile: profileDraft },
+        payload: { business: businessDraft },
       });
       await reloadMarketCatalog();
       setActionMessage("Workspace settings saved.");
@@ -443,12 +443,12 @@ export function SettingsPageSurface() {
     return (
       <PageState
         title="Loading settings"
-        message="Fetching workspace configuration and treasury controls."
+        message="Fetching business settings and treasury controls."
       />
     );
   }
 
-  if (error || !data || !profileDraft || !billingDraft || !notificationsDraft || !securityDraft) {
+  if (error || !data || !businessDraft || !billingDraft || !notificationsDraft || !securityDraft) {
     return (
       <PageState
         title="Settings unavailable"
@@ -473,7 +473,7 @@ export function SettingsPageSurface() {
       <StatGrid>
         <MetricCard
           label="Primary market"
-          value={data.profile.defaultMarket}
+          value={data.business.defaultMarket}
           note="Workspace billing default"
           tone="brand"
         />
@@ -531,29 +531,29 @@ export function SettingsPageSurface() {
       </Card>
 
       {activeTab === "workspace" ? (
-        <Card title="Workspace profile">
+        <Card title="Business settings">
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-start">
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <SettingsField label="Business name">
                   <Input
-                    value={profileDraft.businessName}
-                    onChange={(event) => patchProfile("businessName", event.target.value)}
+                    value={businessDraft.name}
+                    onChange={(event) => patchBusiness("name", event.target.value)}
                   />
                 </SettingsField>
 
                 <SettingsField label="Support email">
                   <Input
                     type="email"
-                    value={profileDraft.supportEmail}
-                    onChange={(event) => patchProfile("supportEmail", event.target.value)}
+                    value={businessDraft.supportEmail}
+                    onChange={(event) => patchBusiness("supportEmail", event.target.value)}
                   />
                 </SettingsField>
 
                 <SettingsField label="Primary market">
                   <Select
-                    value={profileDraft.defaultMarket}
-                    onChange={(event) => patchProfile("defaultMarket", event.target.value)}
+                    value={businessDraft.defaultMarket}
+                    onChange={(event) => patchBusiness("defaultMarket", event.target.value)}
                   >
                     {supportedMarketOptions.length === 0 ? (
                       <option value="">Select a market</option>
@@ -568,15 +568,15 @@ export function SettingsPageSurface() {
 
                 <SettingsField label="Invoice prefix">
                   <Input
-                    value={profileDraft.invoicePrefix}
-                    onChange={(event) => patchProfile("invoicePrefix", event.target.value.toUpperCase())}
+                    value={businessDraft.invoicePrefix}
+                    onChange={(event) => patchBusiness("invoicePrefix", event.target.value.toUpperCase())}
                   />
                 </SettingsField>
 
                 <SettingsField label="Billing timezone">
                   <Select
-                    value={profileDraft.billingTimezone}
-                    onChange={(event) => patchProfile("billingTimezone", event.target.value)}
+                    value={businessDraft.billingTimezone}
+                    onChange={(event) => patchBusiness("billingTimezone", event.target.value)}
                   >
                     <option value="UTC">UTC</option>
                     <option value="Africa/Lagos">Africa/Lagos</option>
@@ -586,8 +586,8 @@ export function SettingsPageSurface() {
 
                 <SettingsField label="Billing display">
                   <Select
-                    value={profileDraft.billingDisplay}
-                    onChange={(event) => patchProfile("billingDisplay", event.target.value)}
+                    value={businessDraft.billingDisplay}
+                    onChange={(event) => patchBusiness("billingDisplay", event.target.value)}
                   >
                     <option value="local-fiat">Customer local fiat</option>
                     <option value="usd-reference">USD reference</option>
@@ -598,24 +598,24 @@ export function SettingsPageSurface() {
               <div className="grid gap-4 md:grid-cols-2">
                 <SettingsField label="Statement descriptor">
                   <Input
-                    value={profileDraft.statementDescriptor}
+                    value={businessDraft.statementDescriptor}
                     onChange={(event) =>
-                      patchProfile("statementDescriptor", event.target.value.toUpperCase())
+                      patchBusiness("statementDescriptor", event.target.value.toUpperCase())
                     }
                   />
                 </SettingsField>
 
                 <SettingsField label="Customer billing domain">
                   <Input
-                    value={profileDraft.customerDomain}
-                    onChange={(event) => patchProfile("customerDomain", event.target.value)}
+                    value={businessDraft.customerDomain}
+                    onChange={(event) => patchBusiness("customerDomain", event.target.value)}
                   />
                 </SettingsField>
 
                 <SettingsField label="Fallback currency">
                   <Select
-                    value={profileDraft.fallbackCurrency}
-                    onChange={(event) => patchProfile("fallbackCurrency", event.target.value)}
+                    value={businessDraft.fallbackCurrency}
+                    onChange={(event) => patchBusiness("fallbackCurrency", event.target.value)}
                   >
                     <option value="USDC">USDC</option>
                     <option value="USD">USD</option>
@@ -624,8 +624,8 @@ export function SettingsPageSurface() {
 
                 <SettingsField label="Brand accent">
                   <Select
-                    value={profileDraft.brandAccent}
-                    onChange={(event) => patchProfile("brandAccent", event.target.value)}
+                    value={businessDraft.brandAccent}
+                    onChange={(event) => patchBusiness("brandAccent", event.target.value)}
                   >
                     <option value="forest-green">Forest green</option>
                     <option value="dark-green">Dark green</option>
@@ -633,13 +633,13 @@ export function SettingsPageSurface() {
                   </Select>
                 </SettingsField>
 
-                <SettingsField label="Email logo URL">
+                <SettingsField label="Logo URL">
                   <Input
-                    value={profileDraft.emailLogoUrl ?? ""}
+                    value={businessDraft.logoUrl ?? ""}
                     placeholder="https://cdn.renew.sh/brand/logo.png"
                     onChange={(event) =>
-                      patchProfile(
-                        "emailLogoUrl",
+                      patchBusiness(
+                        "logoUrl",
                         event.target.value.trim() ? event.target.value : null
                       )
                     }
@@ -656,10 +656,10 @@ export function SettingsPageSurface() {
                   Brand preview
                 </p>
                 <div className="mt-4 flex h-20 items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4">
-                  {profileDraft.emailLogoUrl ? (
+                  {businessDraft.logoUrl ? (
                     <img
-                      src={profileDraft.emailLogoUrl}
-                      alt={`${profileDraft.businessName} logo`}
+                      src={businessDraft.logoUrl}
+                      alt={`${businessDraft.name} logo`}
                       className="max-h-10 w-auto object-contain"
                     />
                   ) : (
@@ -670,17 +670,17 @@ export function SettingsPageSurface() {
 
               <SettingsField label="Invoice footer note">
                 <textarea
-                  value={profileDraft.invoiceFooter}
-                  onChange={(event) => patchProfile("invoiceFooter", event.target.value)}
+                  value={businessDraft.invoiceFooter}
+                  onChange={(event) => patchBusiness("invoiceFooter", event.target.value)}
                   rows={4}
                   className="w-full resize-none rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm text-[color:var(--ink)] outline-none"
                 />
               </SettingsField>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                <SettingsMiniStat label="Display" value={profileDraft.billingDisplay} />
-                <SettingsMiniStat label="Fallback" value={profileDraft.fallbackCurrency} />
-                <SettingsMiniStat label="Timezone" value={profileDraft.billingTimezone} />
+                <SettingsMiniStat label="Display" value={businessDraft.billingDisplay} />
+                <SettingsMiniStat label="Fallback" value={businessDraft.fallbackCurrency} />
+                <SettingsMiniStat label="Timezone" value={businessDraft.billingTimezone} />
               </div>
             </div>
           </div>
@@ -692,7 +692,7 @@ export function SettingsPageSurface() {
               disabled={busyAction === "workspace-save" || supportedMarketsDraft.length === 0}
               onClick={() => void handleWorkspaceSave()}
             >
-              Save workspace
+              Save business settings
             </Button>
           </div>
         </Card>

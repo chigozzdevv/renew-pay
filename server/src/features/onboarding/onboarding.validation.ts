@@ -13,13 +13,12 @@ export const onboardingQuerySchema = z.object({
   environment: environmentInputSchema.default("test"),
 });
 
-export const onboardingBusinessProfileSchema = z.object({
+export const onboardingBusinessSchema = z.object({
   environment: environmentInputSchema.default("test"),
-  businessName: z.string().trim().min(2).max(160),
+  logoUrl: z.string().trim().url().max(2048).optional().or(z.literal("")),
+  name: z.string().trim().min(2).max(160),
   supportEmail: z.email().trim().toLowerCase(),
-  billingTimezone: z.string().trim().min(2).max(80),
   supportedMarkets: z.array(marketSchema).min(1),
-  defaultMarket: marketSchema.optional(),
 });
 
 export const onboardingVerificationStartSchema = z.object({
@@ -36,23 +35,17 @@ export const onboardingVerificationStartSchema = z.object({
   lang: z.string().trim().min(2).max(10).optional(),
 });
 
-export const onboardingPayoutSettingsSchema = z.object({
+export const onboardingPayoutSchema = z.object({
   environment: environmentInputSchema.default("test"),
   payoutWallet: addressSchema,
 });
 
-export const onboardingGovernanceSchema = z.object({
-  environment: environmentInputSchema.default("test"),
-  enabled: z.boolean(),
-});
-
-export const onboardingCompleteSchema = z.object({
+export const onboardingRegisterSchema = z.object({
   environment: environmentInputSchema.default("test"),
 });
 
 export type OnboardingQuery = z.infer<typeof onboardingQuerySchema>;
-export type OnboardingBusinessProfileInput = z.infer<typeof onboardingBusinessProfileSchema>;
+export type OnboardingBusinessInput = z.infer<typeof onboardingBusinessSchema>;
 export type OnboardingVerificationStartInput = z.infer<typeof onboardingVerificationStartSchema>;
-export type OnboardingPayoutSettingsInput = z.infer<typeof onboardingPayoutSettingsSchema>;
-export type OnboardingGovernanceInput = z.infer<typeof onboardingGovernanceSchema>;
-export type OnboardingCompleteInput = z.infer<typeof onboardingCompleteSchema>;
+export type OnboardingPayoutInput = z.infer<typeof onboardingPayoutSchema>;
+export type OnboardingRegisterInput = z.infer<typeof onboardingRegisterSchema>;

@@ -6,13 +6,19 @@ import {
   startTeamMemberKycSession,
 } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import {
+  createProtocolMerchant,
+  isProtocolMerchantRegistered,
+} from "@/features/protocol/protocol.merchant";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { TeamMemberModel } from "@/features/teams/team.model";
+import { TreasuryAccountModel } from "@/features/treasury/treasury-account.model";
+import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
+import { bootstrapTreasuryAccount } from "@/features/treasury/treasury.service";
 import type {
-  OnboardingBusinessProfileInput,
-  OnboardingCompleteInput,
-  OnboardingGovernanceInput,
-  OnboardingPayoutSettingsInput,
+  OnboardingBusinessInput,
+  OnboardingPayoutInput,
+  OnboardingRegisterInput,
   OnboardingVerificationStartInput,
 } from "@/features/onboarding/onboarding.validation";
 import {
@@ -21,6 +27,7 @@ import {
 } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
+import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
 type StepStatus = "complete" | "current" | "pending";
 
@@ -46,6 +53,109 @@ async function getTeamMemberOrThrow(teamMemberId: string, merchantId: string) {
 
 const getOrCreateSetting = getOrCreateMerchantSetting;
 
+async function loadTreasuryAccount(merchantId: string, environment: RuntimeMode) {
+  return TreasuryAccountModel.findOne({
+    merchantId,
+    ...createRuntimeModeCondition("environment", environment),
+  }).exec();
+}
+
+async function getActiveOwnerSigner(input: {
+  merchantId: string;
+  teamMemberId: string;
+}) {
+  const signer = await TreasurySignerModel.findOne({
+    merchantId: input.merchantId,
+    teamMemberId: input.teamMemberId,
+    status: "active",
+  }).exec();
+
+  if (!signer) {
+    throw new HttpError(
+      409,
+      "Verify the signed-in Privy wallet before registering the workspace."
+    );
+  }
+
+  return signer;
+}
+
+function assertOwnerRole(role: string) {
+  if (role !== "owner") {
+    throw new HttpError(
+      403,
+      "Only the workspace owner can finish merchant registration."
+    );
+  }
+}
+
+function hasOperatorTreasuryContext(
+  value: Awaited<ReturnType<typeof loadTreasuryAccount>>
+): value is NonNullable<Awaited<ReturnType<typeof loadTreasuryAccount>>> {
+  return Boolean(
+    value?.governanceMultisigAddress?.trim() &&
+      value.governanceVaultAddress?.trim() &&
+      value.operatorMultisigAddress?.trim() &&
+      value.operatorVaultAddress?.trim()
+  );
+}
+
+async function ensureOnboardingProtocolReady(input: {
+  merchantId: string;
+  teamMemberId: string;
+  actor: string;
+  environment: RuntimeMode;
+  merchantPayoutWallet: string;
+  metadataHash: string;
+}) {
+  const treasuryAccount =
+    (await loadTreasuryAccount(input.merchantId, input.environment)) ??
+    null;
+
+  if (!hasOperatorTreasuryContext(treasuryAccount)) {
+    await bootstrapTreasuryAccount({
+      merchantId: input.merchantId,
+      actor: input.actor,
+      requesterTeamMemberId: input.teamMemberId,
+      payload: {
+        environment: input.environment,
+        mode: "create",
+        ownerTeamMemberIds: [input.teamMemberId],
+        threshold: 1,
+      },
+    });
+  }
+
+  const readyTreasuryAccount = await loadTreasuryAccount(
+    input.merchantId,
+    input.environment
+  );
+
+  if (!hasOperatorTreasuryContext(readyTreasuryAccount)) {
+    throw new HttpError(
+      409,
+      "Merchant treasury setup is incomplete. Verify the owner signer and try again."
+    );
+  }
+
+  const merchantRegistered = await isProtocolMerchantRegistered(
+    input.environment,
+    input.merchantId
+  );
+
+  if (!merchantRegistered) {
+    await createProtocolMerchant({
+      environment: input.environment,
+      merchantId: input.merchantId,
+      payoutWallet: input.merchantPayoutWallet,
+      metadataHash: input.metadataHash,
+      operatorMultisigAddress: readyTreasuryAccount.operatorMultisigAddress!,
+      operatorVaultAddress: readyTreasuryAccount.operatorVaultAddress!,
+      operatorVaultIndex: readyTreasuryAccount.operatorVaultIndex ?? 0,
+    });
+  }
+}
+
 async function resolveOnboardingState(input: {
   merchantId: string;
   teamMemberId: string;
@@ -63,10 +173,9 @@ async function resolveOnboardingState(input: {
     getMerchantKybStatusByMerchantId(input.merchantId, input.environment),
   ]);
 
-  const businessProfileComplete =
+  const businessComplete =
     merchant.name.trim().length > 1 &&
     merchant.supportEmail.trim().length > 3 &&
-    merchant.billingTimezone.trim().length > 1 &&
     merchant.supportedMarkets.length > 0;
   const ownerKycComplete = ownerKyc.status === "approved";
   const merchantKybRequired = input.environment === "live";
@@ -74,24 +183,23 @@ async function resolveOnboardingState(input: {
   const verificationComplete = ownerKycComplete && merchantKybComplete;
   const payoutConfigured = isConfiguredWalletAddress(merchant.payoutWallet);
 
-  const currentStepKey = !businessProfileComplete
-    ? "business_basics"
+  const currentStepKey = !businessComplete
+    ? "business"
     : !verificationComplete
       ? "verification"
       : !payoutConfigured
-        ? "payout_setup"
+        ? "payout"
         : merchant.onboardingStatus === "workspace_active"
           ? "workspace_active"
-          : "governance_optional";
+          : "register";
 
   const steps = [
-    { key: "identity_complete", label: "Identity", status: "complete" as StepStatus },
     {
-      key: "business_basics",
+      key: "business",
       label: "Business basics",
-      status: businessProfileComplete
+      status: businessComplete
         ? "complete"
-        : currentStepKey === "business_basics"
+        : currentStepKey === "business"
           ? "current"
           : "pending",
     },
@@ -105,21 +213,21 @@ async function resolveOnboardingState(input: {
           : "pending",
     },
     {
-      key: "payout_setup",
-      label: "Payout setup",
+      key: "payout",
+      label: "Payout",
       status: payoutConfigured
         ? "complete"
-        : currentStepKey === "payout_setup"
+        : currentStepKey === "payout"
           ? "current"
           : "pending",
     },
     {
-      key: "governance_optional",
-      label: "Advanced governance",
+      key: "register",
+      label: "Register",
       status:
         merchant.onboardingStatus === "workspace_active"
           ? "complete"
-          : currentStepKey === "governance_optional"
+          : currentStepKey === "register"
             ? "current"
             : "pending",
     },
@@ -131,7 +239,7 @@ async function resolveOnboardingState(input: {
     setting,
     ownerKyc,
     merchantKyb,
-    canComplete: businessProfileComplete && verificationComplete && payoutConfigured,
+    canComplete: businessComplete && verificationComplete && payoutConfigured,
     currentStepKey,
     steps,
     status:
@@ -152,12 +260,11 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
     canComplete: input.canComplete,
     currentStepKey: input.currentStepKey,
     steps: input.steps,
-    businessProfile: {
-      businessName: input.merchant.name,
+    business: {
+      logoUrl: input.setting.business.logoUrl ?? "",
+      name: input.merchant.name,
       supportEmail: input.merchant.supportEmail,
-      billingTimezone: input.merchant.billingTimezone,
       supportedMarkets: input.merchant.supportedMarkets,
-      defaultMarket: input.setting.defaultMarket,
     },
     verification: {
       ownerKyc: input.ownerKyc,
@@ -170,14 +277,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
     payout: {
       payoutWallet: input.merchant.payoutWallet,
       payoutConfigured: isConfiguredWalletAddress(input.merchant.payoutWallet),
-      payoutMode: input.setting.payoutMode,
-      autoPayoutFrequency: input.setting.autoPayoutFrequency,
-      autoPayoutTimeLocal: input.setting.autoPayoutTimeLocal,
-      thresholdPayoutEnabled: input.setting.thresholdPayoutEnabled,
-      autoPayoutThresholdUsdc: input.setting.autoPayoutThresholdUsdc,
-    },
-    governance: {
-      enabled: true,
+      bankTransferStatus: "coming_soon" as const,
     },
   };
 }
@@ -215,42 +315,45 @@ export async function getOnboardingState(input: {
   });
 }
 
-export async function updateOnboardingBusinessProfile(input: {
+export async function saveOnboardingBusiness(input: {
   merchantId: string;
   teamMemberId: string;
   actor: string;
-  payload: OnboardingBusinessProfileInput;
+  payload: OnboardingBusinessInput;
 }) {
   const [merchant, setting] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
     getOrCreateSetting(input.merchantId),
   ]);
 
-  merchant.name = input.payload.businessName;
+  merchant.name = input.payload.name;
   merchant.supportEmail = input.payload.supportEmail;
-  merchant.billingTimezone = input.payload.billingTimezone;
   merchant.supportedMarkets = input.payload.supportedMarkets;
-  setting.businessName = input.payload.businessName;
-  setting.supportEmail = input.payload.supportEmail;
-  setting.billingTimezone = input.payload.billingTimezone;
-  setting.defaultMarket =
-    input.payload.defaultMarket && input.payload.supportedMarkets.includes(input.payload.defaultMarket)
-      ? input.payload.defaultMarket
-      : input.payload.supportedMarkets[0] ?? "NGN";
+  setting.business.name = input.payload.name;
+  setting.business.supportEmail = input.payload.supportEmail;
+  setting.business.logoUrl = input.payload.logoUrl?.trim()
+    ? input.payload.logoUrl.trim()
+    : null;
+  setting.business.defaultMarket = input.payload.supportedMarkets[0] ?? "NGN";
+  merchant.billingTimezone = merchant.billingTimezone?.trim() ? merchant.billingTimezone : "UTC";
+  setting.business.billingTimezone = setting.business.billingTimezone?.trim()
+    ? setting.business.billingTimezone
+    : "UTC";
 
   await Promise.all([merchant.save(), setting.save()]);
 
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: "Updated onboarding business profile",
+    action: "Updated onboarding business details",
     category: "workspace",
     status: "ok",
     target: input.payload.supportEmail,
-    detail: "Business profile was updated during onboarding.",
+    detail: "Business basics were updated during onboarding.",
     metadata: {
       supportedMarkets: input.payload.supportedMarkets,
-      defaultMarket: setting.defaultMarket,
+      defaultMarket: setting.business.defaultMarket,
+      logoUrl: setting.business.logoUrl,
     },
     ipAddress: null,
     userAgent: null,
@@ -297,11 +400,11 @@ export async function startOnboardingVerification(input: {
   });
 }
 
-export async function updateOnboardingPayoutSettings(input: {
+export async function saveOnboardingPayout(input: {
   merchantId: string;
   teamMemberId: string;
   actor: string;
-  payload: OnboardingPayoutSettingsInput;
+  payload: OnboardingPayoutInput;
 }) {
   const [merchant, setting] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
@@ -315,7 +418,7 @@ export async function updateOnboardingPayoutSettings(input: {
   }
 
   merchant.payoutWallet = payoutWallet;
-  setting.primaryWallet = payoutWallet;
+  setting.wallets.primaryWallet = payoutWallet;
   await Promise.all([merchant.save(), setting.save()]);
 
   await appendAuditLog({
@@ -340,45 +443,11 @@ export async function updateOnboardingPayoutSettings(input: {
   });
 }
 
-export async function updateOnboardingGovernance(input: {
+export async function registerOnboardingMerchant(input: {
   merchantId: string;
   teamMemberId: string;
   actor: string;
-  payload: OnboardingGovernanceInput;
-}) {
-  const merchant = await getMerchantOrThrow(input.merchantId);
-  merchant.governanceEnabled = true;
-  await merchant.save();
-
-  await appendAuditLog({
-    merchantId: input.merchantId,
-    actor: input.actor,
-    action: "Configured workspace approvals",
-    category: "security",
-    status: "ok",
-    target: merchant.name,
-    detail:
-      "Workspace approvals stay enabled; multi-owner workspaces automatically use multisig.",
-    metadata: {
-      governanceEnabled: true,
-      requestedEnabled: input.payload.enabled,
-    },
-    ipAddress: null,
-    userAgent: null,
-  });
-
-  return persistIntermediateOnboardingStatus({
-    merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
-    environment: input.payload.environment,
-  });
-}
-
-export async function completeOnboarding(input: {
-  merchantId: string;
-  teamMemberId: string;
-  actor: string;
-  payload: OnboardingCompleteInput;
+  payload: OnboardingRegisterInput;
 }) {
   const state = await resolveOnboardingState({
     merchantId: input.merchantId,
@@ -390,20 +459,40 @@ export async function completeOnboarding(input: {
     throw new HttpError(409, "Onboarding is still missing required steps.");
   }
 
+  assertOwnerRole(state.owner.role);
+
+  const activeSigner = await getActiveOwnerSigner({
+    merchantId: input.merchantId,
+    teamMemberId: input.teamMemberId,
+  });
+
+  await ensureOnboardingProtocolReady({
+    merchantId: input.merchantId,
+    teamMemberId: input.teamMemberId,
+    actor: input.actor,
+    environment: input.payload.environment,
+    merchantPayoutWallet: state.merchant.payoutWallet,
+    metadataHash: state.merchant.metadataHash,
+  });
+
+  state.merchant.operatorWalletAddress = activeSigner.walletAddress;
+  state.merchant.governanceEnabled = true;
   state.merchant.onboardingStatus = "workspace_active";
   await state.merchant.save();
 
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: "Completed onboarding",
+    action: "Registered merchant workspace",
     category: "workspace",
     status: "ok",
     target: state.merchant.name,
-    detail: "Workspace onboarding was completed.",
+    detail:
+      "Merchant registration completed and the initial 1-of-1 signer/governance context was created.",
     metadata: {
       environment: input.payload.environment,
       governanceEnabled: true,
+      signerWallet: activeSigner.walletAddress,
     },
     ipAddress: null,
     userAgent: null,

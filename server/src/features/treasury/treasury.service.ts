@@ -49,7 +49,7 @@ import {
   isProtocolMerchantRegistered,
   updateProtocolSubscriptionMandate,
   withdrawProtocolMerchantBalance,
-} from "@/features/treasury/protocol-sync";
+} from "@/features/protocol/protocol.merchant";
 import {
   encodePayoutWalletChangeConfirmCall,
   encodePayoutWalletChangeRequestCall,
@@ -305,11 +305,14 @@ function mapRetryPolicyToMaxRetryCount(input: {
 
 async function getMerchantMaxRetryCount(merchantId: string) {
   const setting = await SettingModel.findOne({ merchantId })
-    .select({ autoRetries: 1, retryPolicy: 1 })
+    .select({ "billing.autoRetries": 1, "billing.retryPolicy": 1 })
     .lean()
     .exec();
 
-  return mapRetryPolicyToMaxRetryCount(setting ?? {});
+  return mapRetryPolicyToMaxRetryCount({
+    autoRetries: setting?.billing?.autoRetries,
+    retryPolicy: setting?.billing?.retryPolicy,
+  });
 }
 
 async function getProtocolFeeBps(environment: RuntimeMode) {
@@ -852,8 +855,8 @@ async function syncWalletState(input: {
   merchant.reserveWallet = input.reserveWallet;
 
   if (setting) {
-    setting.primaryWallet = input.payoutWallet;
-    setting.reserveWallet = input.reserveWallet;
+    setting.wallets.primaryWallet = input.payoutWallet;
+    setting.wallets.reserveWallet = input.reserveWallet;
     await setting.save();
   }
 
@@ -1557,11 +1560,11 @@ export async function listPayoutBatchesByMerchantId(
     merchantId,
     environment,
     payoutWallet: merchant.payoutWallet,
-    payoutMode: setting.payoutMode,
-    autoPayoutFrequency: setting.autoPayoutFrequency,
-    autoPayoutTimeLocal: setting.autoPayoutTimeLocal,
-    thresholdPayoutEnabled: setting.thresholdPayoutEnabled,
-    autoPayoutThresholdUsdc: setting.autoPayoutThresholdUsdc,
+    payoutMode: setting.treasury.payoutMode,
+    autoPayoutFrequency: setting.treasury.autoPayoutFrequency,
+    autoPayoutTimeLocal: setting.treasury.autoPayoutTimeLocal,
+    thresholdPayoutEnabled: setting.treasury.thresholdPayoutEnabled,
+    autoPayoutThresholdUsdc: setting.treasury.autoPayoutThresholdUsdc,
     availableBalanceUsdc: eligibleSettlements.reduce(
       (total, settlement) => total + settlement.netUsdc,
       0
@@ -1600,7 +1603,7 @@ export async function previewPayoutBatch(input: {
   if (existingBatch) {
     return {
       payoutWallet: merchant.payoutWallet,
-      payoutMode: setting.payoutMode,
+      payoutMode: setting.treasury.payoutMode,
       preview: toPayoutBatchResponse(existingBatch),
       availableSettlementIds: existingBatch.settlementIds.map((entry) => entry.toString()),
     };
@@ -1609,7 +1612,7 @@ export async function previewPayoutBatch(input: {
   if (settlements.length === 0) {
     return {
       payoutWallet: merchant.payoutWallet,
-      payoutMode: setting.payoutMode,
+      payoutMode: setting.treasury.payoutMode,
       preview: null,
       availableSettlementIds: [],
     };
@@ -1619,7 +1622,7 @@ export async function previewPayoutBatch(input: {
 
   return {
     payoutWallet: merchant.payoutWallet,
-    payoutMode: setting.payoutMode,
+    payoutMode: setting.treasury.payoutMode,
     preview: {
       id: null,
       merchantId: input.merchantId,
@@ -1656,19 +1659,19 @@ export async function updateTreasuryPayoutSettings(input: {
 
   const setting = await getOrCreatePayoutSetting(input.merchantId);
 
-  setting.payoutMode = input.payload.payoutMode;
-  setting.autoPayoutFrequency =
+  setting.treasury.payoutMode = input.payload.payoutMode;
+  setting.treasury.autoPayoutFrequency =
     input.payload.payoutMode === "automatic"
-      ? input.payload.autoPayoutFrequency ?? setting.autoPayoutFrequency
+      ? input.payload.autoPayoutFrequency ?? setting.treasury.autoPayoutFrequency
       : null;
   if (input.payload.autoPayoutTimeLocal !== undefined) {
-    setting.autoPayoutTimeLocal = input.payload.autoPayoutTimeLocal;
+    setting.treasury.autoPayoutTimeLocal = input.payload.autoPayoutTimeLocal;
   }
   if (input.payload.thresholdPayoutEnabled !== undefined) {
-    setting.thresholdPayoutEnabled = input.payload.thresholdPayoutEnabled;
+    setting.treasury.thresholdPayoutEnabled = input.payload.thresholdPayoutEnabled;
   }
   if (input.payload.autoPayoutThresholdUsdc !== undefined) {
-    setting.autoPayoutThresholdUsdc = input.payload.autoPayoutThresholdUsdc;
+    setting.treasury.autoPayoutThresholdUsdc = input.payload.autoPayoutThresholdUsdc;
   }
   await setting.save();
 
@@ -1681,11 +1684,11 @@ export async function updateTreasuryPayoutSettings(input: {
     target: input.merchantId,
     detail: "Treasury payout settings were updated.",
     metadata: {
-      payoutMode: setting.payoutMode,
-      autoPayoutFrequency: setting.autoPayoutFrequency,
-      autoPayoutTimeLocal: setting.autoPayoutTimeLocal,
-      thresholdPayoutEnabled: setting.thresholdPayoutEnabled,
-      autoPayoutThresholdUsdc: setting.autoPayoutThresholdUsdc,
+      payoutMode: setting.treasury.payoutMode,
+      autoPayoutFrequency: setting.treasury.autoPayoutFrequency,
+      autoPayoutTimeLocal: setting.treasury.autoPayoutTimeLocal,
+      thresholdPayoutEnabled: setting.treasury.thresholdPayoutEnabled,
+      autoPayoutThresholdUsdc: setting.treasury.autoPayoutThresholdUsdc,
       environment: input.environment,
     },
     ipAddress: null,
@@ -2251,12 +2254,6 @@ export async function bootstrapTreasuryAccount(input: {
     ipAddress: null,
     userAgent: null,
   });
-
-  await queueMerchantRegistrationOperation({
-    merchantId: input.merchantId,
-    actor: input.actor,
-    environment: input.payload.environment,
-  }).catch(() => null);
 
   return toTreasuryAccountResponse(treasuryAccount);
 }

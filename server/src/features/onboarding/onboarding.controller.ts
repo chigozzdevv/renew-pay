@@ -1,19 +1,17 @@
 import type { Request, Response } from "express";
 
 import {
-  completeOnboarding,
+  registerOnboardingMerchant,
   getOnboardingState,
+  saveOnboardingBusiness,
+  saveOnboardingPayout,
   startOnboardingVerification,
-  updateOnboardingBusinessProfile,
-  updateOnboardingGovernance,
-  updateOnboardingPayoutSettings,
 } from "@/features/onboarding/onboarding.service";
 import {
-  onboardingBusinessProfileSchema,
-  onboardingCompleteSchema,
-  onboardingGovernanceSchema,
-  onboardingPayoutSettingsSchema,
+  onboardingBusinessSchema,
+  onboardingPayoutSchema,
   onboardingQuerySchema,
+  onboardingRegisterSchema,
   onboardingVerificationStartSchema,
 } from "@/features/onboarding/onboarding.validation";
 import { asyncHandler } from "@/shared/utils/async-handler";
@@ -52,11 +50,11 @@ export const getOnboardingController = asyncHandler(
   }
 );
 
-export const updateOnboardingBusinessProfileController = asyncHandler(
+export const saveOnboardingBusinessController = asyncHandler(
   async (request: Request, response: Response) => {
     const scope = requireSessionScope(request);
-    const payload = onboardingBusinessProfileSchema.parse(request.body);
-    const onboarding = await updateOnboardingBusinessProfile({
+    const payload = onboardingBusinessSchema.parse(request.body);
+    const onboarding = await saveOnboardingBusiness({
       ...scope,
       actor: resolveActor(request),
       payload,
@@ -64,7 +62,7 @@ export const updateOnboardingBusinessProfileController = asyncHandler(
 
     response.status(200).json({
       success: true,
-      message: "Business profile updated.",
+      message: "Business basics updated.",
       data: onboarding,
     });
   }
@@ -88,11 +86,11 @@ export const startOnboardingVerificationController = asyncHandler(
   }
 );
 
-export const updateOnboardingPayoutSettingsController = asyncHandler(
+export const saveOnboardingPayoutController = asyncHandler(
   async (request: Request, response: Response) => {
     const scope = requireSessionScope(request);
-    const payload = onboardingPayoutSettingsSchema.parse(request.body);
-    const onboarding = await updateOnboardingPayoutSettings({
+    const payload = onboardingPayoutSchema.parse(request.body);
+    const onboarding = await saveOnboardingPayout({
       ...scope,
       actor: resolveActor(request),
       payload,
@@ -106,11 +104,11 @@ export const updateOnboardingPayoutSettingsController = asyncHandler(
   }
 );
 
-export const updateOnboardingGovernanceController = asyncHandler(
+export const registerOnboardingMerchantController = asyncHandler(
   async (request: Request, response: Response) => {
     const scope = requireSessionScope(request);
-    const payload = onboardingGovernanceSchema.parse(request.body);
-    const onboarding = await updateOnboardingGovernance({
+    const payload = onboardingRegisterSchema.parse(request.body);
+    const onboarding = await registerOnboardingMerchant({
       ...scope,
       actor: resolveActor(request),
       payload,
@@ -118,25 +116,7 @@ export const updateOnboardingGovernanceController = asyncHandler(
 
     response.status(200).json({
       success: true,
-      message: "Governance preference saved.",
-      data: onboarding,
-    });
-  }
-);
-
-export const completeOnboardingController = asyncHandler(
-  async (request: Request, response: Response) => {
-    const scope = requireSessionScope(request);
-    const payload = onboardingCompleteSchema.parse(request.body);
-    const onboarding = await completeOnboarding({
-      ...scope,
-      actor: resolveActor(request),
-      payload,
-    });
-
-    response.status(200).json({
-      success: true,
-      message: "Workspace onboarding completed.",
+      message: "Merchant registered.",
       data: onboarding,
     });
   }

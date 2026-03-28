@@ -6,9 +6,9 @@ import { ChargeModel } from "@/features/charges/charge.model";
 import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
-import { recordProtocolChargeFailure } from "@/features/settlements/protocol-execution.service";
+import { recordProtocolChargeFailure } from "@/features/protocol/protocol.settlement";
 import { createSettlement } from "@/features/settlements/settlement.service";
-import { deriveProtocolMerchantAddress } from "@/features/treasury/protocol-sync";
+import { deriveProtocolMerchantAddress } from "@/features/protocol/protocol.merchant";
 import { getTreasuryByMerchantId } from "@/features/treasury/treasury.service";
 import type {
   CreateChargeInput,

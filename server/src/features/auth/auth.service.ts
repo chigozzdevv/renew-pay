@@ -34,7 +34,7 @@ function toAuthenticatedUser(
 },
   merchant?: {
     authProvider?: string | null;
-    operatorSmartAccountAddress?: string | null;
+    operatorWalletAddress?: string | null;
     onboardingStatus?: string | null;
     governanceEnabled?: boolean | null;
   }
@@ -51,8 +51,8 @@ function toAuthenticatedUser(
     markets: document.markets,
     lastActiveAt: document.lastActiveAt ?? null,
     authProvider: merchant?.authProvider ?? "privy",
-    operatorWalletAddress: merchant?.operatorSmartAccountAddress ?? null,
-    onboardingStatus: merchant?.onboardingStatus ?? "workspace_active",
+    operatorWalletAddress: merchant?.operatorWalletAddress ?? null,
+    onboardingStatus: merchant?.onboardingStatus ?? "business",
     governanceEnabled: true,
   };
 }
@@ -221,7 +221,7 @@ async function resolveMerchantSessionMeta(merchantId: string) {
   const merchant = await MerchantModel.findById(merchantId)
     .select({
       authProvider: 1,
-      operatorSmartAccountAddress: 1,
+      operatorWalletAddress: 1,
       onboardingStatus: 1,
       governanceEnabled: 1,
     })
@@ -264,8 +264,8 @@ export async function signupWithPassword(input: SignupInput) {
     status: "active",
     authProvider: "password",
     authProviderUserId: null,
-    operatorSmartAccountAddress: null,
-    onboardingStatus: "identity_complete",
+    operatorWalletAddress: null,
+    onboardingStatus: "business",
     governanceEnabled: true,
   });
 
@@ -533,9 +533,9 @@ export async function exchangePrivySession(input: PrivySessionInput) {
         status: "active",
         authProvider: "privy",
         authProviderUserId: providerUserId,
-        operatorSmartAccountAddress:
+        operatorWalletAddress:
           normalizeSolanaAddress(input.operatorWalletAddress),
-        onboardingStatus: "identity_complete",
+        onboardingStatus: "business",
         governanceEnabled: true,
       });
 
@@ -593,12 +593,12 @@ export async function exchangePrivySession(input: PrivySessionInput) {
       throw new HttpError(400, "Operator wallet address is invalid.");
     }
 
-    if (!merchant.operatorSmartAccountAddress) {
+    if (!merchant.operatorWalletAddress) {
       await MerchantModel.findByIdAndUpdate(member.merchantId, {
-        operatorSmartAccountAddress: normalizedAddress,
+        operatorWalletAddress: normalizedAddress,
         merchantAccount: normalizedAddress,
       }).exec();
-      merchant.operatorSmartAccountAddress = normalizedAddress;
+      merchant.operatorWalletAddress = normalizedAddress;
     }
   }
 

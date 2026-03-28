@@ -10,10 +10,10 @@ import { queueChargeStatusNotifications } from "@/features/notifications/notific
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { PlanModel } from "@/features/plans/plan.model";
-import { executeProtocolSettlement } from "@/features/settlements/protocol-execution.service";
+import { executeProtocolSettlement } from "@/features/protocol/protocol.settlement";
 import { SettlementModel } from "@/features/settlements/settlement.model";
 import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
-import { deriveProtocolMerchantAddress } from "@/features/treasury/protocol-sync";
+import { deriveProtocolMerchantAddress } from "@/features/protocol/protocol.merchant";
 import type {
   CreateSettlementInput,
   ListSettlementsQuery,

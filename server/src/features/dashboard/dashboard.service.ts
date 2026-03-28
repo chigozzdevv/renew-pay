@@ -217,7 +217,7 @@ export async function getDashboardMarketCatalog(query: DashboardMarketCatalogQue
   const merchant = await ensureMerchant(query.merchantId);
   const [settings, marketCatalog] = await Promise.all([
     SettingModel.findOne({ merchantId: query.merchantId })
-      .select({ defaultMarket: 1 })
+      .select({ "business.defaultMarket": 1 })
       .lean()
       .exec(),
     listBillingMarketCatalog(query.environment),
@@ -227,7 +227,8 @@ export async function getDashboardMarketCatalog(query: DashboardMarketCatalogQue
   const merchantSupportedMarkets = merchant.supportedMarkets.filter((market) =>
     marketMap.has(market)
   );
-  const defaultMarketCandidate = settings?.defaultMarket ?? merchant.supportedMarkets[0] ?? null;
+  const defaultMarketCandidate =
+    settings?.business?.defaultMarket ?? merchant.supportedMarkets[0] ?? null;
   const defaultMarket =
     defaultMarketCandidate && marketMap.has(defaultMarketCandidate)
       ? defaultMarketCandidate

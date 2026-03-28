@@ -31,8 +31,8 @@ export const merchantParamSchema = z.object({
   merchantId: objectIdSchema,
 });
 
-const profileSettingsSchema = z.object({
-  businessName: z.string().trim().min(2).max(160).optional(),
+const businessSettingsSchema = z.object({
+  name: z.string().trim().min(2).max(160).optional(),
   supportEmail: z.email().trim().toLowerCase().optional(),
   defaultMarket: z.string().trim().min(2).max(8).toUpperCase().optional(),
   invoicePrefix: z.string().trim().min(2).max(12).toUpperCase().optional(),
@@ -41,7 +41,7 @@ const profileSettingsSchema = z.object({
   fallbackCurrency: z.string().trim().min(2).max(12).toUpperCase().optional(),
   statementDescriptor: z.string().trim().min(2).max(40).optional(),
   brandAccent: z.string().trim().min(2).max(40).optional(),
-  emailLogoUrl: nullableUrlSchema.optional(),
+  logoUrl: nullableUrlSchema.optional(),
   customerDomain: z.string().trim().min(2).max(160).optional(),
   invoiceFooter: z.string().trim().min(2).max(240).optional(),
 });
@@ -85,7 +85,7 @@ export const updateSettingsSchema = z
   .object({
     actor: z.string().trim().min(2).max(120).default("system"),
     environment: environmentInputSchema.default("test"),
-    profile: profileSettingsSchema.optional(),
+    business: businessSettingsSchema.optional(),
     billing: billingSettingsSchema.optional(),
     wallets: walletSettingsSchema.optional(),
     notifications: notificationSettingsSchema.optional(),
@@ -93,7 +93,7 @@ export const updateSettingsSchema = z
   })
   .refine(
     (value) =>
-      value.profile !== undefined ||
+      value.business !== undefined ||
       value.billing !== undefined ||
       value.wallets !== undefined ||
       value.notifications !== undefined ||

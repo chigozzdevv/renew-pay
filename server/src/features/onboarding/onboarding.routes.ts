@@ -1,12 +1,11 @@
 import { Router } from "express";
 
 import {
-  completeOnboardingController,
   getOnboardingController,
+  registerOnboardingMerchantController,
+  saveOnboardingBusinessController,
+  saveOnboardingPayoutController,
   startOnboardingVerificationController,
-  updateOnboardingBusinessProfileController,
-  updateOnboardingGovernanceController,
-  updateOnboardingPayoutSettingsController,
 } from "@/features/onboarding/onboarding.controller";
 import { requirePlatformAuth, requirePlatformRoles } from "@/shared/middleware/platform-auth";
 
@@ -16,9 +15,9 @@ onboardingRouter.use(requirePlatformAuth);
 
 onboardingRouter.get("/", getOnboardingController);
 onboardingRouter.post(
-  "/business-profile",
+  "/business",
   requirePlatformRoles(["owner", "admin"]),
-  updateOnboardingBusinessProfileController
+  saveOnboardingBusinessController
 );
 onboardingRouter.post(
   "/verification/start",
@@ -26,19 +25,14 @@ onboardingRouter.post(
   startOnboardingVerificationController
 );
 onboardingRouter.post(
-  "/payout-settings",
+  "/payout",
   requirePlatformRoles(["owner", "admin"]),
-  updateOnboardingPayoutSettingsController
+  saveOnboardingPayoutController
 );
 onboardingRouter.post(
-  "/governance",
-  requirePlatformRoles(["owner", "admin"]),
-  updateOnboardingGovernanceController
-);
-onboardingRouter.post(
-  "/complete",
-  requirePlatformRoles(["owner", "admin"]),
-  completeOnboardingController
+  "/register",
+  requirePlatformRoles(["owner"]),
+  registerOnboardingMerchantController
 );
 
 export { onboardingRouter };

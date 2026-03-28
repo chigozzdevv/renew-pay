@@ -6,17 +6,12 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
-  Keypair,
   PublicKey,
   SystemProgram,
   type TransactionInstruction,
 } from "@solana/web3.js";
 
-import type { RuntimeMode } from "@/shared/constants/runtime-mode";
-import { HttpError } from "@/shared/errors/http-error";
 import { executeSquadsVaultInstructions } from "@/features/governance/squads.service";
-import { normalizeSolanaAddress } from "@/shared/constants/solana";
-import { getSolanaAdminKeypair } from "@/features/solana/solana-keypair.service";
 import {
   deriveMerchantIdBytes,
   findConfigPda,
@@ -29,10 +24,13 @@ import {
   getServerSponsoredTransactionContext,
   hashProgramIdentifier,
   loadSubscriptionContext,
-  sendSponsoredTransaction,
   toFixed6Bn,
   toUnixSeconds,
 } from "@/features/solana/renew-program.service";
+import { getSolanaAdminKeypair } from "@/features/solana/solana-keypair.service";
+import { normalizeSolanaAddress } from "@/shared/constants/solana";
+import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { HttpError } from "@/shared/errors/http-error";
 
 type Runtime = ReturnType<typeof getRenewProgramRuntime>;
 
@@ -126,10 +124,8 @@ function toOperatorVaultContext(input: {
   };
 }
 
-async function ensureProtocolMerchantAuthority(input: {
-  environment: RuntimeMode;
+async function assertProtocolMerchantAuthority(input: {
   runtime: Runtime;
-  admin: Keypair;
   merchantIdBytes: Uint8Array;
   operator: ReturnType<typeof toOperatorVaultContext>;
   merchantAddress?: PublicKey;
@@ -146,37 +142,14 @@ async function ensureProtocolMerchantAuthority(input: {
   const merchant = await accounts.merchant.fetch(merchantAddress);
   const currentAuthority = (merchant as { authority: PublicKey }).authority;
 
-  if (currentAuthority.equals(input.operator.operatorVault)) {
-    return {
-      merchantAddress,
-      txHash: null,
-    };
-  }
-
-  if (!currentAuthority.equals(input.admin.publicKey)) {
+  if (!currentAuthority.equals(input.operator.operatorVault)) {
     throw new HttpError(
       409,
       "Protocol merchant authority is not controlled by the configured operator vault."
     );
   }
 
-  const instruction = await input.runtime.program.methods
-    .updateMerchantAuthority(input.operator.operatorVault)
-    .accounts({
-      authority: input.admin.publicKey,
-      merchant: merchantAddress,
-    })
-    .instruction();
-  const execution = await sendSponsoredTransaction({
-    mode: input.environment,
-    authority: input.admin,
-    instructions: [instruction],
-  });
-
-  return {
-    merchantAddress,
-    txHash: execution.signature,
-  };
+  return merchantAddress;
 }
 
 function buildPlanTermsArgs(input: {
@@ -372,10 +345,8 @@ export async function createProtocolMerchant(input: {
   const existingMerchant = await runtime.connection.getAccountInfo(merchantAddress);
 
   if (existingMerchant) {
-    const migration = await ensureProtocolMerchantAuthority({
-      environment: input.environment,
+    await assertProtocolMerchantAuthority({
       runtime,
-      admin,
       merchantIdBytes,
       operator,
       merchantAddress,
@@ -383,7 +354,7 @@ export async function createProtocolMerchant(input: {
 
     return {
       merchantAddress: merchantAddress.toBase58(),
-      txHash: migration.txHash,
+      txHash: null,
     };
   }
 
@@ -449,10 +420,8 @@ export async function createProtocolPlan(input: {
   const runtime = getRenewProgramRuntime(input.environment, admin);
   const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime,
-    admin,
     merchantIdBytes,
     operator,
   });
@@ -502,10 +471,8 @@ export async function updateProtocolPlan(input: {
   const runtime = getRenewProgramRuntime(input.environment, admin);
   const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime,
-    admin,
     merchantIdBytes,
     operator,
   });
@@ -549,10 +516,8 @@ export async function createProtocolSubscriptionForMerchant(input: {
   const runtime = getRenewProgramRuntime(input.environment, admin);
   const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime,
-    admin,
     merchantIdBytes,
     operator,
   });
@@ -614,10 +579,8 @@ export async function updateProtocolSubscriptionMandate(input: {
     admin,
     input.protocolSubscriptionId
   );
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime: context.runtime,
-    admin,
     merchantIdBytes: context.merchantId,
     operator,
     merchantAddress: context.merchantAddress,
@@ -657,10 +620,8 @@ export async function pauseProtocolSubscription(input: {
     admin,
     input.protocolSubscriptionId
   );
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime: context.runtime,
-    admin,
     merchantIdBytes: context.merchantId,
     operator,
     merchantAddress: context.merchantAddress,
@@ -701,10 +662,8 @@ export async function resumeProtocolSubscription(input: {
     admin,
     input.protocolSubscriptionId
   );
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime: context.runtime,
-    admin,
     merchantIdBytes: context.merchantId,
     operator,
     merchantAddress: context.merchantAddress,
@@ -746,10 +705,8 @@ export async function cancelProtocolSubscription(input: {
     admin,
     input.protocolSubscriptionId
   );
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime: context.runtime,
-    admin,
     merchantIdBytes: context.merchantId,
     operator,
     merchantAddress: context.merchantAddress,
@@ -788,10 +745,8 @@ export async function requestProtocolPayoutDestinationUpdate(input: {
   const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
   const merchantAddress = findMerchantPda(runtime.programId, merchantIdBytes);
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime,
-    admin,
     merchantIdBytes,
     operator,
     merchantAddress,
@@ -838,10 +793,8 @@ export async function confirmProtocolPayoutDestinationUpdate(input: {
   const runtime = getRenewProgramRuntime(input.environment, admin);
   const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime,
-    admin,
     merchantIdBytes,
     operator,
   });
@@ -878,10 +831,8 @@ export async function withdrawProtocolMerchantBalance(input: {
   const operator = toOperatorVaultContext(input);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
   const merchantAddress = findMerchantPda(runtime.programId, merchantIdBytes);
-  await ensureProtocolMerchantAuthority({
-    environment: input.environment,
+  await assertProtocolMerchantAuthority({
     runtime,
-    admin,
     merchantIdBytes,
     operator,
     merchantAddress,

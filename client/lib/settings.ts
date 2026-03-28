@@ -6,8 +6,8 @@ import type { TreasuryOperation } from "@/lib/treasury";
 export type WorkspaceSettings = {
   id: string;
   merchantId: string;
-  profile: {
-    businessName: string;
+  business: {
+    name: string;
     supportEmail: string;
     defaultMarket: string;
     invoicePrefix: string;
@@ -16,7 +16,7 @@ export type WorkspaceSettings = {
     fallbackCurrency: string;
     statementDescriptor: string;
     brandAccent: string;
-    emailLogoUrl: string | null;
+    logoUrl: string | null;
     customerDomain: string;
     invoiceFooter: string;
   };
@@ -88,7 +88,7 @@ export async function updateWorkspaceSettings(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  payload: Partial<Pick<WorkspaceSettings, "profile" | "billing" | "notifications" | "security">>;
+  payload: Partial<Pick<WorkspaceSettings, "business" | "billing" | "notifications" | "security">>;
 }) {
   const response = await fetchApi<WorkspaceSettings>(
     `/settings/${input.merchantId}`,

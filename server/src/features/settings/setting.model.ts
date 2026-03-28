@@ -1,14 +1,8 @@
 import { InferSchemaType, Model, Schema, Types, model, models } from "mongoose";
 
-const settingSchema = new Schema(
+const businessSettingsSchema = new Schema(
   {
-    merchantId: {
-      type: Schema.Types.ObjectId,
-      required: true,
-      ref: "Merchant",
-      unique: true,
-    },
-    businessName: {
+    name: {
       type: String,
       required: true,
       trim: true,
@@ -64,7 +58,7 @@ const settingSchema = new Schema(
       trim: true,
       default: "forest-green",
     },
-    emailLogoUrl: {
+    logoUrl: {
       type: String,
       trim: true,
       default: null,
@@ -81,6 +75,14 @@ const settingSchema = new Schema(
       trim: true,
       default: "Thanks for billing with Renew.",
     },
+  },
+  {
+    _id: false,
+  }
+);
+
+const billingSettingsSchema = new Schema(
+  {
     retryPolicy: {
       type: String,
       required: true,
@@ -103,6 +105,14 @@ const settingSchema = new Schema(
       required: true,
       default: true,
     },
+  },
+  {
+    _id: false,
+  }
+);
+
+const walletSettingsSchema = new Schema(
+  {
     primaryWallet: {
       type: String,
       required: true,
@@ -118,6 +128,14 @@ const settingSchema = new Schema(
       required: true,
       default: true,
     },
+  },
+  {
+    _id: false,
+  }
+);
+
+const notificationSettingsSchema = new Schema(
+  {
     financeDigest: {
       type: Boolean,
       required: true,
@@ -190,6 +208,14 @@ const settingSchema = new Schema(
       required: true,
       default: true,
     },
+  },
+  {
+    _id: false,
+  }
+);
+
+const securitySettingsSchema = new Schema(
+  {
     sessionTimeout: {
       type: String,
       required: true,
@@ -212,6 +238,14 @@ const settingSchema = new Schema(
       required: true,
       default: false,
     },
+  },
+  {
+    _id: false,
+  }
+);
+
+const treasurySettingsSchema = new Schema(
+  {
     sweepApprovalThreshold: {
       type: Number,
       required: true,
@@ -244,6 +278,50 @@ const settingSchema = new Schema(
       type: Number,
       min: 0,
       default: null,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+const settingSchema = new Schema(
+  {
+    merchantId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "Merchant",
+      unique: true,
+    },
+    business: {
+      type: businessSettingsSchema,
+      required: true,
+      default: () => ({}),
+    },
+    billing: {
+      type: billingSettingsSchema,
+      required: true,
+      default: () => ({}),
+    },
+    wallets: {
+      type: walletSettingsSchema,
+      required: true,
+      default: () => ({}),
+    },
+    notifications: {
+      type: notificationSettingsSchema,
+      required: true,
+      default: () => ({}),
+    },
+    security: {
+      type: securitySettingsSchema,
+      required: true,
+      default: () => ({}),
+    },
+    treasury: {
+      type: treasurySettingsSchema,
+      required: true,
+      default: () => ({}),
     },
   },
   {

@@ -76,7 +76,7 @@ export async function getGovernanceState(
     controllerWalletAddress:
       treasuryAccount?.operatorVaultAddress ??
       treasuryAccount?.governanceVaultAddress ??
-      merchant.operatorSmartAccountAddress ??
+      merchant.operatorWalletAddress ??
       null,
     payoutWallet: merchant.payoutWallet,
     activeSignerCount: activeApprovers.length,

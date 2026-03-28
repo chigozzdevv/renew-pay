@@ -14,12 +14,11 @@ export type OnboardingState = {
     label: string;
     status: "complete" | "current" | "pending";
   }>;
-  businessProfile: {
-    businessName: string;
+  business: {
+    logoUrl: string;
+    name: string;
     supportEmail: string;
-    billingTimezone: string;
     supportedMarkets: string[];
-    defaultMarket: string;
   };
   verification: {
     ownerKyc: {
@@ -46,14 +45,7 @@ export type OnboardingState = {
   payout: {
     payoutWallet: string;
     payoutConfigured: boolean;
-    payoutMode: string;
-    autoPayoutFrequency: string | null;
-    autoPayoutTimeLocal: string;
-    thresholdPayoutEnabled: boolean;
-    autoPayoutThresholdUsdc: number | null;
-  };
-  governance: {
-    enabled: boolean;
+    bankTransferStatus: "coming_soon";
   };
 };
 
@@ -71,25 +63,23 @@ export async function loadOnboardingState(input: {
   return response.data;
 }
 
-export async function saveOnboardingBusinessProfile(input: {
+export async function saveOnboardingBusiness(input: {
   token: string;
   environment: "test" | "live";
-  businessName: string;
+  logoUrl?: string;
+  name: string;
   supportEmail: string;
-  billingTimezone: string;
   supportedMarkets: string[];
-  defaultMarket?: string;
 }) {
-  const response = await fetchApi<OnboardingState>("/onboarding/business-profile", {
+  const response = await fetchApi<OnboardingState>("/onboarding/business", {
     method: "POST",
     token: input.token,
     body: JSON.stringify({
       environment: input.environment,
-      businessName: input.businessName,
+      logoUrl: input.logoUrl,
+      name: input.name,
       supportEmail: input.supportEmail,
-      billingTimezone: input.billingTimezone,
       supportedMarkets: input.supportedMarkets,
-      defaultMarket: input.defaultMarket,
     }),
   });
 
@@ -120,12 +110,12 @@ export async function startOnboardingVerification(input: {
   return response.data;
 }
 
-export async function saveOnboardingPayoutWallet(input: {
+export async function saveOnboardingPayout(input: {
   token: string;
   environment: "test" | "live";
   payoutWallet: string;
 }) {
-  const response = await fetchApi<OnboardingState>("/onboarding/payout-settings", {
+  const response = await fetchApi<OnboardingState>("/onboarding/payout", {
     method: "POST",
     token: input.token,
     body: JSON.stringify({
@@ -137,28 +127,11 @@ export async function saveOnboardingPayoutWallet(input: {
   return response.data;
 }
 
-export async function saveOnboardingGovernance(input: {
-  token: string;
-  environment: "test" | "live";
-  enabled: boolean;
-}) {
-  const response = await fetchApi<OnboardingState>("/onboarding/governance", {
-    method: "POST",
-    token: input.token,
-    body: JSON.stringify({
-      environment: input.environment,
-      enabled: input.enabled,
-    }),
-  });
-
-  return response.data;
-}
-
-export async function completeWorkspaceOnboarding(input: {
+export async function registerOnboardingMerchant(input: {
   token: string;
   environment: "test" | "live";
 }) {
-  const response = await fetchApi<OnboardingState>("/onboarding/complete", {
+  const response = await fetchApi<OnboardingState>("/onboarding/register", {
     method: "POST",
     token: input.token,
     body: JSON.stringify({

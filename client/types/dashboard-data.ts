@@ -255,8 +255,8 @@ export type TreasuryPayload = {
 export type SettingsPayload = {
   id: string;
   merchantId: string;
-  profile: {
-    businessName: string;
+  business: {
+    name: string;
     supportEmail: string;
     defaultMarket: string;
     invoicePrefix: string;
@@ -265,7 +265,7 @@ export type SettingsPayload = {
     fallbackCurrency: string;
     statementDescriptor: string;
     brandAccent: string;
-    emailLogoUrl: string | null;
+    logoUrl: string | null;
     customerDomain: string;
     invoiceFooter: string;
   };
