@@ -69,14 +69,6 @@ const envSchema = z
     SOLANA_ADMIN_SECRET_KEY_LIVE: z.string().trim().default(""),
     SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_TEST: z.string().trim().default(""),
     SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_LIVE: z.string().trim().default(""),
-    KORA_RPC_URL_TEST: z.string().trim().default(""),
-    KORA_RPC_URL_LIVE: z.string().trim().default(""),
-    KORA_API_KEY_TEST: z.string().trim().default(""),
-    KORA_API_KEY_LIVE: z.string().trim().default(""),
-    KORA_HMAC_SECRET_TEST: z.string().trim().default(""),
-    KORA_HMAC_SECRET_LIVE: z.string().trim().default(""),
-    KORA_FEE_TOKEN_MINT_TEST: z.string().trim().default(""),
-    KORA_FEE_TOKEN_MINT_LIVE: z.string().trim().default(""),
     SQUADS_DEFAULT_VAULT_INDEX: z.coerce.number().int().min(0).default(0),
     ENABLE_WORKERS: booleanEnv.default(true),
     REDIS_URL: z.string().trim().min(1).default("redis://127.0.0.1:6379"),
@@ -147,6 +139,9 @@ const envSchema = z
       .trim()
       .default("Renew <notifications@updates.renew.sh>"),
     RESEND_REPLY_TO_EMAIL: z.string().trim().default(""),
+    RESEND_WEBHOOK_SECRET: z.string().trim().default(""),
+    RESEND_INBOUND_FORWARD_TO: z.string().trim().default(""),
+    RESEND_INBOUND_FORWARD_FROM: z.string().trim().default(""),
   });
 
 export const env = envSchema.parse(process.env);

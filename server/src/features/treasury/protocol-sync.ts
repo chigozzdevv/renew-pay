@@ -20,7 +20,7 @@ import {
   findPlanPda,
   findSubscriptionPda,
   getRenewProgramRuntime,
-  getSponsoredTransactionContext,
+  getServerSponsoredTransactionContext,
   hashProgramIdentifier,
   loadSubscriptionContext,
   sendSponsoredTransaction,
@@ -303,14 +303,14 @@ export async function createProtocolMerchant(input: {
     };
   }
 
-  const sponsoredContext = await getSponsoredTransactionContext({
+  const sponsorshipContext = await getServerSponsoredTransactionContext({
     mode: input.environment,
-    fallbackFeePayer: admin.publicKey,
+    serverFeePayer: admin.publicKey,
   });
   const payout = await resolveSettlementTokenAccount({
     runtime,
     destination: input.payoutWallet,
-    feePayer: sponsoredContext.feePayer,
+    feePayer: sponsorshipContext.feePayer,
   });
   const instruction = await runtime.program.methods
     .createMerchant(
@@ -608,14 +608,14 @@ export async function requestProtocolPayoutDestinationUpdate(input: {
   const runtime = getRenewProgramRuntime(input.environment, admin);
   const merchantIdBytes = deriveMerchantIdBytes(input.merchantId);
   const merchantAddress = findMerchantPda(runtime.programId, merchantIdBytes);
-  const sponsoredContext = await getSponsoredTransactionContext({
+  const sponsorshipContext = await getServerSponsoredTransactionContext({
     mode: input.environment,
-    fallbackFeePayer: admin.publicKey,
+    serverFeePayer: admin.publicKey,
   });
   const payout = await resolveSettlementTokenAccount({
     runtime,
     destination: input.payoutWallet,
-    feePayer: sponsoredContext.feePayer,
+    feePayer: sponsorshipContext.feePayer,
   });
   const instruction = await runtime.program.methods
     .requestPayoutDestinationUpdate()

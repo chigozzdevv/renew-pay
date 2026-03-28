@@ -164,7 +164,6 @@ export function createApp() {
     );
     app.use(
       `${apiBasePath}/notifications`,
-      requirePlatformAuth,
       notificationRouter
     );
     app.use(

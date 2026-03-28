@@ -14,9 +14,7 @@ import {
 } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
-import { getKoraConfig } from "@/config/kora.config";
 import { getProtocolRuntimeConfig } from "@/config/protocol.config";
-import { KoraClient } from "@solana/kora";
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 
@@ -370,77 +368,35 @@ export function createFxQuoteArgs(input: {
   };
 }
 
-async function getKoraClient(mode: RuntimeMode) {
-  const koraConfig = getKoraConfig(mode);
-
-  if (!koraConfig.enabled) {
-    return null;
-  }
-
-  return new KoraClient({
-    rpcUrl: koraConfig.rpcUrl,
-    apiKey: koraConfig.apiKey || undefined,
-    hmacSecret: koraConfig.hmacSecret || undefined,
-  });
-}
-
-export async function getSponsoredTransactionContext(input: {
+export async function getServerSponsoredTransactionContext(input: {
   mode: RuntimeMode;
-  fallbackFeePayer: PublicKey;
+  serverFeePayer: PublicKey;
 }) {
   const runtime = getProtocolRuntimeConfig(input.mode);
-  const kora = await getKoraClient(input.mode);
-
-  if (!kora) {
-    const connection = new Connection(runtime.rpcUrl, "confirmed");
-    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-
-    return {
-      blockhash: latestBlockhash.blockhash,
-      feePayer: input.fallbackFeePayer,
-      sponsored: false,
-    };
-  }
-
-  const [blockhash, payer] = await Promise.all([
-    kora.getBlockhash(),
-    kora.getPayerSigner(),
-  ]);
+  const connection = new Connection(runtime.rpcUrl, "confirmed");
+  const latestBlockhash = await connection.getLatestBlockhash("confirmed");
 
   return {
-    blockhash: blockhash.blockhash,
-    feePayer: new PublicKey(payer.signer_address),
-    sponsored: true,
+    blockhash: latestBlockhash.blockhash,
+    feePayer: input.serverFeePayer,
+    sponsored: false,
   };
 }
 
-export async function sendSerializedSponsoredTransaction(input: {
+export async function sendSerializedServerSponsoredTransaction(input: {
   mode: RuntimeMode;
   transactionBase64: string;
 }) {
-  const kora = await getKoraClient(input.mode);
-
-  if (!kora) {
-    const runtimeConfig = getProtocolRuntimeConfig(input.mode);
-    const connection = new Connection(runtimeConfig.rpcUrl, "confirmed");
-    const signature = await connection.sendRawTransaction(
-      Buffer.from(input.transactionBase64, "base64")
-    );
-    await connection.confirmTransaction(signature, "confirmed");
-
-    return {
-      signature,
-      sponsored: false,
-    };
-  }
-
-  const response = await kora.signAndSendTransaction({
-    transaction: input.transactionBase64,
-  });
+  const runtimeConfig = getProtocolRuntimeConfig(input.mode);
+  const connection = new Connection(runtimeConfig.rpcUrl, "confirmed");
+  const signature = await connection.sendRawTransaction(
+    Buffer.from(input.transactionBase64, "base64")
+  );
+  await connection.confirmTransaction(signature, "confirmed");
 
   return {
-    signature: response.signature,
-    sponsored: true,
+    signature,
+    sponsored: false,
   };
 }
 
@@ -451,20 +407,20 @@ export async function sendSponsoredTransaction(input: {
   signers?: Keypair[];
 }) {
   const runtime = getRenewProgramRuntime(input.mode, input.authority);
-  const sponsoredContext = await getSponsoredTransactionContext({
+  const sponsorshipContext = await getServerSponsoredTransactionContext({
     mode: input.mode,
-    fallbackFeePayer: input.authority.publicKey,
+    serverFeePayer: input.authority.publicKey,
   });
 
   const transaction = new Transaction({
-    feePayer: sponsoredContext.feePayer,
-    recentBlockhash: sponsoredContext.blockhash,
+    feePayer: sponsorshipContext.feePayer,
+    recentBlockhash: sponsorshipContext.blockhash,
   }).add(...input.instructions);
 
   const signers = [input.authority, ...(input.signers ?? [])];
   transaction.partialSign(...signers);
 
-  return sendSerializedSponsoredTransaction({
+  return sendSerializedServerSponsoredTransaction({
     mode: input.mode,
     transactionBase64: transaction
       .serialize({
