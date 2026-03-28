@@ -133,10 +133,9 @@ const flowSteps: FlowStep[] = [
   },
 ];
 
-// The phone width matches the card width so cards fit perfectly inside
 const PHONE_W = 380;
 const BEZEL = 6;
-const CARD_W = PHONE_W - BEZEL * 2; // card = phone screen width
+const CARD_W = PHONE_W - BEZEL * 2;
 const CARD_GAP = 28;
 const PHONE_H = 520;
 const STEP_TRACK_END = 0.74;
@@ -200,7 +199,6 @@ export function HowItWorksSection() {
   const stripOpacity = useTransform(expansionProgress, [0, 0.06, 0.18], [1, 1, 0]);
   const frameOpacity = useTransform(expansionProgress, [0, 0.08, 0.2], [1, 1, 0]);
   const frameScale = useTransform(expansionProgress, [0, 0.2], [1, 0.97]);
-  const indicatorOpacity = useTransform(expansionProgress, [0, 0.14, 0.28], [1, 1, 0]);
   const overlayOpacity = useTransform(
     scrollYProgress,
     [EXPANSION_START, EXPANSION_START + 0.04, 0.92, 0.985, 1],
@@ -277,7 +275,7 @@ export function HowItWorksSection() {
               style={{
                 top: BEZEL,
                 left: "50%",
-                marginLeft: -(CARD_W / 2), // first card centered
+                marginLeft: -(CARD_W / 2),
                 gap: CARD_GAP,
                 opacity: stripOpacity,
               }}
@@ -287,7 +285,7 @@ export function HowItWorksSection() {
               {flowSteps.map((step) => (
                 <div
                   key={step.id}
-                  className="flex shrink-0 flex-col items-center justify-center rounded-[2.4rem] p-6 text-center"
+                  className="flex shrink-0 flex-col items-center justify-center rounded-t-[2.4rem] rounded-b-none p-6 text-center"
                   style={{
                     width: CARD_W,
                     height: PHONE_H - BEZEL * 2,
@@ -314,7 +312,10 @@ export function HowItWorksSection() {
                 rotate: overlayRotate,
                 x: overlayX,
                 y: overlayY,
-                borderRadius: overlayRadius,
+                borderTopLeftRadius: overlayRadius,
+                borderTopRightRadius: overlayRadius,
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
                 boxShadow: overlayShadow,
                 transformOrigin: "center center",
               }}
@@ -342,31 +343,6 @@ export function HowItWorksSection() {
             </motion.div>
           </div>
 
-          {/* Step indicators */}
-          <motion.div
-            className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2"
-            style={{ opacity: indicatorOpacity }}
-          >
-            {flowSteps.map((step, index) => (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => {
-                  if (!sectionRef.current) return;
-                  const rect = sectionRef.current.getBoundingClientRect();
-                  const sectionTop = window.scrollY + rect.top;
-                  const sectionHeight = rect.height;
-                  const targetScroll = sectionTop + (index / (totalSteps + EXTRA_SCROLL_SCREENS)) * sectionHeight;
-                  window.scrollTo({ top: targetScroll, behavior: "smooth" });
-                }}
-                className="h-2 rounded-full transition-all duration-300"
-                style={{
-                  width: index === activeIndex ? 32 : 8,
-                  backgroundColor: index === activeIndex ? step.accentColor : "#e5e7eb",
-                }}
-              />
-            ))}
-          </motion.div>
         </div>
       </div>
     </section>
