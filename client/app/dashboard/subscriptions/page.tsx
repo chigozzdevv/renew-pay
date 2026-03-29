@@ -408,7 +408,7 @@ export default function SubscriptionsPage() {
       <Card
         title="Subscriptions"
         description="Recurring and usage-based subscriptions for the selected environment."
-        action={<Button onClick={openCreateModal}>Create subscription</Button>}
+        action={<Button tone="brand" onClick={openCreateModal}>Create subscription</Button>}
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
@@ -467,14 +467,14 @@ export default function SubscriptionsPage() {
                   <button
                     type="button"
                     onClick={() => setDetailSubscription(subscription)}
-                    className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
+                    className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                   >
                     View
                   </button>
                   <button
                     type="button"
                     onClick={() => openEditModal(subscription)}
-                    className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
+                    className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                   >
                     Edit
                   </button>

@@ -226,7 +226,7 @@ export default function CustomersPage() {
         title="Customer directory"
         description="Customer records with status and renewal state for the selected environment."
         action={
-          <Button onClick={() => {
+          <Button tone="brand" onClick={() => {
             setDraft({ customerRef: "", name: "", email: "", market: marketCatalog?.defaultMarket ?? "" });
             setShowCreate(true);
           }}>

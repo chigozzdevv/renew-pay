@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -118,6 +118,28 @@ function toggleEventType(
   return current.includes(eventType)
     ? current.filter((value) => value !== eventType)
     : [...current, eventType];
+}
+
+function DeveloperEmptyState({
+  title,
+  message,
+  action,
+}: {
+  title: string;
+  message: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-[color:var(--line)] bg-[#fafafd] px-6 py-10 text-center">
+      <div className="mx-auto max-w-md space-y-3">
+        <p className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--ink)]">
+          {title}
+        </p>
+        <p className="text-sm leading-7 text-[color:var(--muted)]">{message}</p>
+        {action ? <div className="pt-1">{action}</div> : null}
+      </div>
+    </div>
+  );
 }
 
 export default function DevelopersPage() {
@@ -485,60 +507,80 @@ export default function DevelopersPage() {
         <Card
           title="Server keys"
           description="Backend credentials for the selected environment."
-          action={<Button onClick={() => setShowCreateKey(true)}>Create key</Button>}
+          action={<Button tone="brand" onClick={() => setShowCreateKey(true)}>Create key</Button>}
         >
           <div className="space-y-4">
-            <Table columns={["Label", "Last used", "Status", "Actions"]}>
-              {keys.map((key) => (
-                <TableRow key={key.id} columns={4}>
-                  <div>
-                    <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                      {key.label}
-                    </p>
-                    <p className="mt-1 text-sm text-[color:var(--muted)]">{key.maskedToken}</p>
-                  </div>
-                  <p className="self-center text-sm text-[color:var(--muted)]">
-                    {formatDateTime(key.lastUsedAt)}
-                  </p>
-                  <div className="self-center">
-                    <StatusBadge value={key.status} />
-                  </div>
-                  <div className="flex justify-start md:justify-end">
-                    {key.status === "active" ? (
-                      <Button
-                        disabled={isBusy === `revoke-key:${key.id}`}
-                        onClick={() => void handleRevokeKey(key)}
-                      >
-                        Revoke
-                      </Button>
-                    ) : null}
-                  </div>
-                </TableRow>
-              ))}
-            </Table>
+            {keys.length === 0 ? (
+              <DeveloperEmptyState
+                title="No server keys yet"
+                message="Create a key when your backend is ready to authenticate API calls, webhooks, or internal tooling."
+                action={
+                  <Button tone="brand" onClick={() => setShowCreateKey(true)}>
+                    Create key
+                  </Button>
+                }
+              />
+            ) : (
+              <>
+                <Table columns={["Label", "Last used", "Status", "Actions"]}>
+                  {keys.map((key) => (
+                    <TableRow key={key.id} columns={4}>
+                      <div>
+                        <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                          {key.label}
+                        </p>
+                        <p className="mt-1 text-sm text-[color:var(--muted)]">{key.maskedToken}</p>
+                      </div>
+                      <p className="self-center text-sm text-[color:var(--muted)]">
+                        {formatDateTime(key.lastUsedAt)}
+                      </p>
+                      <div className="self-center">
+                        <StatusBadge value={key.status} />
+                      </div>
+                      <div className="flex justify-start md:justify-end">
+                        {key.status === "active" ? (
+                          <Button
+                            disabled={isBusy === `revoke-key:${key.id}`}
+                            onClick={() => void handleRevokeKey(key)}
+                          >
+                            Revoke
+                          </Button>
+                        ) : null}
+                      </div>
+                    </TableRow>
+                  ))}
+                </Table>
 
-            <PaginationControls
-              page={keysPagination.page}
-              total={keysPagination.total}
-              totalPages={keysPagination.totalPages}
-              onPrevious={() => setKeyPage((current) => Math.max(1, current - 1))}
-              onNext={() =>
-                setKeyPage((current) => Math.min(keysPagination.totalPages, current + 1))
-              }
-            />
+                <PaginationControls
+                  page={keysPagination.page}
+                  total={keysPagination.total}
+                  totalPages={keysPagination.totalPages}
+                  onPrevious={() => setKeyPage((current) => Math.max(1, current - 1))}
+                  onNext={() =>
+                    setKeyPage((current) => Math.min(keysPagination.totalPages, current + 1))
+                  }
+                />
+              </>
+            )}
           </div>
         </Card>
 
         <Card
           title="Webhook endpoints"
           description="Endpoints registered for the selected environment."
-          action={<Button onClick={() => setShowCreateWebhook(true)}>Create webhook</Button>}
+          action={<Button tone="brand" onClick={() => setShowCreateWebhook(true)}>Create webhook</Button>}
         >
           <div className="space-y-4">
             {webhooks.length === 0 ? (
-              <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-10 text-center text-sm text-[color:var(--muted)]">
-                No webhook endpoints yet for this environment.
-              </div>
+              <DeveloperEmptyState
+                title="No webhook endpoints yet"
+                message="Add a webhook when you want Renew to deliver billing events into your own backend."
+                action={
+                  <Button tone="brand" onClick={() => setShowCreateWebhook(true)}>
+                    Create webhook
+                  </Button>
+                }
+              />
             ) : (
               <Table columns={["Label", "Events", "Status", "Actions"]}>
                 {webhooks.map((webhook) => (
@@ -561,7 +603,7 @@ export default function DevelopersPage() {
                       <button
                         type="button"
                         onClick={() => openManageWebhook(webhook)}
-                        className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
+                        className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                       >
                         Manage
                       </button>
@@ -605,9 +647,25 @@ export default function DevelopersPage() {
         }
       >
         {deliveries.length === 0 ? (
-          <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-10 text-center text-sm text-[color:var(--muted)]">
-            No deliveries recorded yet.
-          </div>
+          <DeveloperEmptyState
+            title="No deliveries yet"
+            message={
+              webhooks.length === 0
+                ? "Create a webhook first, then send a test event to start building delivery history."
+                : "Send a test event from a webhook to verify your endpoint and start seeing delivery history here."
+            }
+            action={
+              webhooks.length === 0 ? (
+                <Button tone="brand" onClick={() => setShowCreateWebhook(true)}>
+                  Create webhook
+                </Button>
+              ) : selectedWebhook ? (
+                <Button tone="brand" onClick={() => void handleSendTest(selectedWebhook)}>
+                  Send test
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table columns={["Event", "Attempts", "HTTP", "Delivered", "Status"]}>
             {deliveries.map((delivery: DeliveryRecord) => (

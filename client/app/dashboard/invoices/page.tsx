@@ -665,7 +665,7 @@ export default function InvoicesPage() {
       <Card
         title="Invoices"
         description="Create, send, and track one-time billing links."
-        action={<Button onClick={openCreateModal}>Create invoice</Button>}
+        action={<Button tone="brand" onClick={openCreateModal}>Create invoice</Button>}
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
@@ -726,7 +726,7 @@ export default function InvoicesPage() {
                   <button
                     type="button"
                     onClick={() => setDetailInvoice(invoice)}
-                    className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
+                    className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                   >
                     View
                   </button>
@@ -734,7 +734,7 @@ export default function InvoicesPage() {
                     <button
                       type="button"
                       onClick={() => openEditModal(invoice)}
-                      className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
+                      className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                     >
                       Edit
                     </button>

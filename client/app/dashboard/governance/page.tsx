@@ -25,7 +25,7 @@ import {
   Table,
   TableRow,
 } from "@/components/dashboard/ui";
-import { loadGovernanceState, setGovernanceEnabled } from "@/lib/governance";
+import { loadGovernanceState } from "@/lib/governance";
 import {
   createTreasurySignerChallenge,
   verifyTreasurySigner,
@@ -163,7 +163,6 @@ function encodeBase58(bytes: Uint8Array) {
 export default function GovernancePage() {
   const { token, user, refresh } = useDashboardSession();
   const { mode } = useWorkspaceMode();
-  const [busyAction, setBusyAction] = useState<"enable" | "disable" | null>(null);
   const [isVerifyingSigner, setIsVerifyingSigner] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -235,37 +234,38 @@ export default function GovernancePage() {
       ? "Syncing wallet..."
       : currentSigner?.status === "active" && currentWalletMatchesSigner
         ? "Signer verified"
-        : currentSigner?.status === "active"
-          ? "Verify this wallet"
-          : "Verify my signer";
+      : currentSigner?.status === "active"
+        ? "Verify this wallet"
+        : "Verify my signer";
+  const approverRows = useMemo(() => {
+    const rows = (data?.approvers ?? []).map((approver) => ({
+      ...approver,
+      isCurrentSession: approver.teamMemberId === user?.teamMemberId,
+      isSynthetic: false,
+    }));
 
-  async function toggleGovernance(enabled: boolean) {
-    if (!token) {
-      return;
-    }
-
-    setBusyAction(enabled ? "enable" : "disable");
-    setErrorMessage(null);
-    setMessage(null);
-
-    try {
-      await setGovernanceEnabled({
-        token,
-        environment: mode,
-        enabled,
+    if (
+      user?.role === "owner" &&
+      user.teamMemberId &&
+      !rows.some((approver) => approver.teamMemberId === user.teamMemberId)
+    ) {
+      rows.unshift({
+        id: `session-${user.teamMemberId}`,
+        teamMemberId: user.teamMemberId,
+        walletAddress: activeWalletAddress ?? "",
+        status: isWalletSyncing ? "wallet_syncing" : "not_verified",
+        verifiedAt: null,
+        revokedAt: null,
+        role: user.role,
+        name: user.name,
+        email: user.email,
+        isCurrentSession: true,
+        isSynthetic: true,
       });
-      await Promise.all([governanceResource.reload(), refresh()]);
-      setMessage(
-        enabled
-          ? "Advanced governance is enabled. The page remains hidden by default unless the workspace needs it."
-          : "Advanced governance is disabled. The workspace is back in single-owner mode."
-      );
-    } catch (requestError) {
-      setErrorMessage(toErrorMessage(requestError));
-    } finally {
-      setBusyAction(null);
     }
-  }
+
+    return rows;
+  }, [activeWalletAddress, data?.approvers, isWalletSyncing, user?.email, user?.name, user?.role, user?.teamMemberId]);
 
   async function runSignerVerification() {
     if (!token || !user) {
@@ -341,9 +341,13 @@ export default function GovernancePage() {
     <div className="space-y-6">
       <StatGrid>
         <MetricCard
-          label="Mode"
+          label="Approval mode"
           value={data.mode === "multisig" ? "Multisig" : "Single owner"}
-          note={data.enabled ? "Governance enabled" : "Default mode"}
+          note={
+            data.mode === "multisig"
+              ? "Multi-owner treasury approvals"
+              : "1-of-1 owner approval flow"
+          }
         />
         <MetricCard
           label="Operator wallet"
@@ -363,28 +367,8 @@ export default function GovernancePage() {
       </StatGrid>
 
       <Card
-        title="Governance"
-        description="Multi-approval controls for treasury actions."
-        action={
-          <div className="flex items-center gap-3">
-            <Badge tone={data.enabled ? "brand" : "neutral"}>
-              {data.enabled ? "Enabled" : "Disabled"}
-            </Badge>
-            <Button
-              tone={data.enabled ? "neutral" : "brand"}
-              disabled={busyAction !== null}
-              onClick={() => toggleGovernance(!data.enabled)}
-            >
-              {busyAction === "enable"
-                ? "Enabling..."
-                : busyAction === "disable"
-                  ? "Disabling..."
-                  : data.enabled
-                    ? "Disable"
-                    : "Enable"}
-            </Button>
-          </div>
-        }
+        title="Approvers"
+        description="Owner approval seats and their bound treasury signers."
       >
         <div className="space-y-4">
           {message ? (
@@ -394,78 +378,29 @@ export default function GovernancePage() {
             <p className="text-sm text-[#a8382b]">{errorMessage}</p>
           ) : null}
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
-              <span className="text-sm font-medium text-[color:var(--ink)]">Onboarding</span>
-              <Badge tone={data.onboardingStatus === "workspace_active" ? "brand" : "warning"}>
-                {data.onboardingStatus.replace(/_/g, " ")}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
-              <span className="text-sm font-medium text-[color:var(--ink)]">Active approvers</span>
-              <span className="text-sm font-semibold text-[color:var(--ink)]">
-                {activeApprovers.length}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
-              <span className="text-sm font-medium text-[color:var(--ink)]">Current session</span>
-              <span className="text-sm font-semibold text-[color:var(--ink)]">
-                {user?.name ?? "Unknown"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <Card
-        title="Treasury signer"
-        description="Verify your Privy wallet for treasury approvals."
-        action={
-          <Button
-            tone="brand"
-            disabled={signerActionDisabled}
-            onClick={() => void runSignerVerification()}
-          >
-            {signerActionLabel}
-          </Button>
-        }
-      >
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone={signerStatusTone}>{signerStatusLabel}</Badge>
-          <span className="font-mono text-xs text-[color:var(--muted)]">
-            {formatAddress(activeWalletAddress)}
-          </span>
-        </div>
-        {currentSigner?.status === "active" && !currentWalletMatchesSigner ? (
-          <p className="mt-3 text-xs text-[#8a5313]">
-            Current wallet differs from the bound signer. Re-verifying will rotate approvals.
-          </p>
-        ) : null}
-        {!currentSigner && user?.role !== "owner" ? (
-          <p className="mt-3 text-xs text-[color:var(--muted)]">Only owners can bind a signer.</p>
-        ) : null}
-      </Card>
-
-      <Card
-        title="Approvers"
-        description="Owners with a verified treasury signer."
-      >
-        {data.approvers.length === 0 ? (
+          {currentSigner?.status === "active" && !currentWalletMatchesSigner ? (
+            <p className="text-xs text-[#8a5313]">
+              Your signed-in Privy wallet differs from the wallet currently bound to your approver seat.
+            </p>
+          ) : null}
+        {approverRows.length === 0 ? (
           <p className="py-6 text-center text-sm text-[color:var(--muted)]">
-            No approvers yet. Verify an owner's signer wallet to add them.
+            No approvers yet.
           </p>
         ) : (
-          <Table columns={["Approver", "Wallet", "Status", "Verified"]}>
-            {data.approvers.map((approver) => (
-              <TableRow key={approver.id} columns={4}>
+          <Table columns={["Approver", "Wallet", "Status", "Verified", "Actions"]}>
+            {approverRows.map((approver) => (
+              <TableRow key={approver.id} columns={5}>
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-[color:var(--ink)]">{approver.name}</p>
                   <p className="text-xs text-[color:var(--muted)]">
-                    {approver.role} · {approver.email ?? "No email"}
+                    {approver.role}
+                    {approver.email ? ` · ${approver.email}` : ""}
+                    {approver.isCurrentSession ? " · current session" : ""}
                   </p>
                 </div>
                 <span className="font-mono text-xs text-[color:var(--muted)]">
-                  {formatAddress(approver.walletAddress)}
+                  {formatAddress(approver.walletAddress || activeWalletAddress)}
                 </span>
                 <Badge tone={signerTone(approver.status)}>
                   {approver.status.replace(/_/g, " ")}
@@ -473,10 +408,32 @@ export default function GovernancePage() {
                 <span className="text-xs text-[color:var(--muted)]">
                   {formatDate(approver.verifiedAt)}
                 </span>
+                <div className="flex items-center justify-start md:justify-end">
+                  {approver.isCurrentSession ? (
+                    currentSigner?.status === "active" && currentWalletMatchesSigner ? (
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                        Current signer
+                      </span>
+                    ) : (
+                      <Button
+                        tone="brand"
+                        disabled={signerActionDisabled}
+                        onClick={() => void runSignerVerification()}
+                      >
+                        {signerActionLabel}
+                      </Button>
+                    )
+                  ) : (
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                      No action
+                    </span>
+                  )}
+                </div>
               </TableRow>
             ))}
           </Table>
         )}
+        </div>
       </Card>
     </div>
   );

@@ -58,7 +58,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "self-start rounded-[2rem] border border-[color:var(--line)] bg-white/82 p-5 shadow-[0_18px_70px_rgba(16,32,20,0.04)] sm:p-6",
+        "self-start rounded-[2rem] border border-[color:var(--line)] bg-white p-5 shadow-[0_18px_70px_rgba(16,32,20,0.04)] sm:p-6",
         className
       )}
     >
@@ -294,7 +294,7 @@ export function Table({
     <div className="space-y-3">
       <div
         className={cn(
-          "hidden gap-3 rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 md:grid",
+          "hidden gap-3 rounded-2xl border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3 md:grid",
           columnClass
         )}
       >
@@ -333,8 +333,8 @@ export function TableRow({
       className={cn(
         "grid gap-3 rounded-[1.25rem] border px-4 py-4 transition-colors",
         selected
-          ? "border-black/10 bg-[#f2f1eb] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
-          : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[#faf9f5]",
+          ? "border-black/10 bg-[#f8f8fb] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
+          : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[#fafafd]",
         columns === 3
           ? "md:grid-cols-3"
           : columns === 4

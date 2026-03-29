@@ -348,7 +348,7 @@ export default function TeamsPage() {
       <Card
         title="Team members"
         description="Role-based access for this account."
-        action={<Button onClick={openInviteModal}>Invite member</Button>}
+        action={<Button tone="brand" onClick={openInviteModal}>Invite member</Button>}
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
@@ -414,7 +414,7 @@ export default function TeamsPage() {
                   <button
                     type="button"
                     onClick={() => openManageModal(member)}
-                    className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
+                    className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                   >
                     Manage
                   </button>

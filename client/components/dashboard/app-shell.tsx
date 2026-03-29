@@ -28,7 +28,7 @@ export function DashboardAppShell({ children }: DashboardAppShellProps) {
   return (
     <DashboardSessionProvider>
       <ModeProvider>
-        <div className="min-h-screen bg-[#f5f4ef] text-[color:var(--ink)]">
+        <div className="min-h-screen bg-white text-[color:var(--ink)]">
           <div className="flex min-h-screen">
             <aside className="sticky top-0 hidden h-screen w-[288px] shrink-0 lg:block">
               <DashboardSidebar pathname={pathname} />
