@@ -1,6 +1,8 @@
 import { HttpError } from "@/shared/errors/http-error";
 
+import { env } from "@/config/env.config";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
 import type {
   CreateMerchantInput,
   ListMerchantsQuery,
@@ -13,8 +15,8 @@ function toMerchantResponse(document: {
   merchantAccount: string;
   payoutWallet: string;
   reserveWallet?: string | null;
-  name: string;
-  supportEmail: string;
+  name?: string | null;
+  supportEmail?: string | null;
   billingTimezone: string;
   supportedMarkets: string[];
   metadataHash: string;
@@ -27,8 +29,8 @@ function toMerchantResponse(document: {
     merchantAccount: document.merchantAccount,
     payoutWallet: document.payoutWallet,
     reserveWallet: document.reserveWallet ?? null,
-    name: document.name,
-    supportEmail: document.supportEmail,
+    name: document.name ?? "",
+    supportEmail: document.supportEmail ?? "",
     billingTimezone: document.billingTimezone,
     supportedMarkets: document.supportedMarkets,
     metadataHash: document.metadataHash,
@@ -39,6 +41,11 @@ function toMerchantResponse(document: {
 }
 
 export async function createMerchant(input: CreateMerchantInput) {
+  await assertSupportedBillingMarkets({
+    markets: input.supportedMarkets,
+    environment: env.PAYMENT_ENV,
+  });
+
   const merchantAccount = normalizeSolanaAddress(input.merchantAccount);
 
   if (!merchantAccount) {
@@ -103,6 +110,13 @@ export async function updateMerchant(
   merchantId: string,
   input: UpdateMerchantInput
 ) {
+  if (input.supportedMarkets !== undefined) {
+    await assertSupportedBillingMarkets({
+      markets: input.supportedMarkets,
+      environment: env.PAYMENT_ENV,
+    });
+  }
+
   const merchant = await MerchantModel.findById(merchantId).exec();
 
   if (!merchant) {

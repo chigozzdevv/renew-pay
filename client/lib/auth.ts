@@ -18,8 +18,6 @@ export type PrivySessionResponse = {
 export async function exchangePrivySession(input: {
   authToken: string;
   identityToken?: string | null;
-  name?: string;
-  company?: string;
   email?: string;
   billingTimezone?: string;
   supportedMarkets?: string[];
@@ -30,8 +28,6 @@ export async function exchangePrivySession(input: {
     body: JSON.stringify({
       authToken: input.authToken,
       identityToken: input.identityToken ?? undefined,
-      name: input.name,
-      company: input.company,
       email: input.email,
       billingTimezone:
         input.billingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",

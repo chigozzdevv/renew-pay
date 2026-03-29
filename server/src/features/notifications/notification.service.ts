@@ -121,6 +121,13 @@ function createSupportMailto(email: string, merchantName: string) {
   )}`;
 }
 
+function resolveMerchantLabel(input: {
+  name?: string | null;
+  supportEmail?: string | null;
+}) {
+  return input.name?.trim() || input.supportEmail?.trim() || "Renew workspace";
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -406,7 +413,10 @@ async function loadMerchantBranding(merchantId: string) {
     merchant,
     setting,
     branding: {
-      merchantName: merchant.name,
+      merchantName: resolveMerchantLabel({
+        name: merchant.name,
+        supportEmail: merchant.supportEmail,
+      }),
       supportEmail: setting.business.supportEmail,
       brandAccent: setting.business.brandAccent,
       emailLogoUrl: setting.business.logoUrl ?? null,
@@ -761,7 +771,13 @@ export async function queueTeamInviteNotification(input: {
       recipientName: member.name,
       role: member.role,
       inviteUrl: `${getAppBaseUrl()}/login`,
-      supportUrl: createSupportMailto(setting.business.supportEmail, merchant.name),
+      supportUrl: createSupportMailto(
+        setting.business.supportEmail,
+        resolveMerchantLabel({
+          name: merchant.name,
+          supportEmail: merchant.supportEmail,
+        })
+      ),
     },
     metadata: {
       teamMemberId: member._id.toString(),

@@ -25,7 +25,10 @@ import {
   getPreferredCollectionNetwork,
   quoteUsdAmountInBillingCurrency,
 } from "@/features/payment-rails/payment-rails.service";
-import { createPartnaChargeInstruction } from "@/features/payment-rails/partna.service";
+import {
+  createPartnaChargeInstruction,
+  derivePartnaFeeAmountUsdc,
+} from "@/features/payment-rails/partna.service";
 import type { PlanRecord } from "@/features/plans/plan.model";
 import { PlanModel } from "@/features/plans/plan.model";
 import type { SubscriptionRecord } from "@/features/subscriptions/subscription.model";
@@ -233,8 +236,6 @@ async function runPartnaSubscriptionChargeJob(input: {
   const localAmount = quote.localAmount;
   const usdcAmount = quote.usdcAmount;
   const fxRate = quote.fxRate;
-  const feeAmount = quote.feeAmount;
-  const netUsdc = Number(Math.max(0.01, usdcAmount - feeAmount).toFixed(2));
 
   const { voucher, paymentSnapshot } = await createPartnaChargeInstruction({
     environment: input.environment,
@@ -243,6 +244,12 @@ async function runPartnaSubscriptionChargeJob(input: {
     localAmount,
     paymentProfile: customer.paymentProfile,
   });
+  const feeAmount =
+    derivePartnaFeeAmountUsdc({
+      fxRate,
+      voucher,
+    }) ?? quote.feeAmount;
+  const netUsdc = Number(Math.max(0.01, usdcAmount - feeAmount).toFixed(2));
   const treasury = await getTreasuryByMerchantId(
     merchant._id.toString(),
     input.environment
@@ -278,6 +285,9 @@ async function runPartnaSubscriptionChargeJob(input: {
       voucherCode: voucher.voucherCode,
       voucherId: voucher.voucherId,
       reference: voucher.reference,
+      voucherFee: voucher.fee,
+      voucherWavedFee: voucher.wavedFee,
+      feeBearer: voucher.feeBearer,
       paymentInstructions: paymentSnapshot,
       callbackUrl: customer.paymentProfile?.partna?.callbackUrl ?? null,
     },

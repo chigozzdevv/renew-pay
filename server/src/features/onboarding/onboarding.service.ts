@@ -6,11 +6,13 @@ import {
   startTeamMemberKycSession,
 } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
 import {
   createProtocolMerchant,
   isProtocolMerchantRegistered,
 } from "@/features/protocol/protocol.merchant";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
+import { SettingModel } from "@/features/settings/setting.model";
 import { TeamMemberModel } from "@/features/teams/team.model";
 import { TreasuryAccountModel } from "@/features/treasury/treasury-account.model";
 import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
@@ -52,6 +54,10 @@ async function getTeamMemberOrThrow(teamMemberId: string, merchantId: string) {
 }
 
 const getOrCreateSetting = getOrCreateMerchantSetting;
+
+async function loadSetting(merchantId: string) {
+  return SettingModel.findOne({ merchantId }).exec();
+}
 
 async function loadTreasuryAccount(merchantId: string, environment: RuntimeMode) {
   return TreasuryAccountModel.findOne({
@@ -164,7 +170,7 @@ async function resolveOnboardingState(input: {
   const [merchant, owner, setting, ownerKyc, merchantKyb] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
     getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
-    getOrCreateSetting(input.merchantId),
+    loadSetting(input.merchantId),
     getTeamMemberKycStatusById({
       merchantId: input.merchantId,
       teamMemberId: input.teamMemberId,
@@ -174,6 +180,9 @@ async function resolveOnboardingState(input: {
   ]);
 
   const businessComplete =
+    typeof owner.name === "string" &&
+    owner.name.trim().length > 1 &&
+    typeof merchant.name === "string" &&
     merchant.name.trim().length > 1 &&
     merchant.supportEmail.trim().length > 3 &&
     merchant.supportedMarkets.length > 0;
@@ -261,8 +270,9 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
     currentStepKey: input.currentStepKey,
     steps: input.steps,
     business: {
-      logoUrl: input.setting.business.logoUrl ?? "",
-      name: input.merchant.name,
+      logoUrl: input.setting?.business.logoUrl ?? "",
+      ownerName: input.owner.name ?? "",
+      name: input.merchant.name ?? "",
       supportEmail: input.merchant.supportEmail,
       supportedMarkets: input.merchant.supportedMarkets,
     },
@@ -321,11 +331,18 @@ export async function saveOnboardingBusiness(input: {
   actor: string;
   payload: OnboardingBusinessInput;
 }) {
-  const [merchant, setting] = await Promise.all([
+  await assertSupportedBillingMarkets({
+    markets: input.payload.supportedMarkets,
+    environment: input.payload.environment,
+  });
+
+  const [merchant, owner, setting] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
+    getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
     getOrCreateSetting(input.merchantId),
   ]);
 
+  owner.name = input.payload.ownerName;
   merchant.name = input.payload.name;
   merchant.supportEmail = input.payload.supportEmail;
   merchant.supportedMarkets = input.payload.supportedMarkets;
@@ -340,7 +357,7 @@ export async function saveOnboardingBusiness(input: {
     ? setting.business.billingTimezone
     : "UTC";
 
-  await Promise.all([merchant.save(), setting.save()]);
+  await Promise.all([owner.save(), merchant.save(), setting.save()]);
 
   await appendAuditLog({
     merchantId: input.merchantId,
@@ -378,6 +395,14 @@ export async function startOnboardingVerification(input: {
 
   if (subject === "merchant_kyb") {
     const merchant = await getMerchantOrThrow(input.merchantId);
+
+    if (!merchant.name?.trim()) {
+      throw new HttpError(
+        409,
+        "Save business details before starting merchant verification."
+      );
+    }
+
     return startMerchantKybSession({
       merchantId: input.merchantId,
       actor: input.actor,
@@ -486,7 +511,7 @@ export async function registerOnboardingMerchant(input: {
     action: "Registered merchant workspace",
     category: "workspace",
     status: "ok",
-    target: state.merchant.name,
+    target: state.merchant.name ?? state.merchant.supportEmail ?? null,
     detail:
       "Merchant registration completed and the initial 1-of-1 signer/governance context was created.",
     metadata: {

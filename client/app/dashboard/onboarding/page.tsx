@@ -499,7 +499,7 @@ function OnboardingContent(input: {
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Business basics" description="Logo, name, email, and markets.">
+        <Card title="Business basics" description="Owner, logo, business details, and markets.">
           <div className="grid gap-4">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-[color:var(--ink)]">Logo URL</span>
@@ -512,6 +512,17 @@ function OnboardingContent(input: {
                   )
                 }
                 placeholder="https://..."
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-[color:var(--ink)]">Your name</span>
+              <Input
+                value={businessDraft.ownerName}
+                onChange={(event) =>
+                  setBusinessDraft((current) =>
+                    current ? { ...current, ownerName: event.target.value } : current
+                  )
+                }
               />
             </label>
             <label className="grid gap-2">
@@ -571,6 +582,7 @@ function OnboardingContent(input: {
                     token,
                     environment: mode,
                     logoUrl: businessDraft.logoUrl,
+                    ownerName: businessDraft.ownerName,
                     name: businessDraft.name,
                     supportEmail: businessDraft.supportEmail,
                     supportedMarkets: businessDraft.supportedMarkets,

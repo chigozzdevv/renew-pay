@@ -19,8 +19,8 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
     setting = await SettingModel.create({
       merchantId: merchant._id,
       business: {
-        name: merchant.name,
-        supportEmail: merchant.supportEmail,
+        name: merchant.name ?? "",
+        supportEmail: merchant.supportEmail ?? "",
         defaultMarket: merchant.supportedMarkets[0] ?? "NGN",
         invoicePrefix: "RNL",
         billingTimezone: merchant.billingTimezone,

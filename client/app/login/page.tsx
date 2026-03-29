@@ -33,7 +33,7 @@ function LoginPageContent() {
             Back home
           </Link>
         </div>
-        <PrivySessionCard mode="login" nextPath={nextPath} />
+        <PrivySessionCard nextPath={nextPath} />
       </div>
     </main>
   );

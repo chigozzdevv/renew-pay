@@ -45,6 +45,8 @@ export type PartnaVoucherRecord = {
   status: string;
   amount: number;
   fee: number | null;
+  wavedFee: number | null;
+  feeBearer: string | null;
   currency: string;
   email: string;
   fullName: string;
@@ -68,11 +70,74 @@ export type PartnaMockPaymentInput = {
   reference: string;
 };
 
+export type PartnaRateInput = {
+  fromCurrency: string;
+  toCurrency: string;
+  fromAmount?: number;
+  toAmount?: number;
+};
+
+export type PartnaRateQuote = {
+  key: string | null;
+  fromCurrency: string;
+  toCurrency: string;
+  fromAmount: number;
+  toAmount: number;
+  rate: number;
+  raw: Record<string, unknown>;
+};
+
+export type PartnaSupportedAsset = {
+  currency: string;
+  network: string;
+  destinationCurrency: string;
+  name: string;
+  symbol: string;
+  decimals: number | null;
+  minimumWithdrawal: number | null;
+  raw: Record<string, unknown>;
+};
+
+export type PartnaAccountKycDetails = {
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
+  dateOfBirth: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  stateOfResidence: string | null;
+  lgaOfResidence: string | null;
+  raw: Record<string, unknown>;
+};
+
+export type PartnaAccountDetailsRecord = {
+  accountName: string | null;
+  accountNumber: string | null;
+  bankCode: string | null;
+  bankName: string | null;
+  email: string | null;
+  externalRef: string | null;
+  createdAt: Date | null;
+  kycDetails: PartnaAccountKycDetails | null;
+  raw: Record<string, unknown>;
+};
+
+export type PartnaAccountDetailsInput = {
+  accountName?: string;
+  page?: number;
+  perPage?: number;
+};
+
 export interface PartnaProvider {
   createManagedBankAccount(
     input: PartnaManagedAccountInput
   ): Promise<PartnaManagedBankAccount>;
   listStaticBankAccounts(email: string): Promise<PartnaManagedBankAccount[]>;
+  listSupportedAssets(): Promise<PartnaSupportedAsset[]>;
+  getRate(input: PartnaRateInput): Promise<PartnaRateQuote>;
+  getAccountDetails(
+    input?: PartnaAccountDetailsInput
+  ): Promise<PartnaAccountDetailsRecord[]>;
   createVoucher(input: PartnaVoucherInput): Promise<PartnaVoucherRecord>;
   redeemVoucherAndWithdraw(
     input: PartnaRedeemVoucherInput

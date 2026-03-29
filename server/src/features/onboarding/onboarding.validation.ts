@@ -16,6 +16,7 @@ export const onboardingQuerySchema = z.object({
 export const onboardingBusinessSchema = z.object({
   environment: environmentInputSchema.default("test"),
   logoUrl: z.string().trim().url().max(2048).optional().or(z.literal("")),
+  ownerName: z.string().trim().min(2).max(120),
   name: z.string().trim().min(2).max(160),
   supportEmail: z.email().trim().toLowerCase(),
   supportedMarkets: z.array(marketSchema).min(1),

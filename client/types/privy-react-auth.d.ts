@@ -3,6 +3,7 @@ declare module "@privy-io/react-auth" {
 
   export type PrivyLinkedAccount = {
     type?: string;
+    email?: string | null;
     address?: string;
   };
 

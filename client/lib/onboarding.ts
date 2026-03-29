@@ -16,6 +16,7 @@ export type OnboardingState = {
   }>;
   business: {
     logoUrl: string;
+    ownerName: string;
     name: string;
     supportEmail: string;
     supportedMarkets: string[];
@@ -67,6 +68,7 @@ export async function saveOnboardingBusiness(input: {
   token: string;
   environment: "test" | "live";
   logoUrl?: string;
+  ownerName: string;
   name: string;
   supportEmail: string;
   supportedMarkets: string[];
@@ -77,6 +79,7 @@ export async function saveOnboardingBusiness(input: {
     body: JSON.stringify({
       environment: input.environment,
       logoUrl: input.logoUrl,
+      ownerName: input.ownerName,
       name: input.name,
       supportEmail: input.supportEmail,
       supportedMarkets: input.supportedMarkets,

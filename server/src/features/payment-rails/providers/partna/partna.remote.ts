@@ -3,11 +3,17 @@ import { HttpError } from "@/shared/errors/http-error";
 import { getPartnaConfig } from "@/config/partna.config";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import type {
+  PartnaAccountDetailsInput,
+  PartnaAccountDetailsRecord,
+  PartnaAccountKycDetails,
   PartnaManagedAccountInput,
   PartnaManagedBankAccount,
   PartnaMockPaymentInput,
   PartnaProvider,
+  PartnaRateInput,
+  PartnaRateQuote,
   PartnaRedeemVoucherInput,
+  PartnaSupportedAsset,
   PartnaVoucherInput,
   PartnaVoucherRecord,
 } from "@/features/payment-rails/providers/partna/partna.types";
@@ -26,6 +32,29 @@ function readString(value: unknown) {
 function readNumber(value: unknown) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function readDate(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value > 10_000_000_000 ? value : value * 1000);
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const numeric = Number(value);
+
+    if (Number.isFinite(numeric)) {
+      return new Date(numeric > 10_000_000_000 ? numeric : numeric * 1000);
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
 }
 
 function asRecord(value: unknown) {
@@ -80,6 +109,8 @@ function extractVoucherRecord(record: Record<string, unknown>): PartnaVoucherRec
     status: readString(record.status)?.toLowerCase() ?? "pending",
     amount: readNumber(record.amount) ?? 0,
     fee: readNumber(record.fee),
+    wavedFee: readNumber(record.wavedFee),
+    feeBearer: readString(record.feeBearer)?.toLowerCase() ?? null,
     currency: readString(record.currency)?.toUpperCase() ?? "NGN",
     email: readString(record.email) ?? "",
     fullName:
@@ -89,6 +120,152 @@ function extractVoucherRecord(record: Record<string, unknown>): PartnaVoucherRec
       "",
     reference: readString(record.reference) ?? readString(record.id),
     paymentUrl: readString(record.paymentUrl) ?? readString(record.payUrl),
+    raw: record,
+  };
+}
+
+function extractSupportedAssets(payload: unknown) {
+  const data = extractPayloadData(payload);
+  const byCurrency = asRecord(data.byCurrency) ?? {};
+  const assets: PartnaSupportedAsset[] = [];
+
+  for (const [currency, networkMapValue] of Object.entries(byCurrency)) {
+    const networkMap = asRecord(networkMapValue);
+
+    if (!networkMap) {
+      continue;
+    }
+
+    for (const [network, assetValue] of Object.entries(networkMap)) {
+      const asset = asRecord(assetValue);
+
+      if (!asset) {
+        continue;
+      }
+
+      assets.push({
+        currency: currency.trim().toUpperCase(),
+        network: network.trim().toLowerCase(),
+        destinationCurrency:
+          readString(asset.destinationCurrency)?.toUpperCase() ??
+          currency.trim().toUpperCase(),
+        name: readString(asset.name) ?? currency.trim().toUpperCase(),
+        symbol:
+          readString(asset.symbol)?.toUpperCase() ??
+          currency.trim().toUpperCase(),
+        decimals: readNumber(asset.decimals),
+        minimumWithdrawal: readNumber(asset.minimumWithdrawal),
+        raw: asset,
+      });
+    }
+  }
+
+  return assets;
+}
+
+function extractRateQuote(
+  payload: unknown,
+  input: PartnaRateInput
+): PartnaRateQuote {
+  const data = extractPayloadData(payload);
+  const rateMap = asRecord(data.rate) ?? asRecord(data.rates) ?? asRecord(data);
+  const normalizedFrom = input.fromCurrency.trim().toUpperCase();
+  const normalizedTo = input.toCurrency.trim().toUpperCase();
+  const preferredKey = `${normalizedFrom}_to_${normalizedTo}`;
+  const preferredRate =
+    asRecord(rateMap?.[preferredKey]) ??
+    Object.values(rateMap ?? {})
+      .map((entry) => asRecord(entry))
+      .find((entry): entry is Record<string, unknown> => Boolean(entry));
+
+  if (!preferredRate) {
+    throw new HttpError(502, "Partna rate response did not include a usable quote.");
+  }
+
+  let fromAmount =
+    readNumber(preferredRate.fromAmount) ??
+    (input.fromAmount !== undefined ? Number(input.fromAmount) : null);
+  let toAmount =
+    readNumber(preferredRate.toAmount) ??
+    (input.toAmount !== undefined ? Number(input.toAmount) : null);
+  let rate = readNumber(preferredRate.rate);
+
+  if (rate === null && fromAmount && toAmount) {
+    rate = toAmount / fromAmount;
+  }
+
+  if (fromAmount === null && toAmount !== null && rate) {
+    fromAmount = toAmount / rate;
+  }
+
+  if (toAmount === null && fromAmount !== null && rate) {
+    toAmount = fromAmount * rate;
+  }
+
+  if (fromAmount === null || toAmount === null || rate === null) {
+    throw new HttpError(502, "Partna rate response is missing conversion amounts.");
+  }
+
+  return {
+    key: readString(preferredRate.key),
+    fromCurrency:
+      readString(preferredRate.fromCurrency)?.toUpperCase() ?? normalizedFrom,
+    toCurrency:
+      readString(preferredRate.toCurrency)?.toUpperCase() ?? normalizedTo,
+    fromAmount,
+    toAmount,
+    rate,
+    raw: preferredRate,
+  };
+}
+
+function extractAccountKycDetails(
+  record: Record<string, unknown> | null
+): PartnaAccountKycDetails | null {
+  if (!record) {
+    return null;
+  }
+
+  return {
+    firstName: readString(record.first_name) ?? readString(record.firstName),
+    middleName: readString(record.middle_name) ?? readString(record.middleName),
+    lastName: readString(record.last_name) ?? readString(record.lastName),
+    dateOfBirth: readString(record.dob) ?? readString(record.dateOfBirth),
+    addressLine1:
+      readString(record.address_line_1) ?? readString(record.addressLine1),
+    addressLine2:
+      readString(record.address_line_2) ?? readString(record.addressLine2),
+    stateOfResidence:
+      readString(record.state_of_residence) ?? readString(record.stateOfResidence),
+    lgaOfResidence:
+      readString(record.lga_of_residence) ?? readString(record.lgaOfResidence),
+    raw: record,
+  };
+}
+
+function extractAccountDetailsRecord(
+  record: Record<string, unknown>
+): PartnaAccountDetailsRecord {
+  const bankDetails = asRecord(record.bankDetails);
+
+  return {
+    accountName:
+      readString(bankDetails?.account_name) ??
+      readString(bankDetails?.accountName) ??
+      readString(record.accountName),
+    accountNumber:
+      readString(bankDetails?.account_number) ??
+      readString(bankDetails?.accountNumber),
+    bankCode:
+      readString(bankDetails?.bank_code) ??
+      readString(bankDetails?.bankCode),
+    bankName:
+      readString(bankDetails?.bank_name) ??
+      readString(bankDetails?.bankName),
+    email: readString(record.email),
+    externalRef: readString(record.externalRef),
+    createdAt: readDate(record.createdAt) ?? readDate(bankDetails?.createdAt),
+    kycDetails: extractAccountKycDetails(asRecord(record.kycDetails)),
     raw: record,
   };
 }
@@ -215,6 +392,77 @@ export class PartnaRemoteProvider implements PartnaProvider {
       .map((entry) => asRecord(entry))
       .filter((entry): entry is Record<string, unknown> => Boolean(entry))
       .map(extractManagedBankAccount);
+  }
+
+  async listSupportedAssets() {
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/supported/assets",
+      "GET"
+    );
+
+    return extractSupportedAssets(payload);
+  }
+
+  async getRate(input: PartnaRateInput) {
+    const searchParams = new URLSearchParams({
+      fromCurrency: input.fromCurrency.trim().toUpperCase(),
+      toCurrency: input.toCurrency.trim().toUpperCase(),
+    });
+
+    if (input.fromAmount !== undefined) {
+      searchParams.set("fromAmount", String(input.fromAmount));
+    }
+
+    if (input.toAmount !== undefined) {
+      searchParams.set("toAmount", String(input.toAmount));
+    }
+
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/rate",
+      "GET",
+      undefined,
+      searchParams
+    );
+
+    return extractRateQuote(payload, input);
+  }
+
+  async getAccountDetails(input: PartnaAccountDetailsInput = {}) {
+    const searchParams = new URLSearchParams();
+
+    if (input.accountName?.trim()) {
+      searchParams.set("accountName", input.accountName.trim());
+    }
+
+    if (input.page !== undefined) {
+      searchParams.set("page", String(input.page));
+    }
+
+    if (input.perPage !== undefined) {
+      searchParams.set("perPage", String(input.perPage));
+    }
+
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/account/account-details",
+      "GET",
+      undefined,
+      searchParams
+    );
+
+    const data = extractPayloadData(payload);
+    const collection =
+      (Array.isArray(data.accounts) ? data.accounts : null) ??
+      (Array.isArray(data.data) ? data.data : null) ??
+      (Array.isArray(data) ? data : null) ??
+      [];
+
+    return collection
+      .map((entry) => asRecord(entry))
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .map(extractAccountDetailsRecord);
   }
 
   async createVoucher(input: PartnaVoucherInput) {

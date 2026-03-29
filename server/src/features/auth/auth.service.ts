@@ -4,6 +4,7 @@ import { PrivyClient } from "@privy-io/node";
 
 import { env } from "@/config/env.config";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
 import { TeamMemberModel } from "@/features/teams/team.model";
 import type {
   ActivateInviteInput,
@@ -26,7 +27,7 @@ function toAuthenticatedUser(
   document: {
   _id: { toString(): string };
   merchantId: { toString(): string };
-  name: string;
+  name?: string | null;
   email: string;
   role: string;
   status: string;
@@ -41,10 +42,12 @@ function toAuthenticatedUser(
     governanceEnabled?: boolean | null;
   }
 ) {
+  const displayName = document.name?.trim() ? document.name.trim() : document.email;
+
   return {
     teamMemberId: document._id.toString(),
     merchantId: document.merchantId.toString(),
-    name: document.name,
+    name: displayName,
     email: document.email,
     role: document.role,
     status: document.status,
@@ -139,14 +142,6 @@ function extractEmailFromIdentityClaims(claims: Record<string, unknown>) {
   const linkedAccounts = toRecordArray(claims.linked_accounts);
 
   for (const account of linkedAccounts) {
-    const address =
-      typeof account.address === "string" && account.address.trim()
-        ? account.address.trim().toLowerCase()
-        : null;
-    if (address) {
-      return address;
-    }
-
     const email =
       typeof account.email === "string" && account.email.trim()
         ? account.email.trim().toLowerCase()
@@ -154,34 +149,76 @@ function extractEmailFromIdentityClaims(claims: Record<string, unknown>) {
     if (email) {
       return email;
     }
+
+    const accountType =
+      typeof account.type === "string" ? account.type.trim().toLowerCase() : null;
+    const address =
+      accountType === "email" &&
+      typeof account.address === "string" &&
+      account.address.trim()
+        ? account.address.trim().toLowerCase()
+        : null;
+    if (address) {
+      return address;
+    }
   }
 
   return null;
 }
 
-async function resolvePrivyEmail(input: {
+function extractNameFromIdentityClaims(claims: Record<string, unknown>) {
+  if (typeof claims.name === "string" && claims.name.trim()) {
+    return claims.name.trim();
+  }
+
+  const linkedAccounts = toRecordArray(claims.linked_accounts);
+
+  for (const account of linkedAccounts) {
+    const name =
+      typeof account.name === "string" && account.name.trim()
+        ? account.name.trim()
+        : null;
+    if (name) {
+      return name;
+    }
+  }
+
+  return null;
+}
+
+async function resolvePrivyProfile(input: {
   providerUserId: string;
   identityClaims?: Record<string, unknown> | null;
   fallbackEmail?: string | null;
+  fallbackName?: string | null;
 }) {
-  const emailFromIdentity =
+  let resolvedEmail =
     input.identityClaims ? extractEmailFromIdentityClaims(input.identityClaims) : null;
+  let resolvedName =
+    input.identityClaims ? extractNameFromIdentityClaims(input.identityClaims) : null;
 
-  if (emailFromIdentity) {
-    return emailFromIdentity;
+  resolvedEmail ??= input.fallbackEmail?.trim().toLowerCase() ?? null;
+  resolvedName ??= input.fallbackName?.trim() ?? null;
+
+  if (!resolvedEmail || !resolvedName) {
+    try {
+      const privyUser = await getPrivyClient().users()._get(input.providerUserId);
+      const claims = privyUser as unknown as Record<string, unknown>;
+
+      resolvedEmail ??= extractEmailFromIdentityClaims(claims);
+      resolvedName ??= extractNameFromIdentityClaims(claims);
+    } catch {
+      return {
+        email: resolvedEmail,
+        name: resolvedName,
+      };
+    }
   }
 
-  const normalizedFallback = input.fallbackEmail?.trim().toLowerCase() ?? null;
-  if (normalizedFallback) {
-    return normalizedFallback;
-  }
-
-  try {
-    const privyUser = await getPrivyClient().users()._get(input.providerUserId);
-    return extractEmailFromIdentityClaims(privyUser as unknown as Record<string, unknown>);
-  } catch {
-    return null;
-  }
+  return {
+    email: resolvedEmail,
+    name: resolvedName,
+  };
 }
 
 async function resolveMerchantSessionMeta(merchantId: string) {
@@ -203,6 +240,11 @@ async function resolveMerchantSessionMeta(merchantId: string) {
 }
 
 export async function signupWithPassword(input: SignupInput) {
+  await assertSupportedBillingMarkets({
+    markets: input.supportedMarkets,
+    environment: env.PAYMENT_ENV,
+  });
+
   const existingMember = await TeamMemberModel.findOne({
     email: input.email,
   }).exec();
@@ -410,6 +452,11 @@ export async function getAuthenticatedUser(input: AuthTokenPayload) {
 }
 
 export async function exchangePrivySession(input: PrivySessionInput) {
+  await assertSupportedBillingMarkets({
+    markets: input.supportedMarkets,
+    environment: env.PAYMENT_ENV,
+  });
+
   const authClaims = await verifyPrivyJwt(input.authToken);
   const identityClaims = input.identityToken
     ? await getPrivyClient().utils().auth().verifyIdentityToken(input.identityToken)
@@ -426,16 +473,20 @@ export async function exchangePrivySession(input: PrivySessionInput) {
   }).exec();
 
   if (!member) {
-    const resolvedEmail = await resolvePrivyEmail({
+    const resolvedProfile = await resolvePrivyProfile({
       providerUserId,
       identityClaims: identityClaims as Record<string, unknown> | null,
       fallbackEmail: input.email ?? null,
+      fallbackName: null,
     });
-    const resolvedName = input.name?.trim() ?? null;
+    const resolvedEmail = resolvedProfile.email;
 
     if (!resolvedEmail) {
       throw new HttpError(409, "Privy session is missing an email address.");
     }
+
+    const resolvedName =
+      resolvedProfile.name?.trim() || resolvedEmail;
 
     const linkableMembers = await TeamMemberModel.find({
       email: resolvedEmail,
@@ -465,6 +516,11 @@ export async function exchangePrivySession(input: PrivySessionInput) {
       member.passwordHash = null;
       member.passwordSalt = null;
       member.passwordUpdatedAt = null;
+
+      if (!member.name?.trim() && resolvedName) {
+        member.name = resolvedName;
+      }
+
       await member.save();
 
       if (member.role === "owner") {
@@ -474,20 +530,13 @@ export async function exchangePrivySession(input: PrivySessionInput) {
         }).exec();
       }
     } else {
-      if (!resolvedName || !input.company?.trim()) {
-        throw new HttpError(
-          409,
-          "Name and company are required the first time a Privy account creates a workspace."
-        );
-      }
-
       const merchant = await MerchantModel.create({
         merchantAccount:
           normalizeSolanaAddress(input.operatorWalletAddress) ??
           `merchant:${randomBytes(16).toString("hex")}`,
         payoutWallet: createUnconfiguredAddress(),
         reserveWallet: null,
-        name: input.company.trim(),
+        name: null,
         supportEmail: resolvedEmail,
         billingTimezone: input.billingTimezone,
         supportedMarkets: input.supportedMarkets,
@@ -523,11 +572,11 @@ export async function exchangePrivySession(input: PrivySessionInput) {
       await appendAuditLog({
         merchantId: merchant._id.toString(),
         actor: resolvedName,
-        action: "Created workspace",
+        action: "Started workspace onboarding",
         category: "workspace",
         status: "ok",
         target: resolvedEmail,
-        detail: `${resolvedName} created ${merchant.name} with Privy.`,
+        detail: `${resolvedName} started a workspace with Privy.`,
         metadata: {
           role: "owner",
           authProvider: "privy",

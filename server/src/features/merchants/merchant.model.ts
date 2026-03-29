@@ -28,8 +28,8 @@ const merchantSchema = new Schema(
     },
     name: {
       type: String,
-      required: true,
       trim: true,
+      default: null,
     },
     supportEmail: {
       type: String,

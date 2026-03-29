@@ -41,8 +41,6 @@ export const activateInviteSchema = z.object({
 export const privySessionSchema = z.object({
   authToken: z.string().trim().min(20),
   identityToken: z.string().trim().min(20).optional(),
-  name: z.string().trim().min(2).max(120).optional(),
-  company: z.string().trim().min(2).max(120).optional(),
   email: z.email().trim().toLowerCase().optional(),
   billingTimezone: z.string().trim().min(2).max(80).default("UTC"),
   supportedMarkets: z.array(marketSchema).min(1).default(["NGN"]),

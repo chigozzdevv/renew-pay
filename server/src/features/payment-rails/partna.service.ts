@@ -7,8 +7,10 @@ import { getPartnaConfig } from "@/config/partna.config";
 import { PaymentRailEventModel } from "@/features/payment-rails/payment-rail-event.model";
 import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import type {
+  PartnaAccountDetailsRecord,
   PartnaManagedBankAccount,
   PartnaManagedAccountInput,
+  PartnaVoucherRecord,
 } from "@/features/payment-rails/providers/partna/partna.types";
 import { ChargeModel } from "@/features/charges/charge.model";
 import { CustomerModel } from "@/features/customers/customer.model";
@@ -34,6 +36,11 @@ function readString(value: unknown) {
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function readNumber(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function asRecord(value: unknown) {
@@ -79,6 +86,100 @@ function extractNames(fullName: string) {
     lastName: parts[parts.length - 1],
     middleName: parts.length > 2 ? parts.slice(1, -1).join(" ") : null,
   };
+}
+
+function readPartnaFeeBearer(value: unknown) {
+  const normalized = readString(value)?.toLowerCase() ?? null;
+  return normalized === "merchant" || normalized === "client" ? normalized : null;
+}
+
+function toRoundedFee(value: number) {
+  return Number(Math.max(0, value).toFixed(6));
+}
+
+export function derivePartnaFeeAmountUsdc(input: {
+  fxRate: number;
+  voucher?: PartnaVoucherRecord | null;
+  payloadData?: Record<string, unknown> | null;
+  redeemResult?: Record<string, unknown> | null;
+}) {
+  const redeemResult = input.redeemResult ?? null;
+  const payloadData = input.payloadData ?? null;
+  const feeBearer =
+    readPartnaFeeBearer(redeemResult?.feeBearer) ??
+    readPartnaFeeBearer(payloadData?.feeBearer) ??
+    readPartnaFeeBearer(input.voucher?.feeBearer) ??
+    null;
+
+  if (feeBearer === "client") {
+    return 0;
+  }
+
+  const convertedVoucherFeeCurrency =
+    readString(redeemResult?.convertedVoucherFeeCurrency)?.toUpperCase() ??
+    readString(redeemResult?.creditCurrency)?.toUpperCase() ??
+    readString(redeemResult?.toCurrency)?.toUpperCase() ??
+    null;
+  const convertedVoucherFee =
+    readNumber(redeemResult?.convertedVoucherFee) ??
+    readNumber(redeemResult?.merchantFee) ??
+    null;
+
+  if (convertedVoucherFeeCurrency === "USDC" && convertedVoucherFee !== null) {
+    return toRoundedFee(convertedVoucherFee);
+  }
+
+  const localFee =
+    readNumber(redeemResult?.voucherFee) ??
+    readNumber(payloadData?.fee) ??
+    input.voucher?.fee ??
+    null;
+  const wavedFee =
+    readNumber(payloadData?.wavedFee) ??
+    input.voucher?.wavedFee ??
+    0;
+  const effectiveLocalFee =
+    localFee === null ? null : Math.max(0, localFee - Math.max(0, wavedFee ?? 0));
+
+  if (effectiveLocalFee !== null && Number.isFinite(input.fxRate) && input.fxRate > 0) {
+    return toRoundedFee(effectiveLocalFee / input.fxRate);
+  }
+
+  return null;
+}
+
+function buildFullNameFromPartnaKyc(
+  accountDetails: PartnaAccountDetailsRecord | null
+) {
+  const parts = [
+    accountDetails?.kycDetails?.firstName,
+    accountDetails?.kycDetails?.middleName,
+    accountDetails?.kycDetails?.lastName,
+  ]
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function findBestPartnaAccountDetailsMatch(input: {
+  accountDetails: PartnaAccountDetailsRecord[];
+  accountName: string;
+  email: string;
+}) {
+  const normalizedAccountName = input.accountName.trim().toLowerCase();
+  const normalizedEmail = input.email.trim().toLowerCase();
+
+  return (
+    input.accountDetails.find(
+      (entry) => entry.accountName?.trim().toLowerCase() === normalizedAccountName
+    ) ??
+    input.accountDetails.find(
+      (entry) => entry.email?.trim().toLowerCase() === normalizedEmail
+    ) ??
+    input.accountDetails[0] ??
+    null
+  );
 }
 
 export const PARTNA_CHECKOUT_VERIFICATION_FIELDS = [
@@ -177,6 +278,30 @@ export async function ensurePartnaCustomerPaymentProfile(input: {
     lgaOfResidence: input.verification.lgaOfResidence,
     callbackUrl: buildPartnaCallbackUrl(input.environment),
   } satisfies PartnaManagedAccountInput);
+  const accountDetails = await provider
+    .getAccountDetails({
+      accountName: account.accountName,
+      page: 1,
+      perPage: 10,
+    })
+    .catch(() => []);
+  const matchedAccountDetails = findBestPartnaAccountDetailsMatch({
+    accountDetails,
+    accountName: account.accountName,
+    email: normalizeEmail(customer.email),
+  });
+  const verifiedFullName =
+    buildFullNameFromPartnaKyc(matchedAccountDetails) ??
+    account.fullName ??
+    customer.name;
+  const verifiedAccountName = matchedAccountDetails?.accountName ?? account.accountName;
+  const verifiedBankCode = matchedAccountDetails?.bankCode ?? account.bankCode;
+  const verifiedBankName = matchedAccountDetails?.bankName ?? account.bankName;
+  const verifiedAccountNumber =
+    matchedAccountDetails?.accountNumber ?? account.accountNumber;
+  const verifiedCurrency = account.currency;
+
+  customer.name = verifiedFullName;
 
   customer.paymentProvider = "partna";
   customer.paymentProfile = {
@@ -184,19 +309,22 @@ export async function ensurePartnaCustomerPaymentProfile(input: {
     status: "active",
     verifiedAt: new Date(),
     bankTransfer: {
-      bankCode: account.bankCode,
-      bankName: account.bankName,
-      accountName: account.accountName,
-      accountNumber: account.accountNumber,
-      currency: account.currency,
+      bankCode: verifiedBankCode,
+      bankName: verifiedBankName,
+      accountName: verifiedAccountName,
+      accountNumber: verifiedAccountNumber,
+      currency: verifiedCurrency,
     },
     partna: {
       email: normalizeEmail(customer.email),
-      fullName: customer.name,
-      accountName: account.accountName,
+      fullName: verifiedFullName,
+      accountName: verifiedAccountName,
       bvnLast4: input.verification.bvn.slice(-4),
       callbackUrl: buildPartnaCallbackUrl(input.environment),
-      raw: account.raw,
+      raw: {
+        account: account.raw,
+        accountDetails: matchedAccountDetails?.raw ?? null,
+      },
     },
   };
   await customer.save();
@@ -276,6 +404,69 @@ function extractPartnaVoucherCode(payload: PartnaWebhookPayload) {
 function extractPartnaVoucherId(payload: PartnaWebhookPayload) {
   const data = asRecord(payload.data);
   return readString(data?.id) ?? readString(data?.reference);
+}
+
+async function applyPartnaFeeState(input: {
+  charge: {
+    fxRate: number;
+    feeAmount: number;
+    providerMetadata?: unknown;
+  };
+  linkedSettlement:
+    | {
+        status: string;
+        feeUsdc: number;
+        netUsdc: number;
+        grossUsdc: number;
+        save: () => Promise<unknown>;
+      }
+    | null;
+  payloadData?: Record<string, unknown> | null;
+  redeemResult?: Record<string, unknown> | null;
+}) {
+  const feeAmountUsdc = derivePartnaFeeAmountUsdc({
+    fxRate: input.charge.fxRate,
+    payloadData: input.payloadData ?? null,
+    redeemResult: input.redeemResult ?? null,
+  });
+  const voucherFeeLocal =
+    readNumber(input.redeemResult?.voucherFee) ??
+    readNumber(input.payloadData?.fee) ??
+    null;
+  const voucherWavedFeeLocal = readNumber(input.payloadData?.wavedFee);
+  const feeBearer =
+    readPartnaFeeBearer(input.redeemResult?.feeBearer) ??
+    readPartnaFeeBearer(input.payloadData?.feeBearer) ??
+    null;
+  const providerMetadata = asRecord(input.charge.providerMetadata) ?? {};
+
+  input.charge.providerMetadata = {
+    ...providerMetadata,
+    ...(voucherFeeLocal !== null ? { voucherFeeLocal } : {}),
+    ...(voucherWavedFeeLocal !== null ? { voucherWavedFeeLocal } : {}),
+    ...(feeBearer ? { feeBearer } : {}),
+    ...(input.redeemResult ? { redeemResult: input.redeemResult } : {}),
+  };
+
+  if (feeAmountUsdc !== null) {
+    input.charge.feeAmount = feeAmountUsdc;
+  }
+
+  if (
+    input.linkedSettlement &&
+    input.linkedSettlement.status !== "settled" &&
+    feeAmountUsdc !== null
+  ) {
+    input.linkedSettlement.feeUsdc = feeAmountUsdc;
+    input.linkedSettlement.netUsdc = Number(
+      Math.max(0.01, input.linkedSettlement.grossUsdc - feeAmountUsdc).toFixed(2)
+    );
+    await input.linkedSettlement.save();
+  }
+
+  return {
+    feeAmountUsdc,
+  };
 }
 
 function eventIsVoucherSuccess(payload: PartnaWebhookPayload) {
@@ -401,6 +592,7 @@ export async function processPartnaWebhook(
   const voucherCode =
     extractPartnaVoucherCode(payload) ??
     readString(asRecord(charge.providerMetadata)?.voucherCode);
+  const payloadData = asRecord(payload.data) ?? null;
 
   if (eventIsVoucherSuccess(payload)) {
     if (!voucherCode) {
@@ -414,7 +606,7 @@ export async function processPartnaWebhook(
     const settlementAuthority = getSolanaSettlementAuthorityKeypair(environment);
     const redeemResult = await provider.redeemVoucherAndWithdraw({
       email:
-        readString(asRecord(payload.data)?.email) ??
+        readString(payloadData?.email) ??
         readString(asRecord(charge.providerMetadata)?.email) ??
         "",
       voucherCode,
@@ -430,12 +622,17 @@ export async function processPartnaWebhook(
       ...(asRecord(charge.providerMetadata) ?? {}),
       voucherCode,
       voucherId,
-      redeemResult,
       email:
-        readString(asRecord(payload.data)?.email) ??
+        readString(payloadData?.email) ??
         readString(asRecord(charge.providerMetadata)?.email) ??
         null,
     };
+    await applyPartnaFeeState({
+      charge,
+      linkedSettlement,
+      payloadData,
+      redeemResult: asRecord(redeemResult) ?? null,
+    });
     await charge.save();
 
     if (
@@ -471,6 +668,11 @@ export async function processPartnaWebhook(
       voucherId,
       voucherCode,
     };
+    await applyPartnaFeeState({
+      charge,
+      linkedSettlement,
+      payloadData,
+    });
     await charge.save();
 
     if (linkedSettlement && linkedSettlement.status !== "settled") {
@@ -485,6 +687,11 @@ export async function processPartnaWebhook(
       voucherId,
       voucherCode,
     };
+    await applyPartnaFeeState({
+      charge,
+      linkedSettlement,
+      payloadData,
+    });
     await charge.save();
   }
 
@@ -495,9 +702,11 @@ export async function processPartnaWebhook(
       invoice.paymentSnapshot = invoice.paymentSnapshot
         ? {
             ...invoice.paymentSnapshot,
+            feeAmount: charge.feeAmount,
             status: charge.status,
           }
-        : { status: charge.status };
+        : { feeAmount: charge.feeAmount, status: charge.status };
+      invoice.feeAmount = charge.feeAmount;
 
       if (charge.status === "pending") {
         invoice.status = "pending_payment";

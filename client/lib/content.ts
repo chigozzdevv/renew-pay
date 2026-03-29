@@ -2,6 +2,7 @@ import type { NavItem, ProofItem } from "@/types/marketing";
 
 export const landingPrimaryNav: NavItem[] = [
   { label: "Documentation", href: "/docs" },
+  { label: "Developers", href: "/developers" },
   { label: "Enterprise", href: "/enterprise" },
   { label: "Playground", href: "/playground" },
 ];

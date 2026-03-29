@@ -430,15 +430,15 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
   });
 
   if (!record.applicantId) {
-    const applicant = await sumsubProvider.createApplicant({
-      externalUserId: record.externalUserId,
-      type: "company",
-      levelName,
-      companyInfo: {
-        companyName: input.companyName ?? merchant.name,
-        registrationNumber: input.registrationNumber,
-        country: input.country,
-        taxId: input.taxId,
+      const applicant = await sumsubProvider.createApplicant({
+        externalUserId: record.externalUserId,
+        type: "company",
+        levelName,
+        companyInfo: {
+          companyName: input.companyName ?? merchant.name ?? undefined,
+          registrationNumber: input.registrationNumber,
+          country: input.country,
+          taxId: input.taxId,
       },
     });
 
@@ -468,7 +468,7 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
     action: "Started merchant KYB verification",
     category: "security",
     status: "ok",
-    target: merchant.name,
+    target: merchant.name ?? merchant.supportEmail ?? null,
     detail: "Merchant KYB verification was initiated via Sumsub.",
     metadata: {
       subjectType: record.subjectType,

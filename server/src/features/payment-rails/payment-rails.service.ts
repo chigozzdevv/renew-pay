@@ -2,6 +2,7 @@ import { HttpError } from "@/shared/errors/http-error";
 import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
 import { queueNames } from "@/shared/workers/queue-names";
 
+import { getDefaultPaymentRailProvider } from "@/config/payment-rail.config";
 import { ChargeModel } from "@/features/charges/charge.model";
 import { CustomerModel } from "@/features/customers/customer.model";
 import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
@@ -9,6 +10,7 @@ import { queueChargeStatusNotifications } from "@/features/notifications/notific
 import { PaymentRailEventModel } from "@/features/payment-rails/payment-rail-event.model";
 import { ChannelModel } from "@/features/payment-rails/channel.model";
 import { NetworkModel } from "@/features/payment-rails/network.model";
+import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import { PlanModel } from "@/features/plans/plan.model";
 import { recordProtocolChargeFailure } from "@/features/protocol/protocol.settlement";
 import { SettlementModel } from "@/features/settlements/settlement.model";
@@ -37,6 +39,305 @@ function toSafeNumber(value: unknown, fallback = 0) {
   const numeric = Number(value);
 
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+const PARTNA_CRYPTO_NETWORKS = new Set([
+  "avalanche",
+  "binance",
+  "bitcoin",
+  "celo",
+  "ethereum",
+  "polygon",
+  "solana",
+  "tron",
+]);
+
+const PARTNA_VERIFIED_LOCAL_MARKETS: Record<
+  string,
+  {
+    currencyName: string;
+    symbol: string;
+    countryCodes: string[];
+    countries: string[];
+  }
+> = {
+  GHS: {
+    currencyName: "Ghanaian Cedi",
+    symbol: "GHS",
+    countryCodes: ["GH"],
+    countries: ["Ghana"],
+  },
+  KES: {
+    currencyName: "Kenyan Shilling",
+    symbol: "KES",
+    countryCodes: ["KE"],
+    countries: ["Kenya"],
+  },
+  NGN: {
+    currencyName: "Nigerian Naira",
+    symbol: "NGN",
+    countryCodes: ["NG"],
+    countries: ["Nigeria"],
+  },
+};
+
+function usePartnaPaymentRail(environment: RuntimeMode) {
+  return getDefaultPaymentRailProvider(environment) === "partna";
+}
+
+function isPartnaLocalMarketAsset(input: {
+  currency: string;
+  destinationCurrency: string;
+  network: string;
+}) {
+  return (
+    Object.prototype.hasOwnProperty.call(PARTNA_VERIFIED_LOCAL_MARKETS, input.currency) &&
+    input.destinationCurrency === input.currency &&
+    !PARTNA_CRYPTO_NETWORKS.has(input.network)
+  );
+}
+
+function getPartnaCountryMetadata(currency: string) {
+  return PARTNA_VERIFIED_LOCAL_MARKETS[currency] ?? {
+    currencyName: currency,
+    symbol: currency,
+    countryCodes: [],
+    countries: [],
+  };
+}
+
+function buildPartnaChannelId(currency: string, network: string) {
+  return `partna:${currency}:${network}`;
+}
+
+function buildPartnaNetworkId(network: string) {
+  return `partna-network:${network}`;
+}
+
+function getPartnaChannelType(network: string) {
+  return network === "mobilemoney" || network === "mpesa"
+    ? "mobile_money"
+    : "bank_transfer";
+}
+
+function getPartnaNetworkName(network: string) {
+  const networkNameMap: Record<string, string> = {
+    ghanaiancedis: "Ghanaian Cedis",
+    kenyanshilling: "Kenyan Shilling",
+    mobilemoney: "Mobile money",
+    mpesa: "M-Pesa",
+    naira: "Naira",
+  };
+
+  return (
+    networkNameMap[network] ??
+    network
+      .split(/[^a-z0-9]+/i)
+      .filter(Boolean)
+      .map((segment) => segment[0]?.toUpperCase() + segment.slice(1))
+      .join(" ")
+  );
+}
+
+function getPartnaMarketMetadata(currency: string, fallbackSymbol?: string) {
+  const metadata = getPartnaCountryMetadata(currency);
+
+  return {
+    currencyName: metadata.currencyName,
+    symbol: metadata.symbol ?? fallbackSymbol ?? currency,
+    countryCodes: metadata.countryCodes,
+    countries: metadata.countries,
+  };
+}
+
+function getPartnaPreferredAssetRank(network: string) {
+  if (network === "naira" || network === "ghanaiancedis" || network === "kenyanshilling") {
+    return 0;
+  }
+
+  if (network === "mobilemoney" || network === "mpesa") {
+    return 1;
+  }
+
+  return 2;
+}
+
+async function listPartnaBillingMarketCatalog(environment: RuntimeMode) {
+  const provider = getPartnaProvider(environment);
+  const assets = await provider.listSupportedAssets();
+  const localAssets = assets.filter((asset) =>
+    isPartnaLocalMarketAsset({
+      currency: asset.currency,
+      destinationCurrency: asset.destinationCurrency,
+      network: asset.network,
+    })
+  );
+
+  const marketsByCurrency = new Map<
+    string,
+    {
+      currency: string;
+      currencyName: string;
+      symbol: string;
+      countryCodes: Set<string>;
+      countries: Set<string>;
+      channelTypes: Set<string>;
+      min: number | null;
+      max: number | null;
+      estimatedSettlementTime: number | null;
+    }
+  >();
+
+  for (const asset of localAssets) {
+    const marketMetadata = getPartnaMarketMetadata(asset.currency, asset.symbol);
+    const existing = marketsByCurrency.get(asset.currency) ?? {
+      currency: asset.currency,
+      currencyName: marketMetadata.currencyName,
+      symbol: marketMetadata.symbol,
+      countryCodes: new Set<string>(),
+      countries: new Set<string>(),
+      channelTypes: new Set<string>(),
+      min: null as number | null,
+      max: null as number | null,
+      estimatedSettlementTime: null as number | null,
+    };
+
+    for (const countryCode of marketMetadata.countryCodes) {
+      existing.countryCodes.add(countryCode);
+    }
+
+    for (const country of marketMetadata.countries) {
+      existing.countries.add(country);
+    }
+
+    existing.channelTypes.add(getPartnaChannelType(asset.network));
+    existing.min =
+      existing.min === null
+        ? asset.minimumWithdrawal
+        : asset.minimumWithdrawal === null
+          ? existing.min
+          : Math.min(existing.min, asset.minimumWithdrawal);
+
+    marketsByCurrency.set(asset.currency, existing);
+  }
+
+  return [...marketsByCurrency.values()]
+    .sort((left, right) => left.currency.localeCompare(right.currency))
+    .map((entry) => ({
+      currency: entry.currency,
+      currencyName: entry.currencyName,
+      symbol: entry.symbol,
+      countryCodes: [...entry.countryCodes].sort(),
+      countries: [...entry.countries].sort(),
+      channelTypes: [...entry.channelTypes].sort(),
+      min: entry.min,
+      max: entry.max,
+      estimatedSettlementTime: entry.estimatedSettlementTime,
+    }));
+}
+
+export async function assertSupportedBillingMarkets(input: {
+  markets: string[];
+  environment: RuntimeMode;
+}) {
+  const catalog = await listBillingMarketCatalog(input.environment);
+  const supported = new Set(catalog.map((entry) => entry.currency));
+  const unsupported = input.markets.filter((market) => !supported.has(market));
+
+  if (unsupported.length > 0) {
+    throw new HttpError(
+      409,
+      `Unsupported billing markets for ${usePartnaPaymentRail(input.environment) ? "Partna" : "the active payment rail"}: ${unsupported.join(", ")}.`
+    );
+  }
+}
+
+async function getPreferredPartnaMarketAsset(
+  currency: string,
+  environment: RuntimeMode
+) {
+  const provider = getPartnaProvider(environment);
+  const assets = await provider.listSupportedAssets();
+  const matches = assets
+    .filter(
+      (asset) =>
+        asset.currency === currency &&
+        isPartnaLocalMarketAsset({
+          currency: asset.currency,
+          destinationCurrency: asset.destinationCurrency,
+          network: asset.network,
+        })
+    )
+    .sort(
+      (left, right) =>
+        getPartnaPreferredAssetRank(left.network) -
+        getPartnaPreferredAssetRank(right.network)
+    );
+
+  if (matches.length === 0) {
+    throw new HttpError(
+      404,
+      `Partna does not currently expose a billing market for ${currency}.`
+    );
+  }
+
+  return matches[0]!;
+}
+
+async function createPartnaWidgetQuote(input: CreateWidgetQuoteInput) {
+  if (input.coin.trim().toUpperCase() !== "USDC") {
+    throw new HttpError(400, "Partna quotes currently support USDC settlement only.");
+  }
+
+  if (input.network.trim().toUpperCase() !== "SOLANA") {
+    throw new HttpError(
+      400,
+      "Partna quotes currently support SOLANA settlement only."
+    );
+  }
+
+  const provider = getPartnaProvider(input.environment);
+  const marketAsset = await getPreferredPartnaMarketAsset(
+    input.currency,
+    input.environment
+  );
+  const rateQuote = await provider.getRate({
+    fromCurrency:
+      input.localAmount !== undefined
+        ? input.currency
+        : input.coin.trim().toUpperCase(),
+    toCurrency:
+      input.localAmount !== undefined
+        ? input.coin.trim().toUpperCase()
+        : input.currency,
+    ...(input.localAmount !== undefined
+      ? { fromAmount: input.localAmount }
+      : { fromAmount: input.cryptoAmount }),
+  });
+  const localAmount =
+    rateQuote.fromCurrency === input.currency
+      ? rateQuote.fromAmount
+      : rateQuote.toAmount;
+  const cryptoAmount =
+    rateQuote.fromCurrency === input.coin.trim().toUpperCase()
+      ? rateQuote.fromAmount
+      : rateQuote.toAmount;
+  const fxRate = localAmount > 0 && cryptoAmount > 0 ? localAmount / cryptoAmount : 0;
+
+  return {
+    channelId: buildPartnaChannelId(input.currency, marketAsset.network),
+    convertedAmount: Number(localAmount.toFixed(2)),
+    cryptoAmount: Number(cryptoAmount.toFixed(4)),
+    rateLocal: Number(fxRate.toFixed(4)),
+    serviceFeeUSD: 0,
+    partnerFeeUSD: 0,
+    expireAt: null,
+    expiresAt: null,
+    rateKey: rateQuote.key,
+    provider: "partna" as const,
+    paymentNetwork: marketAsset.network,
+    raw: rateQuote.raw,
+  };
 }
 
 function toProtocolFailureCode(value: string) {
@@ -307,6 +608,14 @@ export async function syncNetworks(input: SyncPaymentRailInput) {
 }
 
 export async function createWidgetQuote(input: CreateWidgetQuoteInput) {
+  if (usePartnaPaymentRail(input.environment)) {
+    return {
+      ...(await createPartnaWidgetQuote(input)),
+      settlementAsset: "USDC",
+      settlementNetwork: "SOLANA",
+    };
+  }
+
   await ensureSandboxPaymentRailsSeeded(input.environment);
   const yellowCardProvider = getYellowCardProvider(input.environment);
   const activeChannel = await ChannelModel.findOne({
@@ -334,6 +643,10 @@ export async function createWidgetQuote(input: CreateWidgetQuoteInput) {
 }
 
 export async function listBillingMarketCatalog(environment: RuntimeMode = "test") {
+  if (usePartnaPaymentRail(environment)) {
+    return listPartnaBillingMarketCatalog(environment);
+  }
+
   await ensureSandboxPaymentRailsSeeded(environment);
 
   const countryNameByCode = new Map(
@@ -526,6 +839,67 @@ export async function quoteUsdAmountInBillingCurrency(input: {
   currency: string;
   usdAmount: number;
 }) {
+  if (usePartnaPaymentRail(input.environment)) {
+    const marketAsset = await getPreferredPartnaMarketAsset(
+      input.currency,
+      input.environment
+    );
+    const quote = (await createWidgetQuote({
+      environment: input.environment,
+      currency: input.currency,
+      cryptoAmount: input.usdAmount,
+      channelId: buildPartnaChannelId(input.currency, marketAsset.network),
+      coin: "USDC",
+      network: "SOLANA",
+      transactionType: "Buy",
+    })) as Record<string, unknown>;
+    const localAmount = toSafeNumber(
+      quote.convertedAmount,
+      Number(input.usdAmount.toFixed(2))
+    );
+    const usdcAmount = Number(
+      Math.max(0.01, toSafeNumber(quote.cryptoAmount, input.usdAmount)).toFixed(4)
+    );
+    const fxRate = Number(
+      Math.max(0.0001, localAmount > 0 ? localAmount / usdcAmount : input.usdAmount).toFixed(4)
+    );
+    const feeAmount = Number(
+      (
+        toSafeNumber(quote.serviceFeeUSD) + toSafeNumber(quote.partnerFeeUSD)
+      ).toFixed(2)
+    );
+    const marketMetadata = getPartnaMarketMetadata(input.currency, marketAsset.symbol);
+
+    return {
+      currency: input.currency,
+      localAmount,
+      usdcAmount,
+      fxRate,
+      feeAmount,
+      expiresAt: null,
+      settlementAsset: "USDC" as const,
+      settlementNetwork: "SOLANA" as const,
+      channel: {
+        externalId: buildPartnaChannelId(input.currency, marketAsset.network),
+        country: marketMetadata.countryCodes[0] ?? input.currency,
+        channelType: getPartnaChannelType(marketAsset.network),
+        estimatedSettlementTime: 0,
+        min: marketAsset.minimumWithdrawal ?? 0,
+        max: Number.MAX_SAFE_INTEGER,
+      },
+      network: {
+        externalId: buildPartnaNetworkId(marketAsset.network),
+        name: getPartnaNetworkName(marketAsset.network),
+        country: marketMetadata.countryCodes[0] ?? input.currency,
+        accountNumberType:
+          marketAsset.network === "mobilemoney" || marketAsset.network === "mpesa"
+            ? "phone_number"
+            : "account_number",
+      },
+      raw: quote,
+    };
+  }
+
   const channel = await getPreferredCollectionChannel(input.currency, input.environment);
   const network = await getPreferredCollectionNetwork(
     channel.externalId,

@@ -22,6 +22,7 @@ import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/paymen
 import {
   buildPartnaVerificationSnapshot,
   createPartnaChargeInstruction,
+  derivePartnaFeeAmountUsdc,
   ensurePartnaCustomerPaymentProfile,
   hasActivePartnaPaymentProfile,
   processPartnaWebhook,
@@ -671,6 +672,11 @@ async function createInvoicePaymentAttempt(
     localAmount: invoice.localAmount,
     paymentProfile: customer.paymentProfile ?? {},
   });
+  const feeAmount =
+    derivePartnaFeeAmountUsdc({
+      fxRate: invoice.fxRate,
+      voucher,
+    }) ?? invoice.feeAmount;
   const treasury = await getTreasuryByMerchantId(
     invoice.merchantId.toString(),
     runtimeEnvironment
@@ -695,7 +701,7 @@ async function createInvoicePaymentAttempt(
     localAmount: invoice.localAmount,
     fxRate: invoice.fxRate,
     usdcAmount: invoice.usdcAmount,
-    feeAmount: invoice.feeAmount,
+    feeAmount,
     status: "pending",
     failureCode: null,
     protocolChargeId: null,
@@ -706,6 +712,9 @@ async function createInvoicePaymentAttempt(
       voucherCode: voucher.voucherCode,
       voucherId: voucher.voucherId,
       reference: voucher.reference,
+      voucherFee: voucher.fee,
+      voucherWavedFee: voucher.wavedFee,
+      feeBearer: voucher.feeBearer,
       invoiceNumber: invoice.invoiceNumber,
       invoiceId: invoice._id.toString(),
       paymentInstructions: paymentSnapshot,
@@ -722,8 +731,8 @@ async function createInvoicePaymentAttempt(
     batchRef: voucher.voucherId,
     commercialRef: invoice.invoiceNumber,
     grossUsdc: Number(invoice.usdcAmount.toFixed(2)),
-    feeUsdc: invoice.feeAmount,
-    netUsdc: Number(Math.max(0.01, invoice.usdcAmount - invoice.feeAmount).toFixed(2)),
+    feeUsdc: feeAmount,
+    netUsdc: Number(Math.max(0.01, invoice.usdcAmount - feeAmount).toFixed(2)),
     destinationWallet: treasury.account?.payoutWallet ?? merchant.payoutWallet,
     localAmount: invoice.localAmount,
     fxRate: invoice.fxRate,
@@ -732,6 +741,7 @@ async function createInvoicePaymentAttempt(
   });
 
   invoice.status = "pending_payment";
+  invoice.feeAmount = feeAmount;
   invoice.paymentSnapshot = {
     provider: paymentSnapshot.provider,
     kind: paymentSnapshot.kind,
@@ -739,7 +749,7 @@ async function createInvoicePaymentAttempt(
     billingCurrency: invoice.billingCurrency,
     localAmount: invoice.localAmount,
     usdcAmount: invoice.usdcAmount,
-    feeAmount: invoice.feeAmount,
+    feeAmount,
     status: paymentSnapshot.status,
     reference: paymentSnapshot.reference,
     expiresAt: paymentSnapshot.expiresAt ?? null,

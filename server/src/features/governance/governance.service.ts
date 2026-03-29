@@ -100,7 +100,7 @@ export async function enableGovernance(input: {
     action: "Configured workspace approvals",
     category: "security",
     status: "ok",
-    target: merchant.name,
+    target: merchant.name ?? merchant.supportEmail ?? null,
     detail:
       "Workspace approvals stay enabled; multi-owner workspaces automatically use multisig.",
     metadata: {

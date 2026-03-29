@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -40,18 +39,31 @@ function extractPrivyEmail(user: unknown) {
       : "linked_accounts" in user && Array.isArray(user.linked_accounts)
         ? user.linked_accounts
         : [];
-  const emailAccount = linkedAccounts.find(
-    (entry) =>
-      entry &&
-      typeof entry === "object" &&
-      "type" in entry &&
-      typeof entry.type === "string" &&
-      entry.type.toLowerCase() === "email" &&
-      "address" in entry &&
-      typeof entry.address === "string"
-  ) as { address?: string } | undefined;
 
-  return emailAccount?.address?.trim().toLowerCase() ?? null;
+  for (const account of linkedAccounts) {
+    if (!account || typeof account !== "object") {
+      continue;
+    }
+
+    if ("email" in account && typeof account.email === "string" && account.email.trim()) {
+      return account.email.trim().toLowerCase();
+    }
+
+    const accountType =
+      "type" in account && typeof account.type === "string"
+        ? account.type.trim().toLowerCase()
+        : null;
+    if (
+      accountType === "email" &&
+      "address" in account &&
+      typeof account.address === "string" &&
+      account.address.trim()
+    ) {
+      return account.address.trim().toLowerCase();
+    }
+  }
+
+  return null;
 }
 
 function extractEmbeddedWalletAddress(wallets: Array<{
@@ -81,16 +93,13 @@ function toErrorMessage(error: unknown) {
 }
 
 type PrivySessionCardProps = {
-  mode: "login" | "signup";
   nextPath: string;
 };
 
-export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
+export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   const router = useRouter();
   const { ready, authenticated, user, login, logout } = usePrivy();
   const { wallets } = useSolanaWallets();
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldExchange, setShouldExchange] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +108,7 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
   const embeddedWalletAddress = useMemo(() => extractEmbeddedWalletAddress(wallets), [wallets]);
   const operatorWalletAddress = embeddedWalletAddress;
 
-  const isBusy = isSubmitting;
+  const isBusy = isSubmitting || shouldExchange;
 
   async function finishExchange() {
     setIsSubmitting(true);
@@ -116,8 +125,6 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
       const session = await exchangePrivySession({
         authToken,
         identityToken,
-        name: mode === "signup" ? name.trim() : undefined,
-        company: mode === "signup" ? company.trim() : undefined,
         email: extractPrivyEmail(user) ?? undefined,
         operatorWalletAddress: operatorWalletAddress ?? undefined,
       });
@@ -152,51 +159,20 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
 
   const buttonLabel = isBusy
     ? "Setting up..."
-    : mode === "signup"
-      ? "Create workspace"
-      : "Sign in";
+    : "Sign in";
 
   return (
     <div className="rounded-2xl border border-black/6 bg-white/90 px-6 py-8 shadow-[0_12px_40px_rgba(12,74,39,0.08)] backdrop-blur-sm sm:px-8 sm:py-10">
       <h2 className="font-display text-[clamp(1.5rem,3vw,2rem)] leading-[1.1] tracking-[-0.04em] text-[#111111]">
-        {mode === "signup" ? "Create your workspace." : "Welcome back."}
+        Welcome back.
       </h2>
       <p className="mt-2 text-[15px] leading-relaxed text-[#6b7280]">
-        {mode === "signup"
-          ? "Sign up with Google, passkey, or email to get started."
-          : "Sign in with Google, passkey, or email to continue."}
+        Sign in with Google, passkey, or email to continue.
       </p>
-
-      {mode === "signup" ? (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="h-11 rounded-xl border border-black/8 bg-[#f7f9fc] px-4 text-sm text-[#111111] outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#111111]"
-            placeholder="Full name"
-          />
-          <input
-            type="text"
-            value={company}
-            onChange={(event) => setCompany(event.target.value)}
-            className="h-11 rounded-xl border border-black/8 bg-[#f7f9fc] px-4 text-sm text-[#111111] outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#111111]"
-            placeholder="Company"
-          />
-        </div>
-      ) : null}
 
       {error ? (
         <div className="mt-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#991b1b]">
           {error}
-          {mode === "login" ? (
-            <>
-              {" "}
-              <Link href="/signup" className="font-medium underline">
-                Create a workspace instead.
-              </Link>
-            </>
-          ) : null}
         </div>
       ) : null}
 
@@ -204,8 +180,7 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
         type="button"
         disabled={
           !ready ||
-          isBusy ||
-          (mode === "signup" && (!name.trim() || !company.trim()))
+          isBusy
         }
         onClick={async () => {
           setShouldExchange(true);
