@@ -1,15 +1,14 @@
 import type { NavItem, ProofItem } from "@/types/marketing";
 
 export const landingPrimaryNav: NavItem[] = [
-  { label: "Overview" },
   { label: "Documentation", href: "/docs" },
-  { label: "Enterprise", href: "/#enterprise" },
+  { label: "Enterprise", href: "/enterprise" },
   { label: "Playground", href: "/playground" },
 ];
 
 export const landingProductNav: NavItem[] = [
-  { label: "Subscription" },
-  { label: "Invoice" },
+  { label: "Subscription", href: "/products?type=subscription" },
+  { label: "Invoice", href: "/products?type=invoice" },
 ];
 
 export const proofItems: ProofItem[] = [

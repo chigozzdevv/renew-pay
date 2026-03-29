@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { Hero } from "@/components/landing/hero";
 import { FeaturesSection } from "@/components/landing/features-section";
 import { HowItWorksSection } from "@/components/landing/how-it-works";
@@ -9,7 +11,9 @@ import { Header } from "@/components/shared/header";
 export default function Home() {
   return (
     <>
-      <Header />
+      <Suspense fallback={null}>
+        <Header />
+      </Suspense>
       <main>
         <Hero />
         <FeaturesSection />

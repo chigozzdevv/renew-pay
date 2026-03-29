@@ -6,14 +6,18 @@ import { cn } from "@/lib/utils";
 
 type FooterProps = {
   className?: string;
-  tone?: "default" | "hero";
+  tone?: "default" | "hero" | "feature";
 };
 
 export function Footer({ className, tone = "default" }: FooterProps = {}) {
   return (
     <footer
       className={cn(
-        tone === "hero" ? "bg-[#e8f5e9]" : "bg-[#f7f9fc]",
+        tone === "hero"
+          ? "bg-[#e8f5e9]"
+          : tone === "feature"
+            ? "bg-[#fdf1e7]"
+            : "bg-[#f7f9fc]",
         "pb-6 pt-2",
         className
       )}

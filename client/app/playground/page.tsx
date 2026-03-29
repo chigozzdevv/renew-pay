@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { Footer } from "@/components/landing/footer";
 import { PlaygroundPageClient } from "@/components/playground/playground-page-client";
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
 export default function PlaygroundPage() {
   return (
     <div className="page-shell flex min-h-screen flex-col bg-[#e8f5e9]">
-      <Header />
+      <Suspense fallback={null}>
+        <Header />
+      </Suspense>
       <main className="flex-1">
         <PlaygroundPageClient />
       </main>
