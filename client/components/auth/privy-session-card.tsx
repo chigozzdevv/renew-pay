@@ -10,7 +10,6 @@ import {
   usePrivy,
 } from "@privy-io/react-auth";
 import {
-  useCreateWallet as useCreateSolanaWallet,
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
 
@@ -90,20 +89,17 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
   const router = useRouter();
   const { ready, authenticated, user, login, logout } = usePrivy();
   const { wallets } = useSolanaWallets();
-  const { createWallet } = useCreateSolanaWallet();
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldExchange, setShouldExchange] = useState(false);
-  const [isProvisioningWallet, setIsProvisioningWallet] = useState(false);
-  const [walletBootstrapAttempted, setWalletBootstrapAttempted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
   const embeddedWalletAddress = useMemo(() => extractEmbeddedWalletAddress(wallets), [wallets]);
   const operatorWalletAddress = embeddedWalletAddress;
 
-  const isBusy = isSubmitting || isProvisioningWallet;
+  const isBusy = isSubmitting;
 
   async function finishExchange() {
     setIsSubmitting(true);
@@ -138,56 +134,7 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
   }
 
   useEffect(() => {
-    if (!ready || !authenticated) {
-      setWalletBootstrapAttempted(false);
-      return;
-    }
-
-    if (embeddedWalletAddress || isProvisioningWallet || walletBootstrapAttempted) {
-      return;
-    }
-
-    let cancelled = false;
-    setWalletBootstrapAttempted(true);
-    setIsProvisioningWallet(true);
-    setError(null);
-
-    void createWallet()
-      .catch((walletError) => {
-        if (cancelled) {
-          return;
-        }
-
-        setWalletBootstrapAttempted(false);
-        setShouldExchange(false);
-        setError(toErrorMessage(walletError));
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsProvisioningWallet(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    authenticated,
-    createWallet,
-    embeddedWalletAddress,
-    isProvisioningWallet,
-    ready,
-    walletBootstrapAttempted,
-  ]);
-
-  useEffect(() => {
-    if (
-      !authenticated ||
-      !shouldExchange ||
-      isSubmitting ||
-      isProvisioningWallet ||
-      !operatorWalletAddress
-    ) {
+    if (!authenticated || !shouldExchange || isSubmitting) {
       return;
     }
 
@@ -195,9 +142,7 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     authenticated,
-    operatorWalletAddress,
     shouldExchange,
-    isProvisioningWallet,
     isSubmitting,
   ]);
 
@@ -267,11 +212,6 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
           setError(null);
 
           if (authenticated) {
-            if (!operatorWalletAddress) {
-              setWalletBootstrapAttempted(false);
-              return;
-            }
-
             await finishExchange();
             return;
           }
