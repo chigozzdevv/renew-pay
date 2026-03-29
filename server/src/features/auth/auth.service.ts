@@ -137,15 +137,26 @@ function extractEmailFromIdentityClaims(claims: Record<string, unknown>) {
   }
 
   const linkedAccounts = toRecordArray(claims.linked_accounts);
-  const emailAccount = linkedAccounts.find((entry) => {
-    const type = typeof entry.type === "string" ? entry.type.toLowerCase() : "";
-    return type === "email";
-  });
-  const address = emailAccount?.address;
 
-  return typeof address === "string" && address.trim()
-    ? address.trim().toLowerCase()
-    : null;
+  for (const account of linkedAccounts) {
+    const address =
+      typeof account.address === "string" && account.address.trim()
+        ? account.address.trim().toLowerCase()
+        : null;
+    if (address) {
+      return address;
+    }
+
+    const email =
+      typeof account.email === "string" && account.email.trim()
+        ? account.email.trim().toLowerCase()
+        : null;
+    if (email) {
+      return email;
+    }
+  }
+
+  return null;
 }
 
 async function resolvePrivyEmail(input: {
