@@ -112,3 +112,54 @@ export function toErrorMessage(error: unknown) {
 
   return "Request failed.";
 }
+
+export function extractPrivyEmbeddedWalletAddress(user: unknown) {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  const linkedAccounts =
+    "linkedAccounts" in user && Array.isArray(user.linkedAccounts)
+      ? user.linkedAccounts
+      : "linked_accounts" in user && Array.isArray(user.linked_accounts)
+        ? user.linked_accounts
+        : [];
+
+  for (const account of linkedAccounts) {
+    if (!account || typeof account !== "object") {
+      continue;
+    }
+
+    const accountType =
+      "type" in account && typeof account.type === "string"
+        ? account.type.trim().toLowerCase()
+        : null;
+    const walletClientType =
+      "walletClientType" in account && typeof account.walletClientType === "string"
+        ? account.walletClientType.trim().toLowerCase()
+        : "wallet_client_type" in account && typeof account.wallet_client_type === "string"
+          ? account.wallet_client_type.trim().toLowerCase()
+          : null;
+    const chainType =
+      "chainType" in account && typeof account.chainType === "string"
+        ? account.chainType.trim().toLowerCase()
+        : "chain_type" in account && typeof account.chain_type === "string"
+          ? account.chain_type.trim().toLowerCase()
+          : null;
+    const address =
+      "address" in account && typeof account.address === "string" && account.address.trim()
+        ? account.address.trim()
+        : null;
+
+    if (
+      accountType === "wallet" &&
+      address &&
+      chainType === "solana" &&
+      (walletClientType === "privy" || walletClientType === "privy-v2")
+    ) {
+      return address;
+    }
+  }
+
+  return null;
+}

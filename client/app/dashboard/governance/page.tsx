@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { usePrivy } from "@privy-io/react-auth";
 import {
-  useCreateWallet as useCreateSolanaWallet,
   useSignMessage,
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
@@ -12,6 +11,10 @@ import {
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
+import {
+  extractPrivyEmbeddedWalletAddress,
+  toErrorMessage,
+} from "@/components/dashboard/dashboard-utils";
 import {
   Badge,
   Button,
@@ -23,7 +26,6 @@ import {
   Table,
   TableRow,
 } from "@/components/dashboard/ui";
-import { toErrorMessage } from "@/components/dashboard/dashboard-utils";
 import { loadGovernanceState, setGovernanceEnabled } from "@/lib/governance";
 import {
   createTreasurySignerChallenge,
@@ -91,6 +93,35 @@ function findEmbeddedWallet<T extends PrivyWalletRecord>(wallets: T[]) {
   );
 }
 
+function findPreferredSolanaWallet<T extends PrivyWalletRecord>(
+  wallets: T[],
+  preferredAddress: string | null
+) {
+  const normalizedPreferredAddress = preferredAddress?.trim() ?? null;
+
+  if (normalizedPreferredAddress) {
+    const matchedWallet = wallets.find(
+      (entry) => entry.address?.trim() === normalizedPreferredAddress
+    );
+
+    if (matchedWallet) {
+      return matchedWallet;
+    }
+  }
+
+  const embeddedWallet = findEmbeddedWallet(wallets);
+
+  if (embeddedWallet) {
+    return embeddedWallet;
+  }
+
+  if (wallets.length === 1) {
+    return wallets[0];
+  }
+
+  return null;
+}
+
 function encodeBase58(bytes: Uint8Array) {
   if (bytes.length === 0) {
     return "";
@@ -135,13 +166,10 @@ export default function GovernancePage() {
   const { mode } = useWorkspaceMode();
   const [busyAction, setBusyAction] = useState<"enable" | "disable" | null>(null);
   const [isVerifyingSigner, setIsVerifyingSigner] = useState(false);
-  const [isProvisioningWallet, setIsProvisioningWallet] = useState(false);
-  const [walletBootstrapAttempted, setWalletBootstrapAttempted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { ready: privyReady, authenticated } = usePrivy();
+  const { ready: privyReady, authenticated, user: privyUser } = usePrivy();
   const { ready: solanaWalletsReady, wallets } = useSolanaWallets();
-  const { createWallet } = useCreateSolanaWallet();
   const { signMessage } = useSignMessage();
 
   const governanceResource = useResource(
@@ -161,82 +189,56 @@ export default function GovernancePage() {
     () => (data?.approvers ?? []).filter((entry) => entry.status === "active"),
     [data?.approvers]
   );
-  const embeddedWallet = useMemo(() => findEmbeddedWallet(wallets), [wallets]);
+  const linkedEmbeddedWalletAddress = useMemo(
+    () => extractPrivyEmbeddedWalletAddress(privyUser),
+    [privyUser]
+  );
+  const embeddedWallet = useMemo(
+    () =>
+      findPreferredSolanaWallet(
+        wallets,
+        linkedEmbeddedWalletAddress ?? user?.operatorWalletAddress?.trim() ?? null
+      ),
+    [linkedEmbeddedWalletAddress, user?.operatorWalletAddress, wallets]
+  );
   const currentSigner = useMemo(
     () =>
       data?.approvers.find((entry) => entry.teamMemberId === user?.teamMemberId) ?? null,
     [data?.approvers, user?.teamMemberId]
   );
   const activeWalletAddress =
-    embeddedWallet?.address?.trim() ?? user?.operatorWalletAddress?.trim() ?? null;
+    embeddedWallet?.address?.trim() ??
+    linkedEmbeddedWalletAddress ??
+    user?.operatorWalletAddress?.trim() ??
+    null;
+  const isWalletSyncing =
+    Boolean(authenticated && activeWalletAddress && !embeddedWallet) ||
+    Boolean(authenticated && privyReady && !solanaWalletsReady);
   const currentWalletMatchesSigner =
     Boolean(currentSigner?.walletAddress) && currentSigner?.walletAddress === activeWalletAddress;
   const signerStatusTone =
     currentSigner?.status ? signerTone(currentSigner.status) : ("neutral" as const);
   const signerStatusLabel = currentSigner?.status
     ? currentSigner.status.replace(/_/g, " ")
-    : isProvisioningWallet
-      ? "wallet provisioning"
+    : isWalletSyncing
+      ? "wallet syncing"
       : "not verified";
   const signerActionDisabled =
     !token ||
     !user ||
     user.role !== "owner" ||
     !embeddedWallet ||
-    isProvisioningWallet ||
     isVerifyingSigner ||
     Boolean(currentSigner && currentSigner.status === "active" && currentWalletMatchesSigner);
   const signerActionLabel = isVerifyingSigner
     ? "Verifying..."
-    : isProvisioningWallet
-      ? "Provisioning wallet..."
+    : isWalletSyncing
+      ? "Syncing wallet..."
       : currentSigner?.status === "active" && currentWalletMatchesSigner
         ? "Signer verified"
         : currentSigner?.status === "active"
           ? "Verify this wallet"
           : "Verify my signer";
-
-  useEffect(() => {
-    if (!privyReady || !authenticated || !solanaWalletsReady) {
-      setWalletBootstrapAttempted(false);
-      return;
-    }
-
-    if (embeddedWallet || isProvisioningWallet || walletBootstrapAttempted) {
-      return;
-    }
-
-    let cancelled = false;
-    setWalletBootstrapAttempted(true);
-    setIsProvisioningWallet(true);
-
-    void createWallet()
-      .catch((walletError) => {
-        if (cancelled) {
-          return;
-        }
-
-        setWalletBootstrapAttempted(false);
-        setErrorMessage(toErrorMessage(walletError));
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsProvisioningWallet(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    authenticated,
-    createWallet,
-    embeddedWallet,
-    isProvisioningWallet,
-    privyReady,
-    solanaWalletsReady,
-    walletBootstrapAttempted,
-  ]);
 
   async function toggleGovernance(enabled: boolean) {
     if (!token) {
@@ -279,8 +281,8 @@ export default function GovernancePage() {
 
     if (!embeddedWallet) {
       setErrorMessage(
-        isProvisioningWallet
-          ? "Privy is still provisioning your Solana wallet."
+        isWalletSyncing
+          ? "Privy is still syncing your Solana wallet into this session."
           : "Your signed-in Privy Solana wallet is not ready yet."
       );
       setMessage(null);
