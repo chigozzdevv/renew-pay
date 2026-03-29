@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getAccessToken,
@@ -103,6 +103,7 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldExchange, setShouldExchange] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const exchangeStartedRef = useRef(false);
 
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
   const embeddedWalletAddress = useMemo(() => extractEmbeddedWalletAddress(wallets), [wallets]);
@@ -111,12 +112,23 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   const isBusy = isSubmitting || shouldExchange;
 
   async function finishExchange() {
+    if (exchangeStartedRef.current) {
+      return;
+    }
+
+    exchangeStartedRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
     try {
       const authToken = await getAccessToken();
-      const identityToken = await getIdentityToken();
+      let identityToken: string | null = null;
+
+      try {
+        identityToken = await getIdentityToken();
+      } catch {
+        identityToken = null;
+      }
 
       if (!authToken) {
         throw new Error("Privy did not return an access token.");
@@ -132,6 +144,7 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
       window.localStorage.setItem(accessTokenStorageKey, session.accessToken);
       router.replace(nextPath);
     } catch (exchangeError) {
+      exchangeStartedRef.current = false;
       setError(toErrorMessage(exchangeError));
       setShouldExchange(false);
       await logout?.();
@@ -141,16 +154,16 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   }
 
   useEffect(() => {
-    if (!authenticated || !shouldExchange || isSubmitting) {
+    if (!ready || !authenticated || !shouldExchange) {
       return;
     }
 
     void finishExchange();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    ready,
     authenticated,
     shouldExchange,
-    isSubmitting,
   ]);
 
   if (!appId) {
@@ -185,20 +198,18 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
         onClick={async () => {
           setShouldExchange(true);
           setError(null);
+          exchangeStartedRef.current = false;
 
           if (authenticated) {
-            await finishExchange();
             return;
           }
 
-          setIsSubmitting(true);
           try {
             await login();
           } catch (loginError) {
+            exchangeStartedRef.current = false;
             setError(toErrorMessage(loginError));
             setShouldExchange(false);
-          } finally {
-            setIsSubmitting(false);
           }
         }}
         className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#111111] text-sm font-semibold text-white transition-colors hover:bg-[#222222] disabled:cursor-not-allowed disabled:opacity-50"

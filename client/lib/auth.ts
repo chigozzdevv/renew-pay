@@ -23,17 +23,33 @@ export async function exchangePrivySession(input: {
   supportedMarkets?: string[];
   operatorWalletAddress?: string | null;
 }) {
+  const body: Record<string, unknown> = {
+    authToken: input.authToken,
+  };
+
+  if (input.identityToken) {
+    body.identityToken = input.identityToken;
+  }
+
+  if (input.email) {
+    body.email = input.email;
+  }
+
+  if (input.billingTimezone) {
+    body.billingTimezone = input.billingTimezone;
+  }
+
+  if (input.supportedMarkets?.length) {
+    body.supportedMarkets = input.supportedMarkets;
+  }
+
+  if (input.operatorWalletAddress) {
+    body.operatorWalletAddress = input.operatorWalletAddress;
+  }
+
   const response = await fetchApi<PrivySessionResponse>("/auth/privy/session", {
     method: "POST",
-    body: JSON.stringify({
-      authToken: input.authToken,
-      identityToken: input.identityToken ?? undefined,
-      email: input.email,
-      billingTimezone:
-        input.billingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-      supportedMarkets: input.supportedMarkets ?? ["NGN"],
-      operatorWalletAddress: input.operatorWalletAddress ?? undefined,
-    }),
+    body: JSON.stringify(body),
   });
 
   return response.data;

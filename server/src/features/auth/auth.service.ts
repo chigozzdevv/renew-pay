@@ -87,6 +87,22 @@ function createUnconfiguredAddress() {
   return createUnconfiguredWalletAddress();
 }
 
+const defaultPrivyBillingTimezone = "UTC";
+const defaultPrivySupportedMarkets = ["NGN"] as const;
+
+function resolvePrivyBillingTimezone(value?: string | null) {
+  return value?.trim() || defaultPrivyBillingTimezone;
+}
+
+function resolvePrivySupportedMarkets(markets?: string[] | null) {
+  const normalized = (markets ?? [])
+    .map((market) => market.trim().toUpperCase())
+    .filter(Boolean);
+
+  return normalized.length > 0
+    ? [...new Set(normalized)]
+    : [...defaultPrivySupportedMarkets];
+}
 
 function getPrivyClient() {
   const appId = env.PRIVY_APP_ID.trim();
@@ -109,6 +125,21 @@ async function verifyPrivyJwt(token: string) {
     return await privy.utils().auth().verifyAccessToken(token);
   } catch {
     throw new HttpError(401, "Privy token verification failed.");
+  }
+}
+
+async function verifyPrivyIdentityToken(token?: string | null) {
+  if (!token?.trim()) {
+    return null;
+  }
+
+  try {
+    return (await getPrivyClient().utils().auth().verifyIdentityToken(token)) as unknown as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    return null;
   }
 }
 
@@ -452,16 +483,11 @@ export async function getAuthenticatedUser(input: AuthTokenPayload) {
 }
 
 export async function exchangePrivySession(input: PrivySessionInput) {
-  await assertSupportedBillingMarkets({
-    markets: input.supportedMarkets,
-    environment: env.PAYMENT_ENV,
-  });
-
   const authClaims = await verifyPrivyJwt(input.authToken);
-  const identityClaims = input.identityToken
-    ? await getPrivyClient().utils().auth().verifyIdentityToken(input.identityToken)
-    : null;
+  const identityClaims = await verifyPrivyIdentityToken(input.identityToken);
   const providerUserId = authClaims.user_id?.trim() || null;
+  const billingTimezone = resolvePrivyBillingTimezone(input.billingTimezone);
+  const supportedMarkets = resolvePrivySupportedMarkets(input.supportedMarkets);
 
   if (!providerUserId) {
     throw new HttpError(401, "Privy session is missing a subject.");
@@ -475,7 +501,7 @@ export async function exchangePrivySession(input: PrivySessionInput) {
   if (!member) {
     const resolvedProfile = await resolvePrivyProfile({
       providerUserId,
-      identityClaims: identityClaims as Record<string, unknown> | null,
+      identityClaims,
       fallbackEmail: input.email ?? null,
       fallbackName: null,
     });
@@ -488,103 +514,167 @@ export async function exchangePrivySession(input: PrivySessionInput) {
     const resolvedName =
       resolvedProfile.name?.trim() || resolvedEmail;
 
-    const linkableMembers = await TeamMemberModel.find({
-      email: resolvedEmail,
-      status: { $in: ["active", "invited"] },
-      authProviderUserId: null,
-    })
-      .sort({ createdAt: 1 })
-      .exec();
+    await assertSupportedBillingMarkets({
+      markets: supportedMarkets,
+      environment: env.PAYMENT_ENV,
+    });
 
-    if (linkableMembers.length > 1) {
-      throw new HttpError(
-        409,
-        "This email belongs to multiple workspaces. Complete the session exchange with a specific owner account."
-      );
+    const existingMerchant = await MerchantModel.findOne({
+      authProvider: "privy",
+      authProviderUserId: providerUserId,
+    }).exec();
+
+    if (existingMerchant) {
+      member = await TeamMemberModel.findOne({
+        merchantId: existingMerchant._id,
+        role: "owner",
+      })
+        .sort({ createdAt: 1 })
+        .exec();
+
+      if (member) {
+        if (member.status === "invited") {
+          member.status = "active";
+          member.inviteToken = null;
+          member.inviteSentAt = null;
+        }
+        member.authProvider = "privy";
+        member.authProviderUserId = providerUserId;
+        member.lastActiveAt = new Date();
+        member.passwordHash = null;
+        member.passwordSalt = null;
+        member.passwordUpdatedAt = null;
+
+        if (!member.name?.trim() && resolvedName) {
+          member.name = resolvedName;
+        }
+
+        await member.save();
+      }
+
+      const merchantPatch: Record<string, unknown> = {};
+      if (!existingMerchant.supportEmail?.trim()) {
+        merchantPatch.supportEmail = resolvedEmail;
+      }
+      if (!existingMerchant.billingTimezone?.trim()) {
+        merchantPatch.billingTimezone = billingTimezone;
+      }
+      if ((existingMerchant.supportedMarkets ?? []).length === 0) {
+        merchantPatch.supportedMarkets = supportedMarkets;
+      }
+
+      if (Object.keys(merchantPatch).length > 0) {
+        await MerchantModel.findByIdAndUpdate(existingMerchant._id, merchantPatch).exec();
+      }
     }
 
-    if (linkableMembers.length === 1 && linkableMembers[0]) {
-      member = linkableMembers[0];
-      if (member.status === "invited") {
-        member.status = "active";
-        member.inviteToken = null;
-        member.inviteSentAt = null;
-      }
-      member.authProvider = "privy";
-      member.authProviderUserId = providerUserId;
-      member.lastActiveAt = new Date();
-      member.passwordHash = null;
-      member.passwordSalt = null;
-      member.passwordUpdatedAt = null;
+    if (!member) {
+      const linkableMembers = await TeamMemberModel.find({
+        email: resolvedEmail,
+        status: { $in: ["active", "invited"] },
+        authProviderUserId: null,
+      })
+        .sort({ createdAt: 1 })
+        .exec();
 
-      if (!member.name?.trim() && resolvedName) {
-        member.name = resolvedName;
+      if (linkableMembers.length > 1) {
+        throw new HttpError(
+          409,
+          "This email belongs to multiple workspaces. Complete the session exchange with a specific owner account."
+        );
       }
 
-      await member.save();
+      if (linkableMembers.length === 1 && linkableMembers[0]) {
+        member = linkableMembers[0];
+        if (member.status === "invited") {
+          member.status = "active";
+          member.inviteToken = null;
+          member.inviteSentAt = null;
+        }
+        member.authProvider = "privy";
+        member.authProviderUserId = providerUserId;
+        member.lastActiveAt = new Date();
+        member.passwordHash = null;
+        member.passwordSalt = null;
+        member.passwordUpdatedAt = null;
 
-      if (member.role === "owner") {
-        await MerchantModel.findByIdAndUpdate(member.merchantId, {
+        if (!member.name?.trim() && resolvedName) {
+          member.name = resolvedName;
+        }
+
+        await member.save();
+
+        if (member.role === "owner") {
+          await MerchantModel.findByIdAndUpdate(member.merchantId, {
+            authProvider: "privy",
+            authProviderUserId: providerUserId,
+          }).exec();
+        }
+      } else {
+        let merchant = existingMerchant;
+        let createdMerchant = false;
+
+        if (!merchant) {
+          merchant = await MerchantModel.create({
+            merchantAccount:
+              normalizeSolanaAddress(input.operatorWalletAddress) ??
+              `merchant:${randomBytes(16).toString("hex")}`,
+            payoutWallet: createUnconfiguredAddress(),
+            reserveWallet: null,
+            name: null,
+            supportEmail: resolvedEmail,
+            billingTimezone,
+            supportedMarkets,
+            metadataHash: "0x0",
+            status: "active",
+            authProvider: "privy",
+            authProviderUserId: providerUserId,
+            operatorWalletAddress:
+              normalizeSolanaAddress(input.operatorWalletAddress),
+            onboardingStatus: "business",
+            governanceEnabled: true,
+          });
+          createdMerchant = true;
+        }
+
+        const permissions = getPermissionsForRole("owner");
+        member = await TeamMemberModel.create({
+          merchantId: merchant._id,
+          name: resolvedName,
+          email: resolvedEmail,
+          role: "owner",
+          status: "active",
+          markets: supportedMarkets,
+          permissions,
+          inviteToken: null,
+          inviteSentAt: null,
+          lastActiveAt: new Date(),
+          passwordHash: null,
+          passwordSalt: null,
+          passwordUpdatedAt: null,
           authProvider: "privy",
           authProviderUserId: providerUserId,
-        }).exec();
+        });
+
+        if (createdMerchant) {
+          await appendAuditLog({
+            merchantId: merchant._id.toString(),
+            actor: resolvedName,
+            action: "Started workspace onboarding",
+            category: "workspace",
+            status: "ok",
+            target: resolvedEmail,
+            detail: `${resolvedName} started a workspace with Privy.`,
+            metadata: {
+              role: "owner",
+              authProvider: "privy",
+              supportedMarkets,
+            },
+            ipAddress: null,
+            userAgent: null,
+          }).catch(() => undefined);
+        }
       }
-    } else {
-      const merchant = await MerchantModel.create({
-        merchantAccount:
-          normalizeSolanaAddress(input.operatorWalletAddress) ??
-          `merchant:${randomBytes(16).toString("hex")}`,
-        payoutWallet: createUnconfiguredAddress(),
-        reserveWallet: null,
-        name: null,
-        supportEmail: resolvedEmail,
-        billingTimezone: input.billingTimezone,
-        supportedMarkets: input.supportedMarkets,
-        metadataHash: "0x0",
-        status: "active",
-        authProvider: "privy",
-        authProviderUserId: providerUserId,
-        operatorWalletAddress:
-          normalizeSolanaAddress(input.operatorWalletAddress),
-        onboardingStatus: "business",
-        governanceEnabled: true,
-      });
-
-      const permissions = getPermissionsForRole("owner");
-      member = await TeamMemberModel.create({
-        merchantId: merchant._id,
-        name: resolvedName,
-        email: resolvedEmail,
-        role: "owner",
-        status: "active",
-        markets: input.supportedMarkets,
-        permissions,
-        inviteToken: null,
-        inviteSentAt: null,
-        lastActiveAt: new Date(),
-        passwordHash: null,
-        passwordSalt: null,
-        passwordUpdatedAt: null,
-        authProvider: "privy",
-        authProviderUserId: providerUserId,
-      });
-
-      await appendAuditLog({
-        merchantId: merchant._id.toString(),
-        actor: resolvedName,
-        action: "Started workspace onboarding",
-        category: "workspace",
-        status: "ok",
-        target: resolvedEmail,
-        detail: `${resolvedName} started a workspace with Privy.`,
-        metadata: {
-          role: "owner",
-          authProvider: "privy",
-          supportedMarkets: input.supportedMarkets,
-        },
-        ipAddress: null,
-        userAgent: null,
-      }).catch(() => undefined);
     }
   }
 

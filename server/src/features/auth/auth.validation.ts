@@ -42,8 +42,8 @@ export const privySessionSchema = z.object({
   authToken: z.string().trim().min(20),
   identityToken: z.string().trim().min(20).optional(),
   email: z.email().trim().toLowerCase().optional(),
-  billingTimezone: z.string().trim().min(2).max(80).default("UTC"),
-  supportedMarkets: z.array(marketSchema).min(1).default(["NGN"]),
+  billingTimezone: z.string().trim().min(2).max(80).optional(),
+  supportedMarkets: z.array(marketSchema).min(1).optional(),
   operatorWalletAddress: addressSchema.optional(),
 });
 
