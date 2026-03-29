@@ -2,7 +2,9 @@
 
 **Fiat-in billing infrastructure with USDC settlement on Solana.**
 
-Renew lets merchants charge customers in local fiat, reconcile billing off-chain, and settle successful payments in USDC on Solana. Renew uses Partna and Yellow Card currently for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
+Renew lets merchants charge customers in local fiat, reconcile billing off-chain, and settle completed payments in USDC on Solana. It is built to solve the friction, low success rates, and poor reliability of card-based billing across many African markets by letting customers pay with the methods and currencies they already use and trust.
+
+Renew currently uses Partna and Yellow Card for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
 
 ## Quick Links
 
