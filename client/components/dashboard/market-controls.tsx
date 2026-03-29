@@ -20,13 +20,17 @@ export function MarketMultiSelect({
   value,
   onChange,
   allLabel,
+  allOptionLabel,
   placeholder = "Select markets",
+  disabled = false,
 }: {
   options: BillingMarketCatalogEntry[];
   value: string[];
   onChange: (value: string[]) => void;
   allLabel?: string;
+  allOptionLabel?: string;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -44,6 +48,12 @@ export function MarketMultiSelect({
     if (open) document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [open]);
+
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+    }
+  }, [disabled]);
 
   function toggleCurrency(currency: string) {
     const next = new Set(selected);
@@ -69,13 +79,19 @@ export function MarketMultiSelect({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!disabled) {
+            setOpen((v) => !v);
+          }
+        }}
+        disabled={disabled}
         className={cn(
-          "flex h-11 w-full items-center justify-between gap-2 rounded-2xl border px-4 text-sm transition-colors",
+          "flex h-11 w-full items-center justify-between gap-2 rounded-2xl border px-4 text-sm transition-colors disabled:cursor-not-allowed",
           open
             ? "border-[#0c4a27] bg-white text-[color:var(--ink)]"
             : "border-[color:var(--line)] bg-white text-[color:var(--ink)] hover:border-[#0c4a27]/40",
-          value.length === 0 && "text-[color:var(--muted)]"
+          value.length === 0 && "text-[color:var(--muted)]",
+          disabled && "border-[color:var(--line)] bg-[#f8faf7] text-[color:var(--muted)] hover:border-[color:var(--line)]"
         )}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -107,7 +123,7 @@ export function MarketMultiSelect({
         </span>
       </button>
 
-      {open ? (
+      {open && !disabled ? (
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-white shadow-[0_12px_40px_rgba(12,74,39,0.10)]">
           {allLabel ? (
             <button
@@ -134,7 +150,7 @@ export function MarketMultiSelect({
                   </svg>
                 ) : null}
               </span>
-              {allLabel}
+              {allOptionLabel ?? allLabel}
             </button>
           ) : null}
 

@@ -10,11 +10,13 @@ import {
 } from "@privy-io/react-auth/solana";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
+import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
 import { Badge, Button, Input } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
 import { ApiError } from "@/lib/api";
+import { loadBillingMarketCatalog } from "@/lib/markets";
 import {
   registerOnboardingMerchant,
   loadOnboardingState,
@@ -30,6 +32,8 @@ import {
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim() ?? "";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const ONBOARDING_PRIMARY_BUTTON_CLASS =
+  "border-[#111111] bg-[#111111] text-white hover:bg-[#333333]";
 
 const STEP_KEYS = ["business", "verification", "payout", "register"] as const;
 
@@ -251,6 +255,19 @@ function useOnboardingWorkspace() {
       }),
     [mode]
   );
+  const {
+    data: marketCatalog,
+    isLoading: isMarketCatalogLoading,
+    error: marketCatalogError,
+  } = useResource(
+    ({ token, merchantId }) =>
+      loadBillingMarketCatalog({
+        token,
+        merchantId,
+        environment: mode,
+      }),
+    [mode]
+  );
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -314,6 +331,9 @@ function useOnboardingWorkspace() {
     busyAction,
     actionMessage,
     actionError,
+    marketCatalog,
+    isMarketCatalogLoading,
+    marketCatalogError,
     businessDraft,
     setBusinessDraft,
     payoutWallet,
@@ -381,12 +401,18 @@ function BusinessStep({
   token,
   businessDraft,
   setBusinessDraft,
+  marketOptions,
+  isMarketCatalogLoading,
+  marketCatalogError,
   busyAction,
   onSave,
 }: {
   token: string;
   businessDraft: OnboardingState["business"];
   setBusinessDraft: (updater: (current: OnboardingState["business"] | null) => OnboardingState["business"] | null) => void;
+  marketOptions: Awaited<ReturnType<typeof loadBillingMarketCatalog>>["markets"];
+  isMarketCatalogLoading: boolean;
+  marketCatalogError: string | null;
   busyAction: string | null;
   onSave: () => void;
 }) {
@@ -443,30 +469,35 @@ function BusinessStep({
           disabled={busyAction === "business"}
         />
       </div>
-      <label className="grid gap-1.5">
+      <div className="grid gap-1.5">
         <span className="text-sm font-medium text-[color:var(--ink)]">Supported markets</span>
-        <Input
-          value={businessDraft.supportedMarkets.join(", ")}
-          onChange={(event) =>
+        <MarketMultiSelect
+          options={marketOptions}
+          value={businessDraft.supportedMarkets}
+          onChange={(supportedMarkets) =>
             setBusinessDraft((current) =>
-              current
-                ? {
-                    ...current,
-                    supportedMarkets: event.target.value
-                      .split(",")
-                      .map((entry) => entry.trim().toUpperCase())
-                      .filter(Boolean),
-                  }
-                : current
+              current ? { ...current, supportedMarkets } : current
             )
           }
-          placeholder="NGN, GHS, KES"
+          allLabel="All available markets"
+          allOptionLabel="Select all"
+          placeholder={
+            isMarketCatalogLoading
+              ? "Loading supported markets..."
+              : marketOptions.length > 0
+                ? "Select supported markets"
+                : "No supported markets available"
+          }
+          disabled={busyAction === "business" || isMarketCatalogLoading || marketOptions.length === 0}
         />
-      </label>
+        {marketCatalogError ? (
+          <p className="text-sm text-[#9b3d31]">{marketCatalogError}</p>
+        ) : null}
+      </div>
       <Button
         type="button"
         tone="brand"
-        className="mt-2 w-full"
+        className={`mt-2 w-full ${ONBOARDING_PRIMARY_BUTTON_CLASS}`}
         disabled={busyAction === "business"}
         onClick={onSave}
       >
@@ -510,6 +541,7 @@ function VerificationStep({
         </div>
         <Button
           type="button"
+          className={ONBOARDING_PRIMARY_BUTTON_CLASS}
           disabled={busyAction === "owner-kyc"}
           onClick={onStartKyc}
         >
@@ -535,6 +567,7 @@ function VerificationStep({
           </div>
           <Button
             type="button"
+            className={ONBOARDING_PRIMARY_BUTTON_CLASS}
             disabled={busyAction === "merchant-kyb"}
             onClick={onStartKyb}
           >
@@ -585,7 +618,7 @@ function PayoutStep({
       <Button
         type="button"
         tone="brand"
-        className="w-full"
+        className={`w-full ${ONBOARDING_PRIMARY_BUTTON_CLASS}`}
         disabled={busyAction === "payout"}
         onClick={onSave}
       >
@@ -616,7 +649,7 @@ function RegisterStep({
       <Button
         type="button"
         tone="brand"
-        className="w-full"
+        className={`w-full ${ONBOARDING_PRIMARY_BUTTON_CLASS}`}
         disabled={registerCard.disabled}
         onClick={registerCard.onRegister}
       >
@@ -643,6 +676,9 @@ function OnboardingModal({
     busyAction,
     actionMessage,
     actionError,
+    marketCatalog,
+    isMarketCatalogLoading,
+    marketCatalogError,
     businessDraft,
     setBusinessDraft,
     payoutWallet,
@@ -806,7 +842,12 @@ function OnboardingModal({
             Unable to load
           </h2>
           <p className="mt-2 text-sm text-[color:var(--muted)]">{error}</p>
-          <Button type="button" tone="brand" className="mt-5" onClick={() => void reload()}>
+          <Button
+            type="button"
+            tone="brand"
+            className={`mt-5 ${ONBOARDING_PRIMARY_BUTTON_CLASS}`}
+            onClick={() => void reload()}
+          >
             Retry
           </Button>
         </div>
@@ -831,9 +872,7 @@ function OnboardingModal({
         <div className="flex max-h-[min(92vh,720px)] w-[min(100%,480px)] flex-col rounded-[2rem] border border-[color:var(--line)] bg-white shadow-[0_40px_120px_rgba(0,0,0,0.12)]">
           <div className="shrink-0 border-b border-[color:var(--line)] px-6 pt-6 pb-5">
             <div className="flex items-center justify-between">
-              <Badge tone={mode === "live" ? "brand" : "neutral"}>
-                {mode === "live" ? "Live" : "Test"}
-              </Badge>
+              <Badge tone="neutral">Onboarding</Badge>
               <StepIndicator
                 steps={data.steps}
                 activeIndex={activeStepIndex}
@@ -865,6 +904,9 @@ function OnboardingModal({
                 token={token}
                 businessDraft={businessDraft}
                 setBusinessDraft={setBusinessDraft}
+                marketOptions={marketCatalog?.markets ?? []}
+                isMarketCatalogLoading={isMarketCatalogLoading}
+                marketCatalogError={marketCatalogError}
                 busyAction={busyAction}
                 onSave={() =>
                   void runAction("business", async () => {

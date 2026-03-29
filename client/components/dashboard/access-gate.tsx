@@ -10,15 +10,14 @@ export function DashboardAccessGate({
 }: {
   children: ReactNode;
 }) {
-  const { user } = useDashboardSession();
+  const { user, isLoading } = useDashboardSession();
 
-  if (user?.onboardingStatus !== "workspace_active") {
-    return (
-      <>
-        {children}
-        <OnboardingPage />
-      </>
-    );
+  if (isLoading || !user) {
+    return <>{children}</>;
+  }
+
+  if (user.onboardingStatus !== "workspace_active") {
+    return <OnboardingPage />;
   }
 
   return <>{children}</>;

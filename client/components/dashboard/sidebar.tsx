@@ -27,7 +27,7 @@ export function DashboardSidebar({
   return (
     <div
       className={cn(
-        "flex h-full flex-col",
+        "flex h-full min-h-0 flex-col overflow-hidden",
         mobile
           ? "rounded-[1.75rem] border border-white/85 bg-white/96 p-4 shadow-[0_30px_90px_rgba(16,32,20,0.12)]"
           : "border-r border-[color:var(--line)] bg-white/68 px-4 py-5 backdrop-blur-xl",
@@ -42,41 +42,43 @@ export function DashboardSidebar({
         <Logo size="compact" />
       </Link>
 
-      <div className="mt-6 space-y-1">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="space-y-1 pb-4">
+          {navItems.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold tracking-[-0.02em] transition-all duration-200",
-                isActive
-                  ? "bg-[color:var(--ink)] text-white"
-                  : "text-[color:var(--muted)] hover:bg-black/4 hover:text-[color:var(--ink)]",
-              )}
-            >
-              <span
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                onClick={onNavigate}
                 className={cn(
-                  "inline-flex h-9 w-9 items-center justify-center rounded-2xl",
+                  "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold tracking-[-0.02em] transition-all duration-200",
                   isActive
-                    ? "bg-white/12 text-white"
-                    : "bg-black/4 text-[color:var(--muted)]",
+                    ? "bg-black/4 text-[color:var(--ink)]"
+                    : "text-[color:var(--muted)] hover:bg-black/4 hover:text-[color:var(--ink)]",
                 )}
               >
-                <SidebarIcon icon={item.icon} className="h-[18px] w-[18px]" />
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+                <span
+                  className={cn(
+                    "inline-flex h-9 w-9 items-center justify-center rounded-2xl transition-colors",
+                    isActive
+                      ? "bg-white text-[color:var(--ink)] shadow-[inset_0_0_0_1px_rgba(12,18,14,0.04)]"
+                      : "bg-black/4 text-[color:var(--muted)]",
+                  )}
+                >
+                  <SidebarIcon icon={item.icon} className="h-[18px] w-[18px]" />
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="mt-auto pt-4">
+      <div className="shrink-0 pt-4">
         <button
           type="button"
           onClick={signOut}

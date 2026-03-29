@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
-import { Badge } from "@/components/dashboard/ui";
 import { loadWorkspaceSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
@@ -140,10 +139,6 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
               Live
             </button>
           </div>
-
-          {user?.onboardingStatus !== "workspace_active" ? (
-            <Badge tone="warning">Onboarding required</Badge>
-          ) : null}
 
           <div className="relative" ref={notifRef}>
             <button
