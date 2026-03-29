@@ -109,14 +109,33 @@ export default function OverviewPage() {
           title="Quick actions"
           className="h-full min-h-[24rem] self-auto"
         >
-          <div className="grid min-h-[15rem] gap-3 sm:grid-cols-2">
+          <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white">
             {quickActions.map((action) => (
               <Link
                 key={action.href}
                 href={action.href}
-                className="flex min-h-[6.75rem] items-end rounded-[1.5rem] border border-[#111111] bg-[#111111] px-4 py-4 text-lg font-semibold tracking-[-0.03em] text-white transition-colors hover:bg-[#2a2a2a]"
+                className="flex items-center justify-between gap-4 border-b border-[color:var(--line)] px-5 py-5 text-[color:var(--ink)] transition-colors hover:bg-[#fafafd] last:border-b-0"
               >
-                {action.label}
+                <div className="flex items-center gap-4">
+                  <span className="inline-flex h-3 w-3 shrink-0 rounded-full bg-[#d9dde5]" />
+                  <span className="text-lg font-semibold tracking-[-0.03em]">
+                    {action.label}
+                  </span>
+                </div>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className="h-5 w-5 shrink-0 text-[#b0b7c3]"
+                  fill="none"
+                >
+                  <path
+                    d="M7 5l5 5-5 5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </Link>
             ))}
           </div>

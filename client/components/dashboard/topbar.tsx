@@ -33,7 +33,6 @@ function formatOpLabel(kind: string) {
 export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   const { mode, isUpdating, setMode } = useWorkspaceMode();
   const { user, signOut } = useDashboardSession();
-  const liveLocked = user?.onboardingStatus !== "workspace_active";
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -119,7 +118,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",
                 mode === "test"
-                  ? "bg-[#111111] text-white"
+                  ? "bg-[#0c4a27] text-[#d9f6bc]"
                   : "text-[color:var(--muted)]"
               )}
             >
@@ -127,18 +126,15 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             </button>
             <button
               type="button"
-              onClick={() => void setMode("live")}
-              disabled={isUpdating || liveLocked}
-              title={liveLocked ? "Live onboarding is coming soon." : undefined}
-              aria-pressed={mode === "live"}
+              disabled
+              title="Live mode is coming soon."
+              aria-pressed={false}
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",
-                mode === "live"
-                  ? "bg-[#111111] text-white"
-                  : "text-[color:var(--muted)]"
+                "text-[color:var(--muted)]"
               )}
             >
-              Live
+              Coming soon
             </button>
           </div>
 

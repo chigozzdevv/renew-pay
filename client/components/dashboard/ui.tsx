@@ -213,7 +213,7 @@ export function Badge({
       className={cn(
         "inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
         tone === "brand"
-          ? "bg-[#111111] text-white"
+          ? "bg-[#0c4a27] text-[#d9f6bc]"
           : tone === "warning"
             ? "bg-[#fff1dc] text-[#8a4b0f]"
             : tone === "danger"
