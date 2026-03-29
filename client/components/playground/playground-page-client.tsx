@@ -185,18 +185,18 @@ export function PlaygroundPageClient() {
           ) : null}
 
           {isLoadingPlans || hasPlans ? (
-            <div className="rounded-[2rem] border border-white/80 bg-white/72 p-5 shadow-[0_28px_90px_rgba(10,20,12,0.08)] backdrop-blur-xl">
-              <div className="grid gap-5">
+            <div className="rounded-[1.75rem] border border-white/80 bg-white/72 p-4 shadow-[0_28px_90px_rgba(10,20,12,0.08)] backdrop-blur-xl">
+              <div className="grid gap-4">
                 {isLoadingPlans ? (
-                  <div className="rounded-[1.6rem] border border-[color:var(--line)] bg-white px-5 py-12 text-center text-sm text-[color:var(--muted)]">
+                  <div className="rounded-[1.4rem] border border-[color:var(--line)] bg-white px-5 py-10 text-center text-sm text-[color:var(--muted)]">
                     Loading active plans...
                   </div>
                 ) : null}
 
                 {!isLoadingPlans && hasPlans ? (
                   <>
-                    <label className="grid gap-2">
-                      <span className="text-sm font-semibold text-[color:var(--ink)]">
+                    <label className="flex flex-col gap-3 rounded-[1.4rem] border border-[color:var(--line)] bg-white px-4 py-4 md:flex-row md:items-center">
+                      <span className="shrink-0 text-sm font-semibold text-[color:var(--ink)] md:min-w-[7rem]">
                         Select a plan
                       </span>
                       <select
@@ -205,7 +205,7 @@ export function PlaygroundPageClient() {
                           const plan = plans.find((p) => p.id === event.target.value);
                           setSelectedPlan(plan ?? null);
                         }}
-                        className="h-12 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-semibold text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27]"
+                        className="h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-semibold text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27] md:flex-1"
                       >
                         <option value="" disabled>
                           Choose a plan...

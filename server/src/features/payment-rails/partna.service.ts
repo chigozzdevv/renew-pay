@@ -199,8 +199,7 @@ export function buildPartnaVerificationSnapshot(currency: string) {
     status: "required",
     country: "NG",
     currency,
-    instructions:
-      "Complete identity verification once to unlock your permanent bank instructions.",
+    instructions: "We need your details to create a billing account for you.",
     requiredFields: [...PARTNA_CHECKOUT_VERIFICATION_FIELDS],
   };
 }

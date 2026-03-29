@@ -51,9 +51,6 @@ export default function PublicInvoicePage() {
     lgaOfOrigin: "",
     lgaOfResidence: "",
     addressLine1: "",
-    addressLine2: "",
-    addressLine3: "",
-    middleName: "",
     country: "NG",
   });
 
@@ -374,30 +371,6 @@ export default function PublicInvoicePage() {
                     }))
                   }
                 />
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="Address line 2 (optional)"
-                    value={verificationDraft.addressLine2}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        addressLine2: event.target.value,
-                      }))
-                    }
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="Middle name (optional)"
-                    value={verificationDraft.middleName}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        middleName: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
                 <button
                   type="button"
                   disabled={isBusy === "verify"}

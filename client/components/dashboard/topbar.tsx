@@ -134,7 +134,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                 "text-[color:var(--muted)]"
               )}
             >
-              Coming soon
+              Live
             </button>
           </div>
 

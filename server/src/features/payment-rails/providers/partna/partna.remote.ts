@@ -163,6 +163,17 @@ function extractSupportedAssets(payload: unknown) {
   return assets;
 }
 
+function formatPartnaDob(value: string) {
+  const trimmed = value.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-");
+    return `${day}-${month}-${year}`;
+  }
+
+  return trimmed;
+}
+
 function extractRateQuote(
   payload: unknown,
   input: PartnaRateInput
@@ -353,11 +364,11 @@ export class PartnaRemoteProvider implements PartnaProvider {
         firstName: input.firstName,
         middleName: input.middleName ?? undefined,
         lastName: input.lastName,
-        dateOfBirth: input.dateOfBirth,
+        dob: formatPartnaDob(input.dateOfBirth),
         addressLine1: input.addressLine1,
         addressLine2: input.addressLine2 ?? undefined,
         addressLine3: input.addressLine3 ?? undefined,
-        phoneNumber: input.phoneNumber,
+        phone: input.phoneNumber,
         country: input.country,
         currency: input.currency,
         bvn: input.bvn,

@@ -338,9 +338,6 @@ export async function submitPublicInvoiceVerification(input: {
     lgaOfOrigin: string;
     lgaOfResidence: string;
     addressLine1: string;
-    addressLine2?: string;
-    addressLine3?: string;
-    middleName?: string;
     country?: string;
   };
 }) {

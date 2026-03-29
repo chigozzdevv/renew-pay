@@ -176,8 +176,5 @@ export type SubmitCheckoutVerificationInput = {
   readonly lgaOfOrigin: string;
   readonly lgaOfResidence: string;
   readonly addressLine1: string;
-  readonly addressLine2?: string;
-  readonly addressLine3?: string;
-  readonly middleName?: string;
   readonly country?: string;
 };

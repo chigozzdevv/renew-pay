@@ -29,9 +29,6 @@ type VerificationFormState = {
   lgaOfOrigin: string;
   lgaOfResidence: string;
   addressLine1: string;
-  addressLine2: string;
-  addressLine3: string;
-  middleName: string;
 };
 
 const modalStyles = `
@@ -48,6 +45,7 @@ const modalStyles = `
 
 .renew-modal__dialog {
   width: min(100%, 540px);
+  max-height: min(92vh, 960px);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 32px;
@@ -118,6 +116,8 @@ const modalStyles = `
 
 .renew-modal__body {
   display: block;
+  max-height: calc(min(92vh, 960px) - 101px);
+  overflow-y: auto;
 }
 
 .renew-modal__primary {
@@ -141,12 +141,12 @@ const modalStyles = `
 
 .renew-modal__stack {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .renew-modal__grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .renew-modal__field {
@@ -390,9 +390,6 @@ function createInitialVerificationState(): VerificationFormState {
     lgaOfOrigin: "",
     lgaOfResidence: "",
     addressLine1: "",
-    addressLine2: "",
-    addressLine3: "",
-    middleName: "",
   };
 }
 
@@ -418,15 +415,13 @@ function getPrimarySectionContent(session: RenewCheckoutSession) {
   if (session.nextAction === "wait_for_charge") {
     return {
       title: "Subscription scheduled",
-      copy:
-        "The subscription is already active on-chain. Payment instructions will appear when the first charge is due.",
+      copy: "Payment details will appear when the first charge is due.",
     };
   }
 
   return {
     title: "Payment instructions",
-    copy:
-      "The checkout now reflects the server-approved charge state. In sandbox mode, provider confirmation stays backend-driven.",
+    copy: "Use these details to complete the payment.",
   };
 }
 
@@ -592,9 +587,6 @@ export function RenewCheckoutModal({
       lgaOfOrigin: verificationState.lgaOfOrigin.trim(),
       lgaOfResidence: verificationState.lgaOfResidence.trim(),
       addressLine1: verificationState.addressLine1.trim(),
-      addressLine2: verificationState.addressLine2.trim() || undefined,
-      addressLine3: verificationState.addressLine3.trim() || undefined,
-      middleName: verificationState.middleName.trim() || undefined,
       country: currentSession.verification?.country ?? "NG",
     });
   };
@@ -689,12 +681,6 @@ export function RenewCheckoutModal({
               <div className="renew-modal__stack">
                 <div>
                   <h3 className="renew-modal__section-title">Start the checkout</h3>
-                  <p className="renew-modal__copy">
-                    Enter customer details. Renew will create the customer,
-                    activate the subscription on-chain, and issue payment
-                    instructions when the first charge is due from the
-                    server-approved plan snapshot.
-                  </p>
                 </div>
 
                 <div className="renew-modal__grid renew-modal__grid--two">
@@ -784,11 +770,9 @@ export function RenewCheckoutModal({
             ) : currentSession.nextAction === "complete_verification" ? (
               <div className="renew-modal__stack">
                 <div>
-                  <h3 className="renew-modal__section-title">Verify once to unlock payment instructions</h3>
+                  <h3 className="renew-modal__section-title">Verify to get payment details</h3>
                   <p className="renew-modal__copy">
-                    Renew uses your submitted customer details to create a permanent
-                    bank account on the underlying rail. After this one-time step,
-                    the customer receives static payment instructions inside Renew.
+                    We need your details to create a billing account for you.
                   </p>
                 </div>
 
@@ -837,21 +821,6 @@ export function RenewCheckoutModal({
                       }
                       className="renew-modal__input"
                       placeholder="Enter BVN"
-                    />
-                  </label>
-
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">Middle name</span>
-                    <input
-                      value={verificationState.middleName}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          middleName: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="Optional"
                     />
                   </label>
                 </div>
@@ -935,38 +904,6 @@ export function RenewCheckoutModal({
                   />
                 </label>
 
-                <div className="renew-modal__grid renew-modal__grid--two">
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">Address line 2</span>
-                    <input
-                      value={verificationState.addressLine2}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          addressLine2: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="Optional"
-                    />
-                  </label>
-
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">Address line 3</span>
-                    <input
-                      value={verificationState.addressLine3}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          addressLine3: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="Optional"
-                    />
-                  </label>
-                </div>
-
                 <button
                   type="button"
                   onClick={() => void handleSubmitVerification()}
@@ -986,7 +923,7 @@ export function RenewCheckoutModal({
                 >
                   {isSubmittingVerification
                     ? "Creating payment instructions..."
-                    : "Unlock payment instructions"}
+                    : "Get payment details"}
                 </button>
               </div>
             ) : (
@@ -1002,8 +939,7 @@ export function RenewCheckoutModal({
                       <div>
                         <p className="renew-modal__card-label">What happens next</p>
                         <p className="renew-modal__card-value renew-modal__card-value--md">
-                          Renew will create payment instructions automatically when the
-                          first billing cycle becomes due.
+                          Payment details will appear when the first charge is due.
                         </p>
                       </div>
 
