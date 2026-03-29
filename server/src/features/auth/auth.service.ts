@@ -148,6 +148,31 @@ function extractEmailFromIdentityClaims(claims: Record<string, unknown>) {
     : null;
 }
 
+async function resolvePrivyEmail(input: {
+  providerUserId: string;
+  identityClaims?: Record<string, unknown> | null;
+  fallbackEmail?: string | null;
+}) {
+  const emailFromIdentity =
+    input.identityClaims ? extractEmailFromIdentityClaims(input.identityClaims) : null;
+
+  if (emailFromIdentity) {
+    return emailFromIdentity;
+  }
+
+  const normalizedFallback = input.fallbackEmail?.trim().toLowerCase() ?? null;
+  if (normalizedFallback) {
+    return normalizedFallback;
+  }
+
+  try {
+    const privyUser = await getPrivyClient().users()._get(input.providerUserId);
+    return extractEmailFromIdentityClaims(privyUser as unknown as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
 async function resolveMerchantSessionMeta(merchantId: string) {
   const merchant = await MerchantModel.findById(merchantId)
     .select({
@@ -390,10 +415,11 @@ export async function exchangePrivySession(input: PrivySessionInput) {
   }).exec();
 
   if (!member) {
-    const resolvedEmail =
-      extractEmailFromIdentityClaims(identityClaims as unknown as Record<string, unknown> ?? {}) ??
-      input.email?.trim().toLowerCase() ??
-      null;
+    const resolvedEmail = await resolvePrivyEmail({
+      providerUserId,
+      identityClaims: identityClaims as Record<string, unknown> | null,
+      fallbackEmail: input.email ?? null,
+    });
     const resolvedName = input.name?.trim() ?? null;
 
     if (!resolvedEmail) {
