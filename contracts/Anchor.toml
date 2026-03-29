@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-renew_protocol = "BvDY6tUDwfsfVSVenC9fPg4ohNMuYm2kFiePSysWJyua"
+renew_protocol = "fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh"
 
 [registry]
 url = "https://api.apr.dev"

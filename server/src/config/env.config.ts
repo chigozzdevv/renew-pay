@@ -53,7 +53,7 @@ const envSchema = z
       .string()
       .trim()
       .min(1)
-      .default("BvDY6tUDwfsfVSVenC9fPg4ohNMuYm2kFiePSysWJyua"),
+      .default("fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh"),
     RENEW_PROGRAM_ID_LIVE: z.string().trim().default(""),
     RENEW_SETTLEMENT_MINT_TEST: z.string().trim().default(""),
     RENEW_SETTLEMENT_MINT_LIVE: z.string().trim().default(""),

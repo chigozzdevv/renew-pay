@@ -218,8 +218,8 @@ export function PrivySessionCard({ mode, nextPath }: PrivySessionCardProps) {
       </h2>
       <p className="mt-2 text-[15px] leading-relaxed text-[#6b7280]">
         {mode === "signup"
-          ? "Sign up with passkey or email to get started."
-          : "Sign in with passkey or email to continue."}
+          ? "Sign up with Google, passkey, or email to get started."
+          : "Sign in with Google, passkey, or email to continue."}
       </p>
 
       {mode === "signup" ? (

@@ -18,7 +18,7 @@ export function RenewPrivyProvider({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ["passkey", "email"],
+        loginMethods: ["google", "passkey", "email"],
         appearance: {
           theme: "light",
           accentColor: "#0c4a27",

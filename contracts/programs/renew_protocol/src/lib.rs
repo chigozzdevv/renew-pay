@@ -49,7 +49,7 @@ pub use state::{
     MerchantLedger, Plan, Subscription, SubscriptionStatus,
 };
 
-declare_id!("BvDY6tUDwfsfVSVenC9fPg4ohNMuYm2kFiePSysWJyua");
+declare_id!("fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh");
 
 #[program]
 pub mod renew_protocol {
