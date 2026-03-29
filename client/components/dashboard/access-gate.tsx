@@ -12,12 +12,12 @@ export function DashboardAccessGate({
 }) {
   const { user, isLoading } = useDashboardSession();
 
-  if (isLoading || !user) {
-    return <>{children}</>;
+  if (user && user.onboardingStatus !== "workspace_active") {
+    return <OnboardingPage />;
   }
 
-  if (user.onboardingStatus !== "workspace_active") {
-    return <OnboardingPage />;
+  if (isLoading || !user) {
+    return <>{children}</>;
   }
 
   return <>{children}</>;

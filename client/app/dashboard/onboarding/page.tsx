@@ -695,6 +695,7 @@ function OnboardingModal({
   const [sumsubError, setSumsubError] = useState<string | null>(null);
   const sumsubContainerRef = useRef<HTMLDivElement | null>(null);
   const sumsubInstanceRef = useRef<{ destroy?: () => void } | null>(null);
+  const isBootstrapping = !businessDraft || !data || !token;
 
   useEffect(() => {
     if (!data) return;
@@ -825,7 +826,7 @@ function OnboardingModal({
     };
   }, [mode, reload, sumsubLaunch, token]);
 
-  if (isLoading || !businessDraft || !data || !token) {
+  if (isBootstrapping) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0b0a]/40 backdrop-blur-sm">
         <div className="w-[min(100%,480px)] rounded-[2rem] border border-[color:var(--line)] bg-white p-8 shadow-[0_40px_120px_rgba(0,0,0,0.12)]">
@@ -883,6 +884,11 @@ function OnboardingModal({
                 onStepClick={setActiveStepIndex}
               />
             </div>
+            {isLoading ? (
+              <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                Syncing your workspace...
+              </p>
+            ) : null}
             <h2 className="mt-4 font-display text-xl font-semibold tracking-[-0.04em] text-[color:var(--ink)]">
               {meta.title}
             </h2>
