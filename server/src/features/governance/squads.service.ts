@@ -1,5 +1,6 @@
 import {
   accounts as squadsAccounts,
+  getProgramConfigPda,
   getMultisigPda,
   getVaultPda,
   instructions as squadsInstructions,
@@ -90,6 +91,16 @@ async function confirmSignature(connection: Connection, signature: string) {
   await connection.confirmTransaction(signature, "confirmed");
 }
 
+async function getSquadsProgramTreasury(connection: Connection) {
+  const programConfigAddress = getProgramConfigPda({})[0];
+  const programConfig = await squadsAccounts.ProgramConfig.fromAccountAddress(
+    connection,
+    programConfigAddress
+  );
+
+  return programConfig.treasury;
+}
+
 export async function loadSquadsGovernanceSnapshot(input: {
   environment: RuntimeMode;
   governanceMultisigAddress: string;
@@ -120,11 +131,13 @@ export async function createSquadsGovernanceVault(input: {
   ownerAddresses: string[];
   threshold: number;
 }) {
+  const connection = getConnection(input.environment);
   const admin = getSolanaAdminKeypair(input.environment);
   const createKey = Keypair.generate();
   const multisigAddress = getMultisigPda({
     createKey: createKey.publicKey,
   })[0];
+  const squadsTreasury = await getSquadsProgramTreasury(connection);
   const { governanceVaultAddress, governanceVaultIndex } =
     deriveVaultAddresses(multisigAddress);
   const members = [
@@ -139,7 +152,7 @@ export async function createSquadsGovernanceVault(input: {
   ];
 
   const instruction = squadsInstructions.multisigCreateV2({
-    treasury: governanceVaultAddress,
+    treasury: squadsTreasury,
     creator: admin.publicKey,
     multisigPda: multisigAddress,
     configAuthority: admin.publicKey,
@@ -177,12 +190,13 @@ export async function createSquadsOperatorVault(input: {
   const multisigAddress = getMultisigPda({
     createKey: createKey.publicKey,
   })[0];
+  const squadsTreasury = await getSquadsProgramTreasury(connection);
   const { governanceVaultAddress, governanceVaultIndex } =
     deriveVaultAddresses(multisigAddress);
 
   const txHash = await squadsRpc.multisigCreateV2({
     connection,
-    treasury: governanceVaultAddress,
+    treasury: squadsTreasury,
     createKey,
     creator: admin,
     multisigPda: multisigAddress,
