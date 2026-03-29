@@ -206,7 +206,7 @@ export function Button({
       className={cn(
         "inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold tracking-[-0.02em] transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         tone === "brand"
-          ? "border-[#0c4a27] bg-[#0c4a27] text-[#d9f6bc]"
+          ? "border-[#111111] bg-[#111111] text-white hover:bg-[#333333]"
           : tone === "danger"
             ? "border-[#dcb7b0] bg-[#fff7f6] text-[#922f25]"
             : tone === "darkBrand"

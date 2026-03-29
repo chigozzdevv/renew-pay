@@ -33,6 +33,7 @@ function formatOpLabel(kind: string) {
 export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   const { mode, isUpdating, setMode } = useWorkspaceMode();
   const { user, signOut } = useDashboardSession();
+  const liveLocked = user?.onboardingStatus !== "workspace_active";
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -127,7 +128,8 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             <button
               type="button"
               onClick={() => void setMode("live")}
-              disabled={isUpdating}
+              disabled={isUpdating || liveLocked}
+              title={liveLocked ? "Live onboarding is coming soon." : undefined}
               aria-pressed={mode === "live"}
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",

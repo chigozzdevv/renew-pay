@@ -33,7 +33,7 @@ import {
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim() ?? "";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const ONBOARDING_PRIMARY_BUTTON_CLASS =
-  "border-[#111111] bg-[#111111] text-white hover:bg-[#333333]";
+  "!border-[#111111] !bg-[#111111] !text-white hover:!bg-[#333333]";
 
 const STEP_KEYS = ["business", "verification", "payout", "register"] as const;
 
@@ -246,7 +246,9 @@ function formatAddress(value: string | null) {
 
 function useOnboardingWorkspace() {
   const { token, refresh: refreshSession, user } = useDashboardSession();
-  const { mode } = useWorkspaceMode();
+  const { mode: workspaceMode } = useWorkspaceMode();
+  const mode =
+    user?.onboardingStatus !== "workspace_active" ? "test" : workspaceMode;
   const { data, isLoading, error, reload } = useResource(
     async ({ token }) =>
       loadOnboardingState({
@@ -541,6 +543,7 @@ function VerificationStep({
         </div>
         <Button
           type="button"
+          tone="brand"
           className={ONBOARDING_PRIMARY_BUTTON_CLASS}
           disabled={busyAction === "owner-kyc"}
           onClick={onStartKyc}
@@ -567,6 +570,7 @@ function VerificationStep({
           </div>
           <Button
             type="button"
+            tone="brand"
             className={ONBOARDING_PRIMARY_BUTTON_CLASS}
             disabled={busyAction === "merchant-kyb"}
             onClick={onStartKyb}

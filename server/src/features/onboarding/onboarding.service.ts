@@ -33,6 +33,12 @@ import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
 type StepStatus = "complete" | "current" | "pending";
 
+function assertTestOnboardingOnly(environment: RuntimeMode) {
+  if (environment === "live") {
+    throw new HttpError(409, "Live onboarding is coming soon. Use test onboarding for now.");
+  }
+}
+
 async function getMerchantOrThrow(merchantId: string) {
   const merchant = await MerchantModel.findById(merchantId).exec();
 
@@ -318,6 +324,8 @@ export async function getOnboardingState(input: {
   teamMemberId: string;
   environment: RuntimeMode;
 }) {
+  assertTestOnboardingOnly(input.environment);
+
   const state = await resolveOnboardingState(input);
 
   return toOnboardingResponse({
@@ -332,6 +340,8 @@ export async function saveOnboardingBusiness(input: {
   actor: string;
   payload: OnboardingBusinessInput;
 }) {
+  assertTestOnboardingOnly(input.payload.environment);
+
   await assertSupportedBillingMarkets({
     markets: input.payload.supportedMarkets,
     environment: input.payload.environment,
@@ -391,6 +401,8 @@ export async function startOnboardingVerification(input: {
   actor: string;
   payload: OnboardingVerificationStartInput;
 }) {
+  assertTestOnboardingOnly(input.payload.environment);
+
   const [merchant, owner] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
     getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
@@ -442,6 +454,8 @@ export async function saveOnboardingPayout(input: {
   actor: string;
   payload: OnboardingPayoutInput;
 }) {
+  assertTestOnboardingOnly(input.payload.environment);
+
   const [merchant, setting] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
     getOrCreateSetting(input.merchantId),
@@ -485,6 +499,8 @@ export async function registerOnboardingMerchant(input: {
   actor: string;
   payload: OnboardingRegisterInput;
 }) {
+  assertTestOnboardingOnly(input.payload.environment);
+
   const state = await resolveOnboardingState({
     merchantId: input.merchantId,
     teamMemberId: input.teamMemberId,
