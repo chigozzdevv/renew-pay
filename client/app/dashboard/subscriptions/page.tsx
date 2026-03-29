@@ -18,6 +18,8 @@ import {
   Card,
   Field,
   Input,
+  InlineLoading,
+  LoadingState,
   MetricCard,
   Modal,
   PaginationControls,
@@ -356,12 +358,7 @@ export default function SubscriptionsPage() {
   }
 
   if (isLoading && !data) {
-    return (
-      <PageState
-        title="Loading subscriptions"
-        message="Fetching recurring billing records for the selected environment."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -407,7 +404,6 @@ export default function SubscriptionsPage() {
 
       <Card
         title="Subscriptions"
-        description="Recurring and usage-based subscriptions for the selected environment."
         action={<Button tone="brand" onClick={openCreateModal}>Create subscription</Button>}
       >
         <div className="space-y-4">
@@ -632,7 +628,7 @@ export default function SubscriptionsPage() {
                     {quote
                       ? formatCurrency(quote.localAmount, quote.currency)
                       : isQuoteLoading
-                        ? "Loading quote..."
+                        ? <InlineLoading label="Preparing quote" />
                         : "Select a plan and billing market"}
                   </div>
                   <p className="text-xs font-medium text-[color:var(--muted)]">

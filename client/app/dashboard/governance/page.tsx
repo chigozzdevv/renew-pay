@@ -19,6 +19,7 @@ import {
   Badge,
   Button,
   Card,
+  LoadingState,
   MetricCard,
   PageState,
   StatGrid,
@@ -318,13 +319,7 @@ export default function GovernancePage() {
   }
 
   if (isLoading) {
-    return (
-      <PageState
-        title="Loading governance"
-        message="Fetching operator control and approval settings."
-        tone="neutral"
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -368,7 +363,6 @@ export default function GovernancePage() {
 
       <Card
         title="Approvers"
-        description="Owner approval seats and their bound treasury signers."
       >
         <div className="space-y-4">
           {message ? (

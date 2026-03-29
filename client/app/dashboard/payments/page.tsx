@@ -17,6 +17,7 @@ import {
   DarkCard,
   DarkField,
   Input,
+  LoadingState,
   MetricCard,
   PaginationControls,
   PageState,
@@ -134,7 +135,7 @@ export default function PaymentsPage() {
   }
 
   if (isLoading && !data) {
-    return <PageState title="Loading payments" message="Fetching charge and settlement state for the selected environment." />;
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -158,7 +159,7 @@ export default function PaymentsPage() {
       </StatGrid>
 
       <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card title="Charge ledger" description="Charges and settlement state for the selected environment.">
+        <Card title="Payments">
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
               <div className="grid gap-3 md:grid-cols-[180px_180px_minmax(0,1fr)] md:col-span-2">

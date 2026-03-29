@@ -20,6 +20,7 @@ import {
   Card,
   Field,
   Input,
+  LoadingState,
   MetricCard,
   Modal,
   PaginationControls,
@@ -615,12 +616,7 @@ export default function InvoicesPage() {
   }
 
   if (isLoading && !data) {
-    return (
-      <PageState
-        title="Loading invoices"
-        message="Fetching one-time billing records for the selected environment."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -664,7 +660,6 @@ export default function InvoicesPage() {
 
       <Card
         title="Invoices"
-        description="Create, send, and track one-time billing links."
         action={<Button tone="brand" onClick={openCreateModal}>Create invoice</Button>}
       >
         <div className="space-y-4">

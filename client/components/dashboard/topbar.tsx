@@ -77,7 +77,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   }, [notifOpen, profileOpen]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-[#f5f4ef]/88 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-white">
       <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <button
           type="button"

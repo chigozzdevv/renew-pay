@@ -12,10 +12,10 @@ import {
   Button,
   Card,
   Input,
-  MetricCard,
+  InlineLoading,
+  LoadingState,
   PageState,
   Select,
-  StatGrid,
 } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
 import { Logo } from "@/components/shared/logo";
@@ -442,12 +442,7 @@ export default function SettingsPage() {
   }
 
   if (isLoading) {
-    return (
-      <PageState
-        title="Loading settings"
-        message="Fetching business settings and treasury controls."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data || !businessDraft || !billingDraft || !notificationsDraft || !securityDraft) {
@@ -472,33 +467,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <StatGrid>
-        <MetricCard
-          label="Primary market"
-          value={data.business.defaultMarket}
-          note="Workspace billing default"
-        />
-        <MetricCard
-          label="Treasury control"
-          value={data.wallets.governanceVaultAddress ? "Governed" : "Single owner"}
-          note={
-            data.wallets.governanceVaultAddress
-              ? "Protected wallet changes route through governance"
-              : "Default owner controls are active"
-          }
-        />
-        <MetricCard
-          label="Pending approvals"
-          value={String(pendingCount)}
-          note="Treasury operations awaiting execution"
-        />
-        <MetricCard
-          label="Wallet alerts"
-          value={data.wallets.walletAlerts ? "On" : "Off"}
-          note="Operator warning policy"
-        />
-      </StatGrid>
-
       <Card title="Settings">
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => (
@@ -510,7 +478,7 @@ export default function SettingsPage() {
                 "rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all duration-200",
                 activeTab === tab.key
                   ? "bg-[#111111] text-white"
-                  : "border border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-[#f5f4ef]",
+                  : "border border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-[#f8f8fb]",
               )}
             >
               {tab.label}
@@ -519,7 +487,7 @@ export default function SettingsPage() {
         </div>
 
         {actionMessage ? (
-          <div className="mt-4 rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 text-sm text-[color:var(--brand)]">
+          <div className="mt-4 rounded-2xl border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3 text-sm text-[color:var(--brand)]">
             {actionMessage}
           </div>
         ) : null}
@@ -807,7 +775,7 @@ export default function SettingsPage() {
               />
 
               {data.wallets.pendingPayoutWallet ? (
-                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] p-4">
+                <div className="rounded-2xl border border-[color:var(--line)] bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand)]">
@@ -832,7 +800,7 @@ export default function SettingsPage() {
                 </div>
               ) : null}
 
-              <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
+              <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
@@ -879,7 +847,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
+            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
@@ -1115,7 +1083,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
+            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                   Email preview
@@ -1136,9 +1104,13 @@ export default function SettingsPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                   Subject
                 </p>
-                <p className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                  {notificationPreview?.subject ?? "Loading preview..."}
-                </p>
+                <div className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                  {notificationPreview?.subject ? (
+                    notificationPreview.subject
+                  ) : (
+                    <InlineLoading label="Preparing preview" />
+                  )}
+                </div>
                 <p className="mt-2 text-sm text-[color:var(--muted)]">
                   {notificationPreview?.description ??
                     "Preview a rendered template with current workspace branding."}
@@ -1153,8 +1125,8 @@ export default function SettingsPage() {
                     className="h-[540px] w-full bg-white"
                   />
                 ) : (
-                  <div className="px-4 py-8 text-sm text-[color:var(--muted)]">
-                    Loading preview...
+                  <div className="flex min-h-[320px] items-center justify-center px-4 py-8">
+                    <InlineLoading label="Preparing preview" />
                   </div>
                 )}
               </div>
@@ -1216,7 +1188,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
+            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
@@ -1292,7 +1264,7 @@ function SettingsPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
+    <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
         {title}
       </p>

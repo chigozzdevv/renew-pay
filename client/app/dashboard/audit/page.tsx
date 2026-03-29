@@ -10,6 +10,7 @@ import { useResource } from "@/components/dashboard/use-resource";
 import {
   Card,
   Field,
+  LoadingState,
   MetricCard,
   Modal,
   PageState,
@@ -57,7 +58,7 @@ export default function AuditPage() {
   }, [items, pagination.total]);
 
   if (isLoading && !data) {
-    return <PageState title="Loading audit log" message="Fetching audit events." />;
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -80,7 +81,7 @@ export default function AuditPage() {
         <MetricCard label="Treasury" value={String(metrics.treasury)} note="Treasury-linked events" />
       </StatGrid>
 
-      <Card title="Audit log" description="Workspace, billing, treasury, and developer events.">
+      <Card title="Audit">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
             <Select value={category} onChange={(e) => { setCategory(e.target.value as AuditCategory | "all"); setPage(1); }}>

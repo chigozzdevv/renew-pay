@@ -12,7 +12,7 @@ import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
-import { Badge, Button, Input } from "@/components/dashboard/ui";
+import { Badge, Button, InlineLoading, Input, LoadingState } from "@/components/dashboard/ui";
 import { extractPrivyEmbeddedWalletAddress } from "@/components/dashboard/dashboard-utils";
 import { ImageUpload } from "@/components/shared/image-upload";
 import { ApiError } from "@/lib/api";
@@ -513,14 +513,13 @@ function BusinessStep({
           allLabel="All available markets"
           allOptionLabel="Select all"
           placeholder={
-            isMarketCatalogLoading
-              ? "Loading supported markets..."
-              : marketOptions.length > 0
-                ? "Select supported markets"
-                : "No supported markets available"
+            marketOptions.length > 0
+              ? "Select supported markets"
+              : "No supported markets available"
           }
           disabled={busyAction === "business" || isMarketCatalogLoading || marketOptions.length === 0}
         />
+        {isMarketCatalogLoading ? <InlineLoading label="Preparing markets" /> : null}
         {marketCatalogError ? (
           <p className="text-sm text-[#9b3d31]">{marketCatalogError}</p>
         ) : null}
@@ -858,12 +857,7 @@ function OnboardingModal({
   if (isBootstrapping) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0b0a]/40 backdrop-blur-sm">
-        <div className="w-[min(100%,480px)] rounded-[2rem] border border-[color:var(--line)] bg-white p-8 shadow-[0_40px_120px_rgba(0,0,0,0.12)]">
-          <div className="flex flex-col items-center gap-3 py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--line)] border-t-[color:var(--ink)]" />
-            <p className="text-sm text-[color:var(--muted)]">Loading setup...</p>
-          </div>
-        </div>
+        <LoadingState label="Preparing onboarding" className="min-h-[18rem] w-[min(100%,480px)] shadow-[0_40px_120px_rgba(0,0,0,0.12)]" />
       </div>
     );
   }

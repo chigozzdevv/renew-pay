@@ -11,6 +11,7 @@ import {
   Card,
   Field,
   Input,
+  LoadingState,
   MetricCard,
   Modal,
   PageState,
@@ -133,12 +134,7 @@ export default function TreasuryPage() {
   }
 
   if (isLoading || !data || !settingsDraft || !token) {
-    return (
-      <PageState
-        title="Loading treasury"
-        message="Fetching balance, payout settings, and batch history."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error) {
@@ -191,7 +187,6 @@ export default function TreasuryPage() {
 
       <Card
         title="Withdraw"
-        description="Batch eligible settlements into a single payout."
         action={
           <div className="flex items-center gap-2">
             <Button onClick={() => setShowSettings(true)}>Payout settings</Button>
@@ -282,8 +277,7 @@ export default function TreasuryPage() {
       </Card>
 
       <Card
-        title="Payout history"
-        description="Completed and pending withdrawal batches."
+        title="Payouts"
       >
         {data.batches.length === 0 ? (
           <p className="py-6 text-center text-sm text-[color:var(--muted)]">

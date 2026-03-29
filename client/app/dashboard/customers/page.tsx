@@ -16,6 +16,7 @@ import {
   Card,
   Field,
   Input,
+  LoadingState,
   MetricCard,
   Modal,
   PaginationControls,
@@ -194,12 +195,7 @@ export default function CustomersPage() {
   }
 
   if (isLoading && !data) {
-    return (
-      <PageState
-        title="Loading customers"
-        message="Fetching customer records for the selected environment."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -223,8 +219,7 @@ export default function CustomersPage() {
       </StatGrid>
 
       <Card
-        title="Customer directory"
-        description="Customer records with status and renewal state for the selected environment."
+        title="Customers"
         action={
           <Button tone="brand" onClick={() => {
             setDraft({ customerRef: "", name: "", email: "", market: marketCatalog?.defaultMarket ?? "" });

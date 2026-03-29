@@ -15,6 +15,7 @@ import {
   Card,
   Field,
   Input,
+  LoadingState,
   MetricCard,
   Modal,
   PaginationControls,
@@ -434,12 +435,7 @@ export default function DevelopersPage() {
   }
 
   if (isLoading && !data) {
-    return (
-      <PageState
-        title="Loading developer tools"
-        message="Fetching server keys, webhook endpoints, and delivery history."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -506,7 +502,6 @@ export default function DevelopersPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card
           title="Server keys"
-          description="Backend credentials for the selected environment."
           action={<Button tone="brand" onClick={() => setShowCreateKey(true)}>Create key</Button>}
         >
           <div className="space-y-4">
@@ -566,8 +561,7 @@ export default function DevelopersPage() {
         </Card>
 
         <Card
-          title="Webhook endpoints"
-          description="Endpoints registered for the selected environment."
+          title="Webhooks"
           action={<Button tone="brand" onClick={() => setShowCreateWebhook(true)}>Create webhook</Button>}
         >
           <div className="space-y-4">

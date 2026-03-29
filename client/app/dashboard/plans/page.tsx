@@ -18,6 +18,7 @@ import {
   Card,
   Field,
   Input,
+  LoadingState,
   MetricCard,
   Modal,
   PaginationControls,
@@ -281,12 +282,7 @@ export default function PlansPage() {
   }
 
   if (isLoading && !data) {
-    return (
-      <PageState
-        title="Loading plans"
-        message="Fetching plan configuration for the selected environment."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -395,8 +391,7 @@ export default function PlansPage() {
       </StatGrid>
 
       <Card
-        title="Plan catalog"
-        description="Plan records for the selected environment."
+        title="Plans"
         action={<Button tone="brand" onClick={() => { setDraft({ ...EMPTY_DRAFT }); setShowCreate(true); }}>Create plan</Button>}
       >
         <div className="space-y-4">

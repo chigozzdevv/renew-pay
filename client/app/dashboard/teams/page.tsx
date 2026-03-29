@@ -16,6 +16,7 @@ import {
   Card,
   Field,
   Input,
+  LoadingState,
   MetricCard,
   Modal,
   PaginationControls,
@@ -306,9 +307,7 @@ export default function TeamsPage() {
   }
 
   if (isLoading && !data) {
-    return (
-      <PageState title="Loading team" message="Fetching team membership and access state." />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -346,8 +345,7 @@ export default function TeamsPage() {
       </StatGrid>
 
       <Card
-        title="Team members"
-        description="Role-based access for this account."
+        title="Teams"
         action={<Button tone="brand" onClick={openInviteModal}>Invite member</Button>}
       >
         <div className="space-y-4">

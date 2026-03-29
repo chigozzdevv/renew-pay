@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Card, MetricCard, PageState, StatGrid } from "@/components/dashboard/ui";
+import { Card, LoadingState, MetricCard, PageState, StatGrid } from "@/components/dashboard/ui";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useResource } from "@/components/dashboard/use-resource";
 import {
@@ -25,12 +25,7 @@ export default function OverviewPage() {
   );
 
   if (isLoading && !data) {
-    return (
-      <PageState
-        title="Loading overview"
-        message="Fetching real billing, settlement, and renewal metrics."
-      />
-    );
+    return <LoadingState />;
   }
 
   if (error || !data) {
@@ -51,52 +46,36 @@ export default function OverviewPage() {
     data.marketMix.length > 0
       ? [...data.marketMix].sort((left, right) => right.share - left.share)[0]
       : null;
-  const atRiskShare =
-    data.stats.totalCustomers > 0
-      ? Math.round((data.stats.atRiskCustomers / data.stats.totalCustomers) * 100)
-      : 0;
-  const meteredPlanShare =
-    data.stats.activePlans > 0
-      ? Math.round((data.stats.meteredPlans / data.stats.activePlans) * 100)
-      : 0;
-
   return (
     <div className="space-y-6">
       <StatGrid>
         <MetricCard
           label="Customers"
           value={formatCompactNumber(data.stats.totalCustomers)}
-          note={`${data.stats.atRiskCustomers} need follow-up`}
         />
         <MetricCard
           label="Plans"
           value={String(data.stats.activePlans)}
-          note={`${data.stats.meteredPlans} metered`}
         />
         <MetricCard
           label="Subscriptions"
           value={formatCompactNumber(data.stats.activeSubscriptions)}
-          note="Active recurring coverage"
         />
         <MetricCard
           label="Ready net"
           value={formatCurrency(data.stats.readyNetUsdc)}
-          note={`${data.stats.pendingSettlements} settlement batches open`}
         />
       </StatGrid>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card
           title="Market mix"
-          description="Real customer volume concentration by billing market."
           className="h-full min-h-[24rem] self-auto"
         >
           <div className="flex min-h-[15rem] flex-col justify-between gap-6">
             <div className="space-y-4">
               {marketMixPreview.length === 0 ? (
-                <p className="text-sm leading-7 text-[color:var(--muted)]">
-                  No market volume is available yet.
-                </p>
+                <p className="text-sm leading-7 text-[color:var(--muted)]">No market volume yet.</p>
               ) : (
                 <>
                   {marketMixPreview.map((item) => (
@@ -119,7 +98,7 @@ export default function OverviewPage() {
 
                   {data.marketMix.length > marketMixPreview.length ? (
                     <p className="text-sm text-[color:var(--muted)]">
-                      {data.marketMix.length - marketMixPreview.length} more markets are active in the live mix.
+                      {data.marketMix.length - marketMixPreview.length} more active.
                     </p>
                   ) : null}
                 </>
@@ -135,7 +114,7 @@ export default function OverviewPage() {
                   {String(data.marketMix.length)}
                 </p>
                 <p className="mt-2 text-sm text-[color:var(--muted)]">
-                  Markets with current customer billing volume.
+                  With billing volume.
                 </p>
               </div>
               <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
@@ -147,8 +126,8 @@ export default function OverviewPage() {
                 </p>
                 <p className="mt-2 text-sm text-[color:var(--muted)]">
                   {leadingMarket
-                    ? `${leadingMarket.share}% of total billing volume`
-                    : "Waiting for first customer volume."}
+                    ? `${leadingMarket.share}% of volume`
+                    : "No billing yet."}
                 </p>
               </div>
             </div>
@@ -156,8 +135,7 @@ export default function OverviewPage() {
         </Card>
 
         <Card
-          title="Upcoming renewals"
-          description="The next real subscription renewals due in the next 48 hours."
+          title="Renewals"
           action={
             data.upcomingRenewals.length > 0 ? (
               <Link
@@ -172,9 +150,7 @@ export default function OverviewPage() {
         >
           <div className="flex min-h-[15rem] flex-col justify-between gap-4">
             {data.upcomingRenewals.length === 0 ? (
-              <p className="text-sm leading-7 text-[color:var(--muted)]">
-                No renewals are scheduled in the current window.
-              </p>
+              <p className="text-sm leading-7 text-[color:var(--muted)]">No renewals in the next 48 hours.</p>
             ) : (
               <>
                 <div className="space-y-3">
@@ -207,7 +183,7 @@ export default function OverviewPage() {
                 <div className="rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                      Due in window
+                      Due soon
                     </p>
                     <p className="font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
                       {String(data.upcomingRenewals.length)}
@@ -215,115 +191,12 @@ export default function OverviewPage() {
                   </div>
                   <p className="mt-2 text-sm text-[color:var(--muted)]">
                     {hasMoreUpcomingRenewals
-                      ? `${data.upcomingRenewals.length - previewRenewals.length} more renewals are available in subscriptions.`
-                      : "Live preview of the next subscriptions queued for collection."}
+                      ? `${data.upcomingRenewals.length - previewRenewals.length} more in subscriptions.`
+                      : "Next 48 hours."}
                   </p>
                 </div>
               </>
             )}
-          </div>
-        </Card>
-
-        <Card
-          title="Settlement snapshot"
-          description="Current net pending vs settled volume in the selected environment."
-          className="h-full min-h-[24rem] self-auto"
-        >
-          <div className="flex min-h-[15rem] flex-col justify-between gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                  Pending settlements
-                </p>
-                <p className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                  {String(data.stats.pendingSettlements)}
-                </p>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">
-                  Batches still waiting to close out.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                  Settled 30d
-                </p>
-                <p className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                  {formatCurrency(data.stats.settledUsdc30d)}
-                </p>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">
-                  Completed settlement throughput over the last month.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                Ready net
-              </p>
-              <p className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                {formatCurrency(data.stats.readyNetUsdc)}
-              </p>
-              <p className="mt-2 text-sm text-[color:var(--muted)]">
-                Available to route into the next settlement cycle.
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          title="Risk snapshot"
-          description="Customer and billing risk surfaced from the selected environment."
-          className="h-full min-h-[24rem] self-auto"
-        >
-          <div className="flex min-h-[15rem] flex-col justify-between gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                  At-risk customers
-                </p>
-                <p className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                  {String(data.stats.atRiskCustomers)}
-                </p>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">
-                  Customers that currently need billing follow-up.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                  Metered plans
-                </p>
-                <p className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                  {String(data.stats.meteredPlans)}
-                </p>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">
-                  Usage-based plans currently active in the catalog.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-[#eadfcd] bg-[#fffaf1] px-4 py-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#87663c]">
-                    Customer watchlist
-                  </p>
-                  <p className="mt-2 text-sm text-[#6f5a3e]">
-                    {data.stats.atRiskCustomers} of {data.stats.totalCustomers} customers currently need follow-up.
-                  </p>
-                </div>
-                <p className="font-display text-3xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                  {atRiskShare}%
-                </p>
-              </div>
-              <div className="mt-4 h-2 rounded-full bg-[#f2e8d7]">
-                <div
-                  className="h-full rounded-full bg-[#b9761f]"
-                  style={{ width: `${Math.max(atRiskShare, atRiskShare > 0 ? 8 : 0)}%` }}
-                />
-              </div>
-              <p className="mt-3 text-sm text-[#6f5a3e]">
-                {meteredPlanShare}% of active plans are usage-based.
-              </p>
-            </div>
           </div>
         </Card>
       </div>

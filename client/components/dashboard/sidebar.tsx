@@ -30,7 +30,7 @@ export function DashboardSidebar({
         "flex h-full min-h-0 flex-col overflow-hidden",
         mobile
           ? "rounded-[1.75rem] border border-white/85 bg-white/96 p-4 shadow-[0_30px_90px_rgba(16,32,20,0.12)]"
-          : "border-r border-[color:var(--line)] bg-white/68 px-4 py-5 backdrop-blur-xl",
+          : "border-r border-[color:var(--line)] bg-white px-4 py-5",
       )}
     >
       <Link

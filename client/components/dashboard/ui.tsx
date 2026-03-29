@@ -42,6 +42,65 @@ export function PageState({
   );
 }
 
+export function LoadingState({
+  label = "Loading",
+  className,
+}: {
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-[28rem] items-center justify-center rounded-[2rem] border border-[color:var(--line)] bg-white p-8",
+        className
+      )}
+    >
+      <div className="flex flex-col items-center gap-4 text-center">
+        <span className="inline-flex h-14 w-14 animate-spin items-center justify-center rounded-full border border-[color:var(--line)] bg-[#f8f8fb] text-[color:var(--ink)]">
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none">
+            <path
+              d="M12 3.5V6.1M12 17.9V20.5M20.5 12H17.9M6.1 12H3.5M18.01 5.99L16.17 7.83M7.83 16.17L5.99 18.01M18.01 18.01L16.17 16.17M7.83 7.83L5.99 5.99"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+            <circle cx="12" cy="12" r="3.6" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+        </span>
+        <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--muted)]">
+          {label}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function InlineLoading({
+  label = "Loading",
+  className,
+}: {
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("inline-flex items-center gap-2 text-sm text-[color:var(--muted)]", className)}>
+      <span className="inline-flex h-5 w-5 animate-spin items-center justify-center rounded-full border border-[color:var(--line)] bg-[#f8f8fb] text-[color:var(--ink)]">
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none">
+          <path
+            d="M12 3.5V6.1M12 17.9V20.5M20.5 12H17.9M6.1 12H3.5M18.01 5.99L16.17 7.83M7.83 16.17L5.99 18.01M18.01 18.01L16.17 16.17M7.83 7.83L5.99 5.99"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+          <circle cx="12" cy="12" r="3.6" stroke="currentColor" strokeWidth="1.8" />
+        </svg>
+      </span>
+      <span className="font-medium tracking-[-0.02em]">{label}</span>
+    </div>
+  );
+}
+
 export function Card({
   title,
   description,
@@ -119,11 +178,10 @@ export function DarkCard({
 export function MetricCard({
   label,
   value,
-  note,
 }: {
   label: string;
   value: string;
-  note: string;
+  note?: string;
 }) {
   return (
     <div
@@ -134,9 +192,6 @@ export function MetricCard({
       </p>
       <p className="mt-3 font-display text-2xl font-semibold tracking-[-0.05em]">
         {value}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-        {note}
       </p>
     </div>
   );
