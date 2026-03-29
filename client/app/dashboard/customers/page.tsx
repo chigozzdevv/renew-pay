@@ -307,7 +307,6 @@ export default function CustomersPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Add customer"
-        description="Register a new customer in this environment."
         footer={
           <div className="flex items-center justify-end gap-3">
             <Button onClick={() => setShowCreate(false)}>Cancel</Button>
@@ -350,7 +349,6 @@ export default function CustomersPage() {
         open={!!detailCustomer}
         onClose={() => setDetailCustomer(null)}
         title={detailCustomer?.name ?? "Customer profile"}
-        description={detailCustomer?.email}
         size="lg"
         footer={
           detailCustomer ? (

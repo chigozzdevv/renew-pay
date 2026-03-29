@@ -14,11 +14,11 @@ import { useResource } from "@/components/dashboard/use-resource";
 import {
   Button,
   Card,
-  DarkCard,
-  DarkField,
+  Field,
   Input,
   LoadingState,
   MetricCard,
+  Modal,
   PaginationControls,
   PageState,
   Select,
@@ -38,7 +38,7 @@ export default function PaymentsPage() {
   const [sourceKind, setSourceKind] = useState<PaymentSourceFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailPayment, setDetailPayment] = useState<PaymentRecord | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -67,16 +67,6 @@ export default function PaymentsPage() {
     total: payments.length,
     totalPages: 1,
   };
-  const selectedPayment = payments.find((payment) => payment.id === selectedId) ?? payments[0] ?? null;
-
-  useEffect(() => {
-    if (!selectedPayment) {
-      setSelectedId(null);
-      return;
-    }
-
-    setSelectedId(selectedPayment.id);
-  }, [selectedPayment?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!message && !errorMessage) {
@@ -111,7 +101,7 @@ export default function PaymentsPage() {
   }, [pagination.total, payments]);
 
   async function handleRetry() {
-    if (!token || !selectedPayment) {
+    if (!token || !detailPayment) {
       return;
     }
 
@@ -122,10 +112,11 @@ export default function PaymentsPage() {
     try {
       await retryCharge({
         token,
-        chargeId: selectedPayment.id,
+        chargeId: detailPayment.id,
         environment: mode,
       });
       setMessage("Retry queued.");
+      setDetailPayment(null);
       await reload();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -158,136 +149,136 @@ export default function PaymentsPage() {
         <MetricCard label="Failed" value={String(metrics.failed)} note="Visible page" />
       </StatGrid>
 
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card title="Payments">
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-              <div className="grid gap-3 md:grid-cols-[180px_180px_minmax(0,1fr)] md:col-span-2">
-                <Select value={sourceKind} onChange={(event) => { setSourceKind(event.target.value as PaymentSourceFilter); setPage(1); }}>
-                  <option value="all">All sources</option>
-                  <option value="subscription">Subscriptions</option>
-                  <option value="invoice">Invoices</option>
-                </Select>
-                <Select value={status} onChange={(event) => { setStatus(event.target.value as PaymentStatusFilter); setPage(1); }}>
-                  <option value="all">All statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="awaiting_settlement">Awaiting settlement</option>
-                  <option value="confirming">Confirming</option>
-                  <option value="settled">Settled</option>
-                  <option value="failed">Failed</option>
-                  <option value="reversed">Reversed</option>
-                </Select>
-                <Input
-                  placeholder="Search by charge, invoice, or customer"
-                  value={search}
-                  onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-                />
-              </div>
+      <Card title="Payments">
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="grid gap-3 md:grid-cols-[180px_180px_minmax(0,1fr)] md:col-span-2">
+              <Select value={sourceKind} onChange={(event) => { setSourceKind(event.target.value as PaymentSourceFilter); setPage(1); }}>
+                <option value="all">All sources</option>
+                <option value="subscription">Subscriptions</option>
+                <option value="invoice">Invoices</option>
+              </Select>
+              <Select value={status} onChange={(event) => { setStatus(event.target.value as PaymentStatusFilter); setPage(1); }}>
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="awaiting_settlement">Awaiting settlement</option>
+                <option value="confirming">Confirming</option>
+                <option value="settled">Settled</option>
+                <option value="failed">Failed</option>
+                <option value="reversed">Reversed</option>
+              </Select>
+              <Input
+                placeholder="Search by charge, invoice, or customer"
+                value={search}
+                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+              />
             </div>
-
-            {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
-            {errorMessage ? <p className="text-sm text-[#a8382b]">{errorMessage}</p> : null}
-
-            <Table columns={["Charge", "Source", "USDC", "Processed", "Status"]}>
-              {payments.map((payment) => (
-                <button key={payment.id} type="button" className="text-left" onClick={() => setSelectedId(payment.id)}>
-                  <TableRow columns={5}>
-                    <div>
-                      <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{payment.externalChargeId}</p>
-                      <p className="mt-1 text-sm text-[color:var(--muted)]">{payment.id.slice(-8)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[color:var(--muted)]">
-                        {payment.sourceKind === "invoice"
-                          ? payment.invoiceNumber ?? "Invoice"
-                          : payment.customerName ?? payment.subscriptionId?.slice(-8) ?? "Subscription"}
-                      </p>
-                      <p className="mt-1 text-sm text-[color:var(--muted)]/80 capitalize">
-                        {payment.sourceKind}
-                      </p>
-                    </div>
-                    <p className="text-sm text-[color:var(--muted)]">{formatCurrency(payment.usdcAmount)}</p>
-                    <p className="text-sm text-[color:var(--muted)]">{formatDateTime(payment.processedAt)}</p>
-                    <div><StatusBadge value={payment.status} /></div>
-                  </TableRow>
-                </button>
-              ))}
-            </Table>
-
-            <PaginationControls
-              page={pagination.page}
-              total={pagination.total}
-              totalPages={pagination.totalPages}
-              onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-              onNext={() =>
-                setPage((current) => Math.min(pagination.totalPages, current + 1))
-              }
-            />
           </div>
-        </Card>
 
-        <DarkCard
-          title={selectedPayment?.externalChargeId ?? "Charge details"}
-          description={
-            selectedPayment
-              ? selectedPayment.sourceKind === "invoice"
-                ? selectedPayment.invoiceNumber ?? selectedPayment.customerName ?? "Invoice payment"
-                : selectedPayment.customerName ?? selectedPayment.subscriptionId ?? "Subscription payment"
-              : "Select a charge to inspect it."
-          }
-        >
-          {selectedPayment ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <DarkField label="Local amount" value={String(selectedPayment.localAmount)} />
-                <DarkField
-                  label="USDC amount"
-                  value={formatCurrency(selectedPayment.usdcAmount)}
-                />
-                <DarkField label="FX rate" value={String(selectedPayment.fxRate)} />
-                <DarkField
-                  label="Fee"
-                  value={formatCurrency(selectedPayment.feeAmount)}
-                />
-                <DarkField
-                  label="Source"
-                  value={
-                    selectedPayment.sourceKind === "invoice"
-                      ? selectedPayment.invoiceNumber ?? "Invoice"
-                      : selectedPayment.subscriptionId ?? "Subscription"
-                  }
-                />
-                <DarkField
-                  label="Settlement source"
-                  value={selectedPayment.settlementSource ?? "Not set"}
-                />
-                <DarkField
-                  label="Processed"
-                  value={formatDateTime(selectedPayment.processedAt)}
-                />
-              </div>
+          {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
+          {errorMessage ? <p className="text-sm text-[#a8382b]">{errorMessage}</p> : null}
 
-              {selectedPayment.failureCode ? (
-                <div className="rounded-2xl border border-[#603029] bg-[#2d1613] px-4 py-4 text-sm leading-7 text-[#ffb6aa]">
-                  {selectedPayment.failureCode}
+          <Table columns={["Charge", "Source", "USDC", "Processed", "Actions"]}>
+            {payments.map((payment) => (
+              <TableRow key={payment.id} columns={5}>
+                <div>
+                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{payment.externalChargeId}</p>
+                  <p className="mt-1 text-sm text-[color:var(--muted)]">{payment.id.slice(-8)}</p>
                 </div>
-              ) : null}
+                <div>
+                  <p className="text-sm text-[color:var(--muted)]">
+                    {payment.sourceKind === "invoice"
+                      ? payment.invoiceNumber ?? "Invoice"
+                      : payment.customerName ?? payment.subscriptionId?.slice(-8) ?? "Subscription"}
+                  </p>
+                  <p className="mt-1 text-sm text-[color:var(--muted)]/80 capitalize">
+                    {payment.sourceKind}
+                  </p>
+                </div>
+                <p className="self-center text-sm text-[color:var(--muted)]">{formatCurrency(payment.usdcAmount)}</p>
+                <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(payment.processedAt)}</p>
+                <div className="flex items-center gap-2 self-center">
+                  <StatusBadge value={payment.status} />
+                  <button
+                    type="button"
+                    onClick={() => setDetailPayment(payment)}
+                    className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
+                  >
+                    View
+                  </button>
+                </div>
+              </TableRow>
+            ))}
+          </Table>
 
-              {selectedPayment.sourceKind !== "invoice" &&
-              selectedPayment.status !== "settled" &&
-              selectedPayment.status !== "reversed" ? (
-                <Button tone="darkBrand" disabled={isBusy} onClick={() => void handleRetry()}>
-                  {isBusy ? "Queueing..." : "Retry charge"}
-                </Button>
-              ) : null}
+          <PaginationControls
+            page={pagination.page}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() =>
+              setPage((current) => Math.min(pagination.totalPages, current + 1))
+            }
+          />
+        </div>
+      </Card>
+
+      <Modal
+        open={!!detailPayment}
+        onClose={() => setDetailPayment(null)}
+        title={detailPayment?.externalChargeId ?? "Charge details"}
+        size="lg"
+        footer={
+          detailPayment ? (
+            <div className="flex items-center justify-between gap-3">
+              <StatusBadge value={detailPayment.status} />
+              <div className="flex items-center gap-3">
+                <Button onClick={() => setDetailPayment(null)}>Close</Button>
+                {detailPayment.sourceKind !== "invoice" &&
+                detailPayment.status !== "settled" &&
+                detailPayment.status !== "reversed" ? (
+                  <Button tone="brand" disabled={isBusy} onClick={() => void handleRetry()}>
+                    {isBusy ? "Queueing..." : "Retry charge"}
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          ) : (
-            <p className="text-sm leading-7 text-white/66">
-              No charge matches the current filter.
-            </p>
-          )}
-        </DarkCard>
-      </div>
+          ) : null
+        }
+      >
+        {detailPayment ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Local amount" value={String(detailPayment.localAmount)} />
+              <Field label="USDC amount" value={formatCurrency(detailPayment.usdcAmount)} />
+              <Field label="FX rate" value={String(detailPayment.fxRate)} />
+              <Field label="Fee" value={formatCurrency(detailPayment.feeAmount)} />
+              <Field
+                label="Source"
+                value={
+                  detailPayment.sourceKind === "invoice"
+                    ? detailPayment.invoiceNumber ?? "Invoice"
+                    : detailPayment.subscriptionId ?? "Subscription"
+                }
+              />
+              <Field
+                label="Settlement source"
+                value={detailPayment.settlementSource ?? "Not set"}
+              />
+              <Field
+                label="Processed"
+                value={formatDateTime(detailPayment.processedAt)}
+              />
+            </div>
+
+            {detailPayment.failureCode ? (
+              <div className="rounded-2xl border border-[#dcb7b0] bg-[#fff7f6] px-4 py-4 text-sm leading-7 text-[#922f25]">
+                {detailPayment.failureCode}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

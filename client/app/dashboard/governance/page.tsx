@@ -16,7 +16,6 @@ import {
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
 import {
-  Badge,
   Button,
   Card,
   LoadingState,
@@ -57,22 +56,6 @@ function formatDate(value: string | null) {
     hour12: false,
     timeZone: "UTC",
   }).format(new Date(value));
-}
-
-function signerTone(status: string): "brand" | "warning" | "neutral" | "danger" {
-  if (status === "active") {
-    return "brand";
-  }
-
-  if (status === "pending") {
-    return "warning";
-  }
-
-  if (status === "revoked") {
-    return "danger";
-  }
-
-  return "neutral";
 }
 
 type PrivyWalletRecord = {
@@ -215,13 +198,6 @@ export default function GovernancePage() {
     Boolean(authenticated && privyReady && !solanaWalletsReady);
   const currentWalletMatchesSigner =
     Boolean(currentSigner?.walletAddress) && currentSigner?.walletAddress === activeWalletAddress;
-  const signerStatusTone =
-    currentSigner?.status ? signerTone(currentSigner.status) : ("neutral" as const);
-  const signerStatusLabel = currentSigner?.status
-    ? currentSigner.status.replace(/_/g, " ")
-    : isWalletSyncing
-      ? "wallet syncing"
-      : "not verified";
   const signerActionDisabled =
     !token ||
     !user ||
@@ -396,9 +372,9 @@ export default function GovernancePage() {
                 <span className="font-mono text-xs text-[color:var(--muted)]">
                   {formatAddress(approver.walletAddress || activeWalletAddress)}
                 </span>
-                <Badge tone={signerTone(approver.status)}>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                   {approver.status.replace(/_/g, " ")}
-                </Badge>
+                </span>
                 <span className="text-xs text-[color:var(--muted)]">
                   {formatDate(approver.verifiedAt)}
                 </span>

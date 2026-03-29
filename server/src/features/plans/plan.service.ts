@@ -139,6 +139,14 @@ function resolvePlanUpdateState(input: {
     } as const;
   }
 
+  if (input.nextStatus === "draft" && input.currentStatus === "active") {
+    return {
+      status: "active",
+      pendingStatus: "draft",
+      shouldQueueProtocolSync: true,
+    } as const;
+  }
+
   return {
     status: input.nextStatus,
     pendingStatus: null,

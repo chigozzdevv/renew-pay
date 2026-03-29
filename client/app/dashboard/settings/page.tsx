@@ -712,7 +712,6 @@ export default function SettingsPage() {
               <SettingsField label="Auto retries">
                 <SettingsToggle
                   label={billingDraft.autoRetries ? "Enabled" : "Disabled"}
-                  description="Retry failed renewals using the workspace policy."
                   enabled={billingDraft.autoRetries}
                   onToggle={() => patchBilling("autoRetries", !billingDraft.autoRetries)}
                 />
@@ -721,7 +720,6 @@ export default function SettingsPage() {
               <SettingsField label="Meter approval">
                 <SettingsToggle
                   label={billingDraft.meterApproval ? "Required" : "Optional"}
-                  description="Require usage sign-off before metered billing runs."
                   enabled={billingDraft.meterApproval}
                   onToggle={() => patchBilling("meterApproval", !billingDraft.meterApproval)}
                 />
@@ -864,7 +862,6 @@ export default function SettingsPage() {
 
               <SettingsToggle
                 label="Wallet alerts"
-                description="Notify operators when payout wallets require attention."
                 enabled={walletDraft.walletAlerts}
                 onToggle={() =>
                   setWalletDraft((current) => ({
@@ -947,7 +944,6 @@ export default function SettingsPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <SettingsToggle
                   label="Customer subscription emails"
-                  description="Send confirmation and lifecycle updates to customers."
                   enabled={notificationsDraft.customerSubscriptionEmails}
                   onToggle={() =>
                     patchNotifications(
@@ -958,7 +954,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Customer receipts"
-                  description="Send a receipt after successful subscription payments."
                   enabled={notificationsDraft.customerReceiptEmails}
                   onToggle={() =>
                     patchNotifications(
@@ -969,7 +964,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Customer follow-ups"
-                  description="Send reminders and failed-payment follow-up emails."
                   enabled={notificationsDraft.customerPaymentFollowUps}
                   onToggle={() =>
                     patchNotifications(
@@ -980,7 +974,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Merchant subscription alerts"
-                  description="Alert the workspace when new subscriptions start."
                   enabled={notificationsDraft.merchantSubscriptionAlerts}
                   onToggle={() =>
                     patchNotifications(
@@ -1028,7 +1021,6 @@ export default function SettingsPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <SettingsToggle
                   label="Team invite emails"
-                  description="Send invite and reminder emails to invited teammates."
                   enabled={notificationsDraft.teamInviteEmails}
                   onToggle={() =>
                     patchNotifications("teamInviteEmails", !notificationsDraft.teamInviteEmails)
@@ -1036,7 +1028,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Governance alerts"
-                  description="Notify approvers when governance actions need attention."
                   enabled={notificationsDraft.governanceAlerts}
                   onToggle={() =>
                     patchNotifications(
@@ -1047,7 +1038,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Treasury alerts"
-                  description="Notify finance and ops when payout actions progress."
                   enabled={notificationsDraft.treasuryAlerts}
                   onToggle={() =>
                     patchNotifications("treasuryAlerts", !notificationsDraft.treasuryAlerts)
@@ -1055,7 +1045,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Verification alerts"
-                  description="Notify admins when KYC or KYB status changes."
                   enabled={notificationsDraft.verificationAlerts}
                   onToggle={() =>
                     patchNotifications(
@@ -1066,7 +1055,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Developer alerts"
-                  description="Notify engineering when keys or webhook health changes."
                   enabled={notificationsDraft.developerAlerts}
                   onToggle={() =>
                     patchNotifications("developerAlerts", !notificationsDraft.developerAlerts)
@@ -1074,7 +1062,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Security alerts"
-                  description="Alert admins when sensitive workspace access events occur."
                   enabled={notificationsDraft.securityAlerts}
                   onToggle={() =>
                     patchNotifications("securityAlerts", !notificationsDraft.securityAlerts)
@@ -1171,7 +1158,6 @@ export default function SettingsPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <SettingsToggle
                   label="Enforce two-factor"
-                  description="Require stronger login checks for sensitive roles."
                   enabled={securityDraft.enforceTwoFactor}
                   onToggle={() =>
                     patchSecurity("enforceTwoFactor", !securityDraft.enforceTwoFactor)
@@ -1179,7 +1165,6 @@ export default function SettingsPage() {
                 />
                 <SettingsToggle
                   label="Restrict invite domains"
-                  description="Only allow invites from approved company domains."
                   enabled={securityDraft.restrictInviteDomains}
                   onToggle={() =>
                     patchSecurity("restrictInviteDomains", !securityDraft.restrictInviteDomains)
@@ -1322,12 +1307,10 @@ function SettingsSummaryRow({
 
 function SettingsToggle({
   label,
-  description,
   enabled,
   onToggle,
 }: {
   label: string;
-  description: string;
   enabled: boolean;
   onToggle: () => void;
 }) {
@@ -1336,7 +1319,6 @@ function SettingsToggle({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{label}</p>
-          <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">{description}</p>
         </div>
         <button
           type="button"

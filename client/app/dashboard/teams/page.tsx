@@ -435,7 +435,6 @@ export default function TeamsPage() {
         open={showInvite}
         onClose={() => setShowInvite(false)}
         title="Invite team member"
-        description="Set the role and market access before the invite email goes out."
         size="lg"
         footer={
           <div className="flex items-center justify-end gap-3">
@@ -522,7 +521,6 @@ export default function TeamsPage() {
           setManageDraft(null);
         }}
         title={manageMember?.name ?? "Member profile"}
-        description={manageMember?.email}
         size="lg"
         footer={
           manageMember ? (

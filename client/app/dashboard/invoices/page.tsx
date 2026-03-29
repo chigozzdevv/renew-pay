@@ -762,7 +762,6 @@ export default function InvoicesPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Create invoice"
-        description="Build a hosted invoice and decide whether it should stay as a draft or go live now."
         size="xl"
         footer={
           <div className="flex items-center justify-end gap-3">
@@ -799,11 +798,6 @@ export default function InvoicesPage() {
         open={!!detailInvoice}
         onClose={() => setDetailInvoice(null)}
         title={detailInvoice?.invoiceNumber ?? "Invoice details"}
-        description={
-          detailInvoice
-            ? `${detailInvoice.customerName} · ${detailInvoice.customerEmail}`
-            : undefined
-        }
         size="lg"
         footer={
           detailInvoice ? (
@@ -929,11 +923,6 @@ export default function InvoicesPage() {
           setEditDraft(null);
         }}
         title="Edit invoice"
-        description={
-          editInvoiceRecord
-            ? `${editInvoiceRecord.invoiceNumber} · ${editInvoiceRecord.customerName}`
-            : undefined
-        }
         size="xl"
         footer={
           <div className="flex items-center justify-end gap-3">

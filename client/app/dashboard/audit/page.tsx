@@ -135,7 +135,6 @@ export default function AuditPage() {
         open={!!detailItem}
         onClose={() => setDetailItem(null)}
         title={detailItem?.action ?? "Audit detail"}
-        description={detailItem?.detail}
         size="lg"
       >
         {detailItem ? (

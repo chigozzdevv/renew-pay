@@ -221,7 +221,7 @@ export default function TreasuryPage() {
           {actionError ? <p className="text-sm text-[#a8382b]">{actionError}</p> : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Destination" value={<span className="truncate">{data.payoutWallet}</span>} />
+            <Field label="Destination" value={<span className="block break-all">{data.payoutWallet}</span>} />
             <Field label="Open batches" value={String(openBatches)} />
             <Field
               label="Threshold"
@@ -316,7 +316,6 @@ export default function TreasuryPage() {
         open={showSettings}
         onClose={() => setShowSettings(false)}
         title="Payout settings"
-        description="Configure automatic payout rules."
         footer={
           <div className="flex items-center justify-end gap-3">
             <Button onClick={() => setShowSettings(false)}>Cancel</Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -123,21 +123,15 @@ function toggleEventType(
 
 function DeveloperEmptyState({
   title,
-  message,
-  action,
 }: {
   title: string;
-  message: string;
-  action?: ReactNode;
 }) {
   return (
     <div className="rounded-[1.75rem] border border-[color:var(--line)] bg-[#fafafd] px-6 py-10 text-center">
-      <div className="mx-auto max-w-md space-y-3">
+      <div className="mx-auto max-w-md">
         <p className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--ink)]">
           {title}
         </p>
-        <p className="text-sm leading-7 text-[color:var(--muted)]">{message}</p>
-        {action ? <div className="pt-1">{action}</div> : null}
       </div>
     </div>
   );
@@ -508,12 +502,6 @@ export default function DevelopersPage() {
             {keys.length === 0 ? (
               <DeveloperEmptyState
                 title="No server keys yet"
-                message="Create a key when your backend is ready to authenticate API calls, webhooks, or internal tooling."
-                action={
-                  <Button tone="brand" onClick={() => setShowCreateKey(true)}>
-                    Create key
-                  </Button>
-                }
               />
             ) : (
               <>
@@ -568,12 +556,6 @@ export default function DevelopersPage() {
             {webhooks.length === 0 ? (
               <DeveloperEmptyState
                 title="No webhook endpoints yet"
-                message="Add a webhook when you want Renew to deliver billing events into your own backend."
-                action={
-                  <Button tone="brand" onClick={() => setShowCreateWebhook(true)}>
-                    Create webhook
-                  </Button>
-                }
               />
             ) : (
               <Table columns={["Label", "Events", "Status", "Actions"]}>
@@ -641,25 +623,7 @@ export default function DevelopersPage() {
         }
       >
         {deliveries.length === 0 ? (
-          <DeveloperEmptyState
-            title="No deliveries yet"
-            message={
-              webhooks.length === 0
-                ? "Create a webhook first, then send a test event to start building delivery history."
-                : "Send a test event from a webhook to verify your endpoint and start seeing delivery history here."
-            }
-            action={
-              webhooks.length === 0 ? (
-                <Button tone="brand" onClick={() => setShowCreateWebhook(true)}>
-                  Create webhook
-                </Button>
-              ) : selectedWebhook ? (
-                <Button tone="brand" onClick={() => void handleSendTest(selectedWebhook)}>
-                  Send test
-                </Button>
-              ) : undefined
-            }
-          />
+          <DeveloperEmptyState title="No deliveries yet" />
         ) : (
           <Table columns={["Event", "Attempts", "HTTP", "Delivered", "Status"]}>
             {deliveries.map((delivery: DeliveryRecord) => (
@@ -709,7 +673,6 @@ export default function DevelopersPage() {
         open={showCreateKey}
         onClose={() => setShowCreateKey(false)}
         title="Create server key"
-        description="Create a backend credential for the selected environment."
         size="sm"
         footer={
           <div className="flex items-center justify-end gap-3">
@@ -740,7 +703,6 @@ export default function DevelopersPage() {
         open={showCreateWebhook}
         onClose={() => setShowCreateWebhook(false)}
         title="Create webhook"
-        description="Register a real endpoint and choose the events to deliver."
         size="lg"
         footer={
           <div className="flex items-center justify-end gap-3">
@@ -831,7 +793,6 @@ export default function DevelopersPage() {
           setEditingWebhook(null);
         }}
         title={manageWebhook?.label ?? "Webhook details"}
-        description={manageWebhook?.endpointUrl}
         size="lg"
         footer={
           manageWebhook ? (

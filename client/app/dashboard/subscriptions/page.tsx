@@ -493,7 +493,6 @@ export default function SubscriptionsPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Create subscription"
-        description="Attach a customer to an existing plan and schedule the first charge."
         size="lg"
         footer={
           <div className="flex items-center justify-end gap-3">
@@ -647,13 +646,6 @@ export default function SubscriptionsPage() {
         open={!!detailSubscription}
         onClose={() => setDetailSubscription(null)}
         title={detailSubscription?.customerName ?? "Subscription details"}
-        description={
-          detailSubscription
-            ? `${planNameById.get(detailSubscription.planId) ?? "Plan"} · ${
-                detailSubscription.customerRef
-              }`
-            : undefined
-        }
         size="lg"
         footer={
           detailSubscription ? (
@@ -779,13 +771,6 @@ export default function SubscriptionsPage() {
           setEditDraft(null);
         }}
         title="Edit subscription"
-        description={
-          editSubscription
-            ? `${editSubscription.customerName} · ${
-                planNameById.get(editSubscription.planId) ?? "Plan"
-              }`
-            : undefined
-        }
         size="md"
         footer={
           <div className="flex items-center justify-end gap-3">
