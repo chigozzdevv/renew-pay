@@ -21,7 +21,6 @@ import {
   findPlanPda,
   findSubscriptionPda,
   getRenewProgramRuntime,
-  getServerSponsoredTransactionContext,
   hashProgramIdentifier,
   loadSubscriptionContext,
   toFixed6Bn,
@@ -358,14 +357,10 @@ export async function createProtocolMerchant(input: {
     };
   }
 
-  const sponsorshipContext = await getServerSponsoredTransactionContext({
-    mode: input.environment,
-    serverFeePayer: admin.publicKey,
-  });
   const payout = await resolveSettlementTokenAccount({
     runtime,
     destination: input.payoutWallet,
-    feePayer: sponsorshipContext.feePayer,
+    feePayer: operator.operatorVault,
   });
   const instruction = await runtime.program.methods
     .createMerchant(
@@ -377,7 +372,7 @@ export async function createProtocolMerchant(input: {
     .accounts({
       config: findConfigPda(runtime.programId),
       authority: operator.operatorVault,
-      payer: admin.publicKey,
+      payer: operator.operatorVault,
       settlementMint: runtime.settlementMint,
       payoutTokenAccount: payout.tokenAccount,
       merchant: merchantAddress,
@@ -431,7 +426,7 @@ export async function createProtocolPlan(input: {
     .createPlan(Array.from(planCodeHash), buildPlanTermsArgs(input))
     .accounts({
       authority: operator.operatorVault,
-      payer: admin.publicKey,
+      payer: operator.operatorVault,
       merchant: findMerchantPda(runtime.programId, merchantIdBytes),
       plan: planAddress,
       systemProgram: SystemProgram.programId,
@@ -543,7 +538,7 @@ export async function createProtocolSubscriptionForMerchant(input: {
     )
     .accounts({
       authority: operator.operatorVault,
-      payer: admin.publicKey,
+      payer: operator.operatorVault,
       merchant: findMerchantPda(runtime.programId, merchantIdBytes),
       plan: new PublicKey(input.protocolPlanId),
       subscription: subscriptionAddress,
@@ -751,14 +746,10 @@ export async function requestProtocolPayoutDestinationUpdate(input: {
     operator,
     merchantAddress,
   });
-  const sponsorshipContext = await getServerSponsoredTransactionContext({
-    mode: input.environment,
-    serverFeePayer: admin.publicKey,
-  });
   const payout = await resolveSettlementTokenAccount({
     runtime,
     destination: input.payoutWallet,
-    feePayer: sponsorshipContext.feePayer,
+    feePayer: operator.operatorVault,
   });
   const instruction = await runtime.program.methods
     .requestPayoutDestinationUpdate()

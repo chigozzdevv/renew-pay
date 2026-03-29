@@ -236,10 +236,14 @@ export async function executeSquadsVaultInstructions(input: {
     connection,
     multisigPda
   );
-  const transactionIndex = BigInt(multisig.transactionIndex.toString());
+  const transactionIndex = BigInt(multisig.transactionIndex.toString()) + 1n;
+  const vaultPda = getVaultPda({
+    multisigPda,
+    index: input.vaultIndex,
+  })[0];
   const latestBlockhash = await connection.getLatestBlockhash("confirmed");
   const transactionMessage = new TransactionMessage({
-    payerKey: admin.publicKey,
+    payerKey: vaultPda,
     recentBlockhash: latestBlockhash.blockhash,
     instructions: input.instructions,
   });
