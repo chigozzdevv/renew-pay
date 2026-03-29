@@ -257,3 +257,5 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 
 - `PLATFORM_AUTH_ENABLED`
 - `PLATFORM_AUTH_JWT_SECRET`
+
+*`renew_protocol` has not yet undergone an external security audit. Treat this repository and its deployed program configuration as a test-environment system, not a production-ready deployment.*
