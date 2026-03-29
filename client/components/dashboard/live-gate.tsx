@@ -12,7 +12,7 @@ export function LiveGate() {
 
   return (
     <section className="space-y-6">
-      <div className="overflow-hidden rounded-[2.4rem] border border-[#d3e4cf] bg-[radial-gradient(circle_at_top_left,_rgba(217,246,188,0.78),_rgba(244,247,241,0.96)_52%,_rgba(255,255,255,0.98)_100%)] p-6 shadow-[0_24px_80px_rgba(12,74,39,0.08)] sm:p-7">
+      <div className="overflow-hidden rounded-[2.4rem] border border-[color:var(--line)] bg-[radial-gradient(circle_at_top_left,_rgba(242,241,235,0.9),_rgba(245,244,239,0.96)_52%,_rgba(255,255,255,0.98)_100%)] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.06)] sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="max-w-3xl space-y-4">
             <Badge tone="warning">Live onboarding locked</Badge>

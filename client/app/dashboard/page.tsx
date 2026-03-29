@@ -106,9 +106,9 @@ export default function OverviewPage() {
                         <span>{item.market}</span>
                         <span className="text-[color:var(--muted)]">{item.share}%</span>
                       </div>
-                      <div className="h-3 rounded-full bg-[#e6ebe4]">
+                      <div className="h-3 rounded-full bg-[#e9e7df]">
                         <div
-                          className="h-full rounded-full bg-[#0c4a27]"
+                          className="h-full rounded-full bg-[#111111]"
                           style={{ width: `${Math.max(item.share, 4)}%` }}
                         />
                       </div>
@@ -163,7 +163,7 @@ export default function OverviewPage() {
             data.upcomingRenewals.length > 0 ? (
               <Link
                 href="/dashboard/subscriptions"
-                className="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-[#f4f7f1] px-3 py-2 text-xs font-semibold tracking-[-0.01em] text-[color:var(--ink)] transition-colors hover:bg-[#edf7eb]"
+                className="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-[#f2f1eb] px-3 py-2 text-xs font-semibold tracking-[-0.01em] text-[color:var(--ink)] transition-colors hover:bg-[#ebe9e1]"
               >
                 View all
               </Link>
@@ -205,7 +205,7 @@ export default function OverviewPage() {
                   ))}
                 </div>
 
-                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f4f7f1] px-4 py-4">
+                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                       Due in window
@@ -256,7 +256,7 @@ export default function OverviewPage() {
               </div>
             </div>
 
-            <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f4f7f1] px-4 py-4">
+            <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                 Ready net
               </p>

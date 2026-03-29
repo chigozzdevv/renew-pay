@@ -366,7 +366,7 @@ export default function GovernancePage() {
       >
         <div className="space-y-4">
           {message ? (
-            <div className="rounded-[1.1rem] border border-[#cde8d4] bg-[#f4fbf6] px-4 py-3 text-sm text-[#0c4a27]">
+            <div className="rounded-[1.1rem] border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 text-sm text-[color:var(--ink)]">
               {message}
             </div>
           ) : null}
@@ -401,7 +401,7 @@ export default function GovernancePage() {
         </div>
       </DarkCard>
 
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card
           title="Control model"
           description="Routine billing and settlement stay on the operator lane. Governance only applies to sensitive changes and large treasury actions."
@@ -425,7 +425,7 @@ export default function GovernancePage() {
           description="The important thing is whether the workspace can safely move from single-owner control into shared approvals."
         >
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-2)] px-4 py-3">
+            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
               <span className="text-sm font-medium text-[color:var(--ink)]">
                 Onboarding status
               </span>
@@ -433,7 +433,7 @@ export default function GovernancePage() {
                 {data.onboardingStatus.replace(/_/g, " ")}
               </Badge>
             </div>
-            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-2)] px-4 py-3">
+            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
               <span className="text-sm font-medium text-[color:var(--ink)]">
                 Active approvers
               </span>
@@ -441,7 +441,7 @@ export default function GovernancePage() {
                 {activeApprovers.length}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-2)] px-4 py-3">
+            <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
               <span className="text-sm font-medium text-[color:var(--ink)]">
                 Current owner session
               </span>
@@ -449,7 +449,7 @@ export default function GovernancePage() {
                 {user?.name ?? "Unknown"}
               </span>
             </div>
-            <div className="rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-2)] px-4 py-4">
+            <div className="rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">

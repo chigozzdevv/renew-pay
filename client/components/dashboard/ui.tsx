@@ -7,6 +7,8 @@ import type {
   SelectHTMLAttributes,
 } from "react";
 
+import { useEffect } from "react";
+
 import { cn } from "@/lib/utils";
 
 export function PageState({
@@ -130,14 +132,14 @@ export function MetricCard({
       className={cn(
         "rounded-[1.6rem] border p-4",
         tone === "brand"
-          ? "border-[#0c4a27]/10 bg-[#0c4a27] text-[#d9f6bc]"
+          ? "border-[color:var(--line)] bg-[#f2f1eb] text-[color:var(--ink)]"
           : "border-[color:var(--line)] bg-white/82 text-[color:var(--ink)]"
       )}
     >
       <p
         className={cn(
           "text-[11px] font-semibold uppercase tracking-[0.16em]",
-          tone === "brand" ? "text-[#d9f6bc]/76" : "text-[color:var(--muted)]"
+          tone === "brand" ? "text-[color:var(--muted)]" : "text-[color:var(--muted)]"
         )}
       >
         {label}
@@ -148,7 +150,7 @@ export function MetricCard({
       <p
         className={cn(
           "mt-2 text-sm leading-6",
-          tone === "brand" ? "text-[#d9f6bc]/78" : "text-[color:var(--muted)]"
+          tone === "brand" ? "text-[color:var(--muted)]" : "text-[color:var(--muted)]"
         )}
       >
         {note}
@@ -173,12 +175,12 @@ export function Badge({
       className={cn(
         "inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
         tone === "brand"
-          ? "bg-[#0c4a27] text-[#d9f6bc]"
+          ? "bg-[#111111] text-white"
           : tone === "warning"
             ? "bg-[#fff1dc] text-[#8a4b0f]"
             : tone === "danger"
               ? "bg-[#fff0ef] text-[#a8382b]"
-              : "border border-[color:var(--line)] bg-[#f8faf7] text-[color:var(--brand)]"
+              : "border border-[color:var(--line)] bg-[#f5f4ef] text-[color:var(--brand)]"
       )}
     >
       {children}
@@ -210,7 +212,7 @@ export function Button({
           : tone === "danger"
             ? "border-[#dcb7b0] bg-[#fff7f6] text-[#922f25]"
             : tone === "darkBrand"
-              ? "border-[#d9f6bc]/18 bg-[#d9f6bc] text-[#0c4a27] shadow-[0_12px_30px_rgba(217,246,188,0.16)] hover:bg-[#cfe8b0]"
+              ? "border-white/12 bg-white text-[#111111] shadow-[0_12px_30px_rgba(255,255,255,0.08)] hover:bg-[#f2f1eb]"
               : tone === "darkDanger"
                 ? "border-[#603029] bg-[#2d1613] text-[#ffb6aa] hover:bg-[#3a1d18]"
                 : tone === "darkNeutral"
@@ -266,7 +268,7 @@ export function DarkField({
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 transition-colors hover:text-[#d9f6bc]"
+            className="inline-flex items-center gap-1 transition-colors hover:text-white/80"
           >
             {value}
             <svg
@@ -309,7 +311,7 @@ export function Table({
     <div className="space-y-3">
       <div
         className={cn(
-          "hidden gap-3 rounded-2xl border border-[color:var(--line)] bg-[#edf7eb] px-4 py-3 md:grid",
+          "hidden gap-3 rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 md:grid",
           columnClass
         )}
       >
@@ -348,8 +350,8 @@ export function TableRow({
       className={cn(
         "grid gap-3 rounded-[1.25rem] border px-4 py-4 transition-colors",
         selected
-          ? "border-[#0c4a27]/30 bg-[#f4f8f1] shadow-[0_4px_20px_rgba(12,74,39,0.04)]"
-          : "border-[color:var(--line)] bg-white hover:border-[#0c4a27]/20 hover:bg-[#fafcfe]",
+          ? "border-black/10 bg-[#f2f1eb] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
+          : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[#faf9f5]",
         columns === 3
           ? "md:grid-cols-3"
           : columns === 4
@@ -412,7 +414,7 @@ export function Input({
     <input
       {...props}
       className={cn(
-        "h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#0c4a27]",
+        "h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#111111]",
         className
       )}
     />
@@ -428,11 +430,105 @@ export function Select({
     <select
       {...props}
       className={cn(
-        "h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27]",
+        "h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
         className
       )}
     >
       {children}
     </select>
+  );
+}
+
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  size = "md",
+  footer,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  size?: "sm" | "md" | "lg" | "xl";
+  footer?: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const widthClass =
+    size === "sm"
+      ? "w-[min(100%,420px)]"
+      : size === "lg"
+        ? "w-[min(100%,680px)]"
+        : size === "xl"
+          ? "w-[min(100%,860px)]"
+          : "w-[min(100%,540px)]";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-[#0a0b0a]/40 backdrop-blur-sm"
+      />
+      <div
+        className={cn(
+          "relative flex max-h-[min(92vh,780px)] flex-col rounded-[2rem] border border-[color:var(--line)] bg-white shadow-[0_40px_120px_rgba(0,0,0,0.12)]",
+          widthClass,
+        )}
+      >
+        <div className="shrink-0 border-b border-[color:var(--line)] px-6 pt-5 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-display text-xl font-semibold tracking-[-0.04em] text-[color:var(--ink)]">
+                {title}
+              </h2>
+              {description ? (
+                <p className="mt-1 text-sm text-[color:var(--muted)]">{description}</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--muted)] transition-colors hover:bg-black/4 hover:text-[color:var(--ink)]"
+            >
+              <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {footer ? (
+          <div className="shrink-0 border-t border-[color:var(--line)] px-6 py-4">
+            {footer}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

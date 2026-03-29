@@ -82,7 +82,7 @@ export function DashboardSidebar({
         <button
           type="button"
           onClick={signOut}
-          className="flex w-full items-center justify-between rounded-2xl border border-[color:var(--line)] bg-white/82 px-4 py-3 text-left transition-all duration-200 hover:border-[#0c4a27]/12 hover:bg-[#f7fbf5]"
+          className="flex w-full items-center justify-between rounded-2xl border border-[color:var(--line)] bg-white/82 px-4 py-3 text-left transition-all duration-200 hover:border-black/8 hover:bg-[#f5f4ef]"
         >
           <span className="inline-flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-black/4 text-[color:var(--muted)]">

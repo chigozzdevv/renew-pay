@@ -608,7 +608,7 @@ function VerificationStep({
           </Button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
+        <div className="rounded-2xl border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3 text-sm text-[color:var(--muted)]">
           KYB is only required in live mode.
         </div>
       )}
@@ -645,7 +645,7 @@ function PayoutStep({
           placeholder="Solana wallet address"
         />
       </label>
-      <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
+      <div className="rounded-2xl border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3 text-sm text-[color:var(--muted)]">
         Bank transfer payout is coming soon.
       </div>
       <Button
@@ -928,7 +928,7 @@ function OnboardingModal({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {actionMessage && (
-              <div className="mb-4 rounded-xl border border-[#c2ddb8] bg-[#f0f8ec] px-4 py-2.5 text-sm text-[#2d5a1e]">
+              <div className="mb-4 rounded-xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-2.5 text-sm text-[color:var(--ink)]">
                 {actionMessage}
               </div>
             )}
@@ -1110,7 +1110,7 @@ function OnboardingModal({
               </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-auto bg-[#f7faf6] p-4">
+            <div className="min-h-0 flex-1 overflow-auto bg-[#f5f4ef] p-4">
               <div
                 ref={sumsubContainerRef}
                 className="min-h-full rounded-[1.6rem] border border-[color:var(--line)] bg-white"

@@ -4,7 +4,20 @@
 
 Renew lets merchants charge customers in local fiat, reconcile billing off-chain, and settle completed payments in USDC on Solana. It is built to solve the friction, low success rates, and poor reliability of card-based billing across many African markets by letting customers pay with the methods and currencies they already use and trust.
 
-Renew currently uses Partna and Yellow Card for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
+Renew uses Partna for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
+
+## Runtime Status
+
+Renew currently runs in test mode on Solana devnet with Partna test rails and Sumsub test KYC during onboarding.
+
+Live mode is not active yet. It will follow the Solana mainnet deployment and the production compliance rollout. That live stack will include KYC, KYB, AML, KYT, and Travel Rule controls for real-money activity.
+
+Current compliance config:
+
+- Test KYC: `SUMSUB_LEVEL_NAME_KYC_TEST`
+- Live KYC: `SUMSUB_LEVEL_NAME_KYC_LIVE`
+- Live KYB: `SUMSUB_LEVEL_NAME_KYB_LIVE`
+- Live AML / KYT / Travel Rule: added with the production compliance stack
 
 ## Quick Links
 
@@ -250,10 +263,20 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 
 - `PRIVY_APP_ID`
 - `PRIVY_APP_SECRET`
+- `SUMSUB_BASE_URL_TEST`
 - `SUMSUB_APP_TOKEN_TEST`
 - `SUMSUB_SECRET_KEY_TEST`
+- `SUMSUB_LEVEL_NAME_KYC_TEST`
+- `SUMSUB_LEVEL_NAME_KYB_TEST`
+- `SUMSUB_WEBHOOK_SECRET_TEST`
+- `SUMSUB_BASE_URL_LIVE`
 - `SUMSUB_APP_TOKEN_LIVE`
 - `SUMSUB_SECRET_KEY_LIVE`
+- `SUMSUB_LEVEL_NAME_KYC_LIVE`
+- `SUMSUB_LEVEL_NAME_KYB_LIVE`
+- `SUMSUB_WEBHOOK_SECRET_LIVE`
+
+Live AML / KYT / Travel Rule configuration should be added alongside this compliance block in `server/.env.example` once the production providers are selected.
 
 ### Platform auth
 

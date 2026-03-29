@@ -230,6 +230,39 @@ export async function createInvoice(input: {
   return response.data;
 }
 
+export async function updateInvoice(input: {
+  token: string;
+  invoiceId: string;
+  merchantId: string;
+  environment: "test" | "live";
+  payload: Partial<{
+    title: string;
+    customerName: string;
+    customerEmail: string;
+    billingCurrency: string;
+    dueDate: string;
+    note: string | null;
+    lineItems: Array<{
+      description: string;
+      quantity: number;
+      unitAmountUsd: number;
+    }>;
+    status: "draft" | "issued" | "void";
+  }>;
+}) {
+  const response = await fetchApi<InvoiceRecord>(`/invoices/${input.invoiceId}`, {
+    method: "PATCH",
+    token: input.token,
+    query: {
+      merchantId: input.merchantId,
+      environment: input.environment,
+    },
+    body: JSON.stringify(input.payload),
+  });
+
+  return response.data;
+}
+
 export async function sendInvoice(input: {
   token: string;
   invoiceId: string;

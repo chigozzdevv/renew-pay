@@ -13,10 +13,10 @@ import { useResource } from "@/components/dashboard/use-resource";
 import {
   Button,
   Card,
-  DarkCard,
-  DarkField,
+  Field,
   Input,
   MetricCard,
+  Modal,
   PaginationControls,
   PageState,
   Select,
@@ -47,6 +47,12 @@ type WebhookDraft = {
   status: WebhookRecord["status"];
 };
 
+type SecretReveal = {
+  title: string;
+  value: string;
+  note: string;
+};
+
 function createDefaultWebhookEvents(): SupportedWebhookEvent[] {
   return [...supportedWebhookEvents] as SupportedWebhookEvent[];
 }
@@ -61,15 +67,23 @@ function createWebhookDraft(webhook: WebhookRecord): WebhookDraft {
   };
 }
 
+function createNewWebhookDraft(): WebhookDraft {
+  return {
+    label: "",
+    endpointUrl: "",
+    eventTypes: createDefaultWebhookEvents(),
+    retryPolicy: "exponential",
+    status: "active",
+  };
+}
+
 function EventSelector({
   selected,
   disabled = false,
-  surface = "light",
   onToggle,
 }: {
   selected: readonly SupportedWebhookEvent[];
   disabled?: boolean;
-  surface?: "light" | "dark";
   onToggle: (eventType: SupportedWebhookEvent) => void;
 }) {
   return (
@@ -80,22 +94,14 @@ function EventSelector({
         return (
           <label
             key={eventType}
-            className={
-              surface === "dark"
-                ? "flex items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm font-medium tracking-[-0.02em] text-white"
-                : "flex items-center gap-3 rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)]"
-            }
+            className="flex items-center gap-3 rounded-2xl border border-[color:var(--line)] bg-[#faf9f5] px-4 py-3 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)]"
           >
             <input
               type="checkbox"
               checked={isChecked}
               disabled={disabled}
               onChange={() => onToggle(eventType)}
-              className={
-                surface === "dark"
-                  ? "h-4 w-4 rounded border-white/16 bg-transparent text-[#d9f6bc] focus:ring-[#d9f6bc]"
-                  : "h-4 w-4 rounded border-[color:var(--line)] text-[#0c4a27] focus:ring-[#0c4a27]"
-              }
+              className="h-4 w-4 rounded border-[color:var(--line)] text-[#111111] focus:ring-[#111111]"
             />
             <span>{eventType}</span>
           </label>
@@ -121,24 +127,20 @@ export default function DevelopersPage() {
   const [webhookPage, setWebhookPage] = useState(1);
   const [deliveryPage, setDeliveryPage] = useState(1);
   const [selectedWebhookId, setSelectedWebhookId] = useState<string | null>(null);
-  const [editingWebhook, setEditingWebhook] = useState<WebhookDraft | null>(null);
   const [isBusy, setIsBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [showCreateKey, setShowCreateKey] = useState(false);
+  const [showCreateWebhook, setShowCreateWebhook] = useState(false);
+  const [manageWebhook, setManageWebhook] = useState<WebhookRecord | null>(null);
+  const [editingWebhook, setEditingWebhook] = useState<WebhookDraft | null>(null);
   const [newKeyLabel, setNewKeyLabel] = useState("");
-  const [newWebhook, setNewWebhook] = useState<{
-    label: string;
-    endpointUrl: string;
-    eventTypes: SupportedWebhookEvent[];
-    retryPolicy: WebhookRecord["retryPolicy"];
-  }>({
-    label: "",
-    endpointUrl: "",
-    eventTypes: createDefaultWebhookEvents(),
-    retryPolicy: "exponential",
-  });
+  const [newWebhook, setNewWebhook] = useState<WebhookDraft>(createNewWebhookDraft());
   const [testEventType, setTestEventType] =
     useState<SupportedWebhookEvent>("charge.settled");
+  const [secretReveal, setSecretReveal] = useState<SecretReveal | null>(null);
+
   const keyPageSize = 12;
   const webhookPageSize = 12;
   const deliveryPageSize = 12;
@@ -182,23 +184,7 @@ export default function DevelopersPage() {
     totalPages: 1,
   };
   const selectedWebhook =
-    webhooks.find((webhook) => webhook.id === selectedWebhookId) ?? null;
-  const selectedWebhookDeliveries = deliveries;
-
-  useEffect(() => {
-    if (webhooks.length === 0) {
-      setSelectedWebhookId(null);
-      return;
-    }
-
-    if (!selectedWebhookId || !webhooks.some((webhook) => webhook.id === selectedWebhookId)) {
-      setSelectedWebhookId(webhooks[0].id);
-    }
-  }, [selectedWebhookId, webhooks]);
-
-  useEffect(() => {
-    setEditingWebhook(selectedWebhook ? createWebhookDraft(selectedWebhook) : null);
-  }, [selectedWebhook]);
+    webhooks.find((webhook) => webhook.id === selectedWebhookId) ?? manageWebhook ?? null;
 
   useEffect(() => {
     if (!message && !errorMessage) {
@@ -223,6 +209,16 @@ export default function DevelopersPage() {
     setDeliveryPage(1);
   }, [selectedWebhookId]);
 
+  useEffect(() => {
+    if (!manageWebhook) {
+      return;
+    }
+
+    const refreshedWebhook = webhooks.find((entry) => entry.id === manageWebhook.id) ?? manageWebhook;
+    setManageWebhook(refreshedWebhook);
+    setEditingWebhook(createWebhookDraft(refreshedWebhook));
+  }, [manageWebhook?.id, webhooks]);
+
   const metrics = useMemo(
     () => ({
       keys: keysPagination.total,
@@ -232,7 +228,14 @@ export default function DevelopersPage() {
       deliveries: deliveriesPagination.total,
       failedDeliveries: deliveries.filter((delivery) => delivery.status === "failed").length,
     }),
-    [deliveries, deliveriesPagination.total, keys, keysPagination.total, webhooks, webhooksPagination.total]
+    [
+      deliveries,
+      deliveriesPagination.total,
+      keys,
+      keysPagination.total,
+      webhooks,
+      webhooksPagination.total,
+    ]
   );
 
   async function runAction(key: string, runner: () => Promise<void>) {
@@ -250,6 +253,12 @@ export default function DevelopersPage() {
     }
   }
 
+  function openManageWebhook(webhook: WebhookRecord) {
+    setSelectedWebhookId(webhook.id);
+    setManageWebhook(webhook);
+    setEditingWebhook(createWebhookDraft(webhook));
+  }
+
   async function handleCreateKey() {
     if (!token || !user?.merchantId || !newKeyLabel.trim()) {
       return;
@@ -263,8 +272,14 @@ export default function DevelopersPage() {
         environment: mode,
       });
       setKeyPage(1);
+      setShowCreateKey(false);
       setNewKeyLabel("");
-      setMessage(`Server key created: ${result.token}`);
+      setSecretReveal({
+        title: "Server key created",
+        value: result.token,
+        note: "Copy this token now. It will not be shown in full again.",
+      });
+      setMessage("Server key created.");
     });
   }
 
@@ -307,28 +322,29 @@ export default function DevelopersPage() {
 
       setWebhookPage(1);
       setDeliveryPage(1);
-      setNewWebhook({
-        label: "",
-        endpointUrl: "",
-        eventTypes: createDefaultWebhookEvents(),
-        retryPolicy: "exponential",
-      });
+      setShowCreateWebhook(false);
+      setNewWebhook(createNewWebhookDraft());
       setSelectedWebhookId(result.webhook.id);
-      setMessage(`Webhook created. Secret: ${result.secret}`);
+      setSecretReveal({
+        title: "Webhook secret created",
+        value: result.secret,
+        note: "Copy this secret now. It will not be shown in full again.",
+      });
+      setMessage("Webhook created.");
     });
   }
 
   async function handleSaveWebhook() {
-    if (!token || !selectedWebhook || !editingWebhook) {
+    if (!token || !manageWebhook || !editingWebhook) {
       return;
     }
 
-    await runAction(`save-webhook:${selectedWebhook.id}`, async () => {
+    await runAction(`save-webhook:${manageWebhook.id}`, async () => {
       await updateWebhook({
         token,
-        merchantId: selectedWebhook.merchantId,
+        merchantId: manageWebhook.merchantId,
         environment: mode,
-        webhookId: selectedWebhook.id,
+        webhookId: manageWebhook.id,
         payload: {
           label: editingWebhook.label.trim(),
           endpointUrl: editingWebhook.endpointUrl.trim(),
@@ -337,37 +353,44 @@ export default function DevelopersPage() {
           status: editingWebhook.status,
         },
       });
+      setManageWebhook(null);
+      setEditingWebhook(null);
       setMessage("Webhook updated.");
     });
   }
 
-  async function handleRotateSecret() {
-    if (!token || !selectedWebhook) {
+  async function handleRotateSecret(webhook: WebhookRecord) {
+    if (!token) {
       return;
     }
 
-    await runAction(`rotate-secret:${selectedWebhook.id}`, async () => {
+    await runAction(`rotate-secret:${webhook.id}`, async () => {
       const result = await rotateWebhookSecret({
         token,
-        merchantId: selectedWebhook.merchantId,
+        merchantId: webhook.merchantId,
         environment: mode,
-        webhookId: selectedWebhook.id,
+        webhookId: webhook.id,
       });
-      setMessage(`Secret rotated: ${result.secret}`);
+      setSecretReveal({
+        title: "Webhook secret rotated",
+        value: result.secret,
+        note: "Use this new secret in your receiving service.",
+      });
+      setMessage("Webhook secret rotated.");
     });
   }
 
-  async function handleSendTest() {
-    if (!token || !selectedWebhook) {
+  async function handleSendTest(webhook: WebhookRecord) {
+    if (!token) {
       return;
     }
 
-    await runAction(`send-test:${selectedWebhook.id}`, async () => {
+    await runAction(`send-test:${webhook.id}`, async () => {
       const delivery = await sendWebhookTest({
         token,
-        merchantId: selectedWebhook.merchantId,
+        merchantId: webhook.merchantId,
         environment: mode,
-        webhookId: selectedWebhook.id,
+        webhookId: webhook.id,
         eventType: testEventType,
       });
 
@@ -377,6 +400,15 @@ export default function DevelopersPage() {
           : "Test delivery queued."
       );
     });
+  }
+
+  async function handleCopySecret(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setMessage("Copied.");
+    } catch {
+      setErrorMessage("Could not copy the value.");
+    }
   }
 
   if (isLoading && !data) {
@@ -395,10 +427,7 @@ export default function DevelopersPage() {
         message={error ?? "Unable to load developer resources."}
         tone="danger"
         action={
-          <button
-            className="text-sm font-semibold"
-            onClick={() => void reload()}
-          >
+          <button className="text-sm font-semibold" onClick={() => void reload()}>
             Retry
           </button>
         }
@@ -406,17 +435,44 @@ export default function DevelopersPage() {
     );
   }
 
+  const canCreateWebhook =
+    newWebhook.label.trim().length > 0 &&
+    newWebhook.endpointUrl.trim().length > 0 &&
+    newWebhook.eventTypes.length > 0;
+  const canSaveWebhook =
+    !!editingWebhook &&
+    editingWebhook.label.trim().length > 0 &&
+    editingWebhook.endpointUrl.trim().length > 0 &&
+    editingWebhook.eventTypes.length > 0;
+
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Server keys" value={String(metrics.keys)} note={`${metrics.activeKeys} active on page`} tone="brand" />
-        <MetricCard label="Webhooks" value={String(metrics.webhooks)} note={`${metrics.activeWebhooks} active on page`} />
-        <MetricCard label="Deliveries" value={String(metrics.deliveries)} note={selectedWebhook ? "For selected webhook" : "Current environment"} />
-        <MetricCard label="Failed" value={String(metrics.failedDeliveries)} note="Visible page" />
+        <MetricCard
+          label="Server keys"
+          value={String(metrics.keys)}
+          note={`${metrics.activeKeys} active on page`}
+          tone="brand"
+        />
+        <MetricCard
+          label="Webhooks"
+          value={String(metrics.webhooks)}
+          note={`${metrics.activeWebhooks} active on page`}
+        />
+        <MetricCard
+          label="Deliveries"
+          value={String(metrics.deliveries)}
+          note={selectedWebhook ? "For selected webhook" : "Current environment"}
+        />
+        <MetricCard
+          label="Failed"
+          value={String(metrics.failedDeliveries)}
+          note="Visible page"
+        />
       </StatGrid>
 
       {message ? (
-        <div className="rounded-2xl border border-[#d6ebc7] bg-[#f4fbef] px-4 py-3 text-sm font-medium text-[#0c4a27]">
+        <div className="rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 text-sm font-medium text-[color:var(--ink)]">
           {message}
         </div>
       ) : null}
@@ -426,40 +482,29 @@ export default function DevelopersPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
-        <Card title="Server keys" description="Backend credentials for the selected environment.">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card
+          title="Server keys"
+          description="Backend credentials for the selected environment."
+          action={<Button onClick={() => setShowCreateKey(true)}>Create key</Button>}
+        >
           <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-              <Input
-                placeholder="Server key label"
-                value={newKeyLabel}
-                onChange={(event) => setNewKeyLabel(event.target.value)}
-              />
-              <Button
-                tone="brand"
-                disabled={isBusy === "create-key" || !newKeyLabel.trim()}
-                onClick={() => void handleCreateKey()}
-              >
-                {isBusy === "create-key" ? "Creating..." : "Create server key"}
-              </Button>
-            </div>
-
-            <Table columns={["Label", "Last used", "Status"]}>
+            <Table columns={["Label", "Last used", "Status", "Actions"]}>
               {keys.map((key) => (
-                <TableRow key={key.id} columns={3}>
+                <TableRow key={key.id} columns={4}>
                   <div>
                     <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
                       {key.label}
                     </p>
-                    <p className="mt-1 text-sm text-[color:var(--muted)]">
-                      {key.maskedToken}
-                    </p>
+                    <p className="mt-1 text-sm text-[color:var(--muted)]">{key.maskedToken}</p>
                   </div>
-                  <p className="text-sm text-[color:var(--muted)]">
+                  <p className="self-center text-sm text-[color:var(--muted)]">
                     {formatDateTime(key.lastUsedAt)}
                   </p>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="self-center">
                     <StatusBadge value={key.status} />
+                  </div>
+                  <div className="flex justify-start md:justify-end">
                     {key.status === "active" ? (
                       <Button
                         disabled={isBusy === `revoke-key:${key.id}`}
@@ -485,14 +530,18 @@ export default function DevelopersPage() {
           </div>
         </Card>
 
-        <Card title="Webhook endpoints" description="Endpoints registered for the selected environment.">
+        <Card
+          title="Webhook endpoints"
+          description="Endpoints registered for the selected environment."
+          action={<Button onClick={() => setShowCreateWebhook(true)}>Create webhook</Button>}
+        >
           <div className="space-y-4">
             {webhooks.length === 0 ? (
               <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-10 text-center text-sm text-[color:var(--muted)]">
                 No webhook endpoints yet for this environment.
               </div>
             ) : (
-              <Table columns={["Label", "Events", "Status", "Manage"]}>
+              <Table columns={["Label", "Events", "Status", "Actions"]}>
                 {webhooks.map((webhook) => (
                   <TableRow key={webhook.id} columns={4}>
                     <div>
@@ -503,19 +552,20 @@ export default function DevelopersPage() {
                         {webhook.endpointUrl}
                       </p>
                     </div>
-                    <p className="text-sm text-[color:var(--muted)]">
+                    <p className="self-center text-sm text-[color:var(--muted)]">
                       {webhook.eventTypes.join(", ")}
                     </p>
-                    <div>
+                    <div className="self-center">
                       <StatusBadge value={webhook.status} />
                     </div>
-                    <div className="flex justify-start md:justify-end">
-                      <Button
-                        tone={selectedWebhookId === webhook.id ? "brand" : "neutral"}
-                        onClick={() => setSelectedWebhookId(webhook.id)}
+                    <div className="flex items-center justify-start gap-2 md:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => openManageWebhook(webhook)}
+                        className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
                       >
-                        {selectedWebhookId === webhook.id ? "Selected" : "Manage"}
-                      </Button>
+                        Manage
+                      </button>
                     </div>
                   </TableRow>
                 ))}
@@ -535,224 +585,6 @@ export default function DevelopersPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.96fr_1.04fr]">
-        <Card title="Create webhook" description="Register a real endpoint and choose the events to deliver.">
-          <div className="space-y-4">
-            <Input
-              placeholder="Webhook label"
-              value={newWebhook.label}
-              onChange={(event) =>
-                setNewWebhook((current) => ({
-                  ...current,
-                  label: event.target.value,
-                }))
-              }
-            />
-            <Input
-              placeholder="https://api.acme.example/renew/webhooks"
-              value={newWebhook.endpointUrl}
-              onChange={(event) =>
-                setNewWebhook((current) => ({
-                  ...current,
-                  endpointUrl: event.target.value,
-                }))
-              }
-            />
-            <EventSelector
-              selected={newWebhook.eventTypes}
-              onToggle={(eventType) =>
-                setNewWebhook((current) => ({
-                  ...current,
-                  eventTypes: toggleEventType(current.eventTypes, eventType),
-                }))
-              }
-            />
-            <Select
-              value={newWebhook.retryPolicy}
-              onChange={(event) =>
-                setNewWebhook((current) => ({
-                  ...current,
-                  retryPolicy: event.target.value as WebhookRecord["retryPolicy"],
-                }))
-              }
-            >
-              <option value="none">No retries</option>
-              <option value="linear">Linear retries</option>
-              <option value="exponential">Exponential retries</option>
-            </Select>
-            <Button
-              tone="brand"
-              disabled={
-                isBusy === "create-webhook" ||
-                !newWebhook.label.trim() ||
-                !newWebhook.endpointUrl.trim() ||
-                newWebhook.eventTypes.length === 0
-              }
-              onClick={() => void handleCreateWebhook()}
-            >
-              {isBusy === "create-webhook" ? "Creating..." : "Create webhook"}
-            </Button>
-          </div>
-        </Card>
-
-        <DarkCard
-          title={selectedWebhook?.label ?? "Webhook details"}
-          description={
-            selectedWebhook?.endpointUrl ?? "Select a webhook endpoint to edit, rotate, and test."
-          }
-        >
-          {selectedWebhook && editingWebhook ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <DarkField
-                  label="Last delivery"
-                  value={formatDateTime(selectedWebhook.lastDeliveryAt)}
-                />
-                <DarkField
-                  label="Current status"
-                  value={<StatusBadge value={selectedWebhook.status} />}
-                />
-              </div>
-
-              <Input
-                className="border-white/12 bg-white/6 text-white placeholder:text-white/40 focus:border-[#d9f6bc]"
-                value={editingWebhook.label}
-                onChange={(event) =>
-                  setEditingWebhook((current) =>
-                    current
-                      ? {
-                          ...current,
-                          label: event.target.value,
-                        }
-                      : current
-                  )
-                }
-              />
-              <Input
-                className="border-white/12 bg-white/6 text-white placeholder:text-white/40 focus:border-[#d9f6bc]"
-                value={editingWebhook.endpointUrl}
-                onChange={(event) =>
-                  setEditingWebhook((current) =>
-                    current
-                      ? {
-                          ...current,
-                          endpointUrl: event.target.value,
-                        }
-                      : current
-                  )
-                }
-              />
-              <EventSelector
-                selected={editingWebhook.eventTypes}
-                surface="dark"
-                onToggle={(eventType) =>
-                  setEditingWebhook((current) =>
-                    current
-                      ? {
-                          ...current,
-                          eventTypes: toggleEventType(current.eventTypes, eventType),
-                        }
-                      : current
-                  )
-                }
-              />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Select
-                  className="border-white/12 bg-white/6 text-white focus:border-[#d9f6bc]"
-                  value={editingWebhook.retryPolicy}
-                  onChange={(event) =>
-                    setEditingWebhook((current) =>
-                      current
-                        ? {
-                            ...current,
-                            retryPolicy: event.target.value as WebhookRecord["retryPolicy"],
-                          }
-                        : current
-                    )
-                  }
-                >
-                  <option value="none">No retries</option>
-                  <option value="linear">Linear retries</option>
-                  <option value="exponential">Exponential retries</option>
-                </Select>
-                <Select
-                  className="border-white/12 bg-white/6 text-white focus:border-[#d9f6bc]"
-                  value={editingWebhook.status}
-                  onChange={(event) =>
-                    setEditingWebhook((current) =>
-                      current
-                        ? {
-                            ...current,
-                            status: event.target.value as WebhookRecord["status"],
-                          }
-                        : current
-                    )
-                  }
-                >
-                  <option value="active">Active</option>
-                  <option value="disabled">Disabled</option>
-                </Select>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  tone="darkBrand"
-                  disabled={
-                    isBusy === `save-webhook:${selectedWebhook.id}` ||
-                    !editingWebhook.label.trim() ||
-                    !editingWebhook.endpointUrl.trim() ||
-                    editingWebhook.eventTypes.length === 0
-                  }
-                  onClick={() => void handleSaveWebhook()}
-                >
-                  {isBusy === `save-webhook:${selectedWebhook.id}`
-                    ? "Saving..."
-                    : "Save changes"}
-                </Button>
-                <Button
-                  tone="darkNeutral"
-                  disabled={isBusy === `rotate-secret:${selectedWebhook.id}`}
-                  onClick={() => void handleRotateSecret()}
-                >
-                  {isBusy === `rotate-secret:${selectedWebhook.id}`
-                    ? "Rotating..."
-                    : "Rotate secret"}
-                </Button>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                <Select
-                  className="border-white/12 bg-white/6 text-white focus:border-[#d9f6bc]"
-                  value={testEventType}
-                  onChange={(event) =>
-                    setTestEventType(event.target.value as SupportedWebhookEvent)
-                  }
-                >
-                  {supportedWebhookEvents.map((eventType) => (
-                    <option key={eventType} value={eventType}>
-                      {eventType}
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  tone="darkBrand"
-                  disabled={isBusy === `send-test:${selectedWebhook.id}`}
-                  onClick={() => void handleSendTest()}
-                >
-                  {isBusy === `send-test:${selectedWebhook.id}`
-                    ? "Sending..."
-                    : "Send real test"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-10 text-center text-sm text-white/66">
-              Select a webhook endpoint to manage it.
-            </div>
-          )}
-        </DarkCard>
-      </div>
-
       <Card
         title="Webhook deliveries"
         description={
@@ -760,32 +592,44 @@ export default function DevelopersPage() {
             ? `Recent delivery attempts for ${selectedWebhook.label}.`
             : "Recent delivery attempts for the selected environment."
         }
+        action={
+          selectedWebhookId ? (
+            <Button
+              onClick={() => {
+                setSelectedWebhookId(null);
+                setDeliveryPage(1);
+              }}
+            >
+              Clear filter
+            </Button>
+          ) : undefined
+        }
       >
-        {selectedWebhookDeliveries.length === 0 ? (
+        {deliveries.length === 0 ? (
           <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-10 text-center text-sm text-[color:var(--muted)]">
             No deliveries recorded yet.
           </div>
         ) : (
           <Table columns={["Event", "Attempts", "HTTP", "Delivered", "Status"]}>
-            {selectedWebhookDeliveries.map((delivery: DeliveryRecord) => (
+            {deliveries.map((delivery: DeliveryRecord) => (
               <div key={delivery.id} className="space-y-2">
                 <TableRow columns={5}>
                   <div>
                     <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
                       {delivery.eventType}
                     </p>
-                    <p className="mt-1 text-sm text-[color:var(--muted)]">
-                      {delivery.eventId}
-                    </p>
+                    <p className="mt-1 text-sm text-[color:var(--muted)]">{delivery.eventId}</p>
                   </div>
-                  <p className="text-sm text-[color:var(--muted)]">{delivery.attempts}</p>
-                  <p className="text-sm text-[color:var(--muted)]">
+                  <p className="self-center text-sm text-[color:var(--muted)]">
+                    {delivery.attempts}
+                  </p>
+                  <p className="self-center text-sm text-[color:var(--muted)]">
                     {delivery.httpStatus ?? "--"}
                   </p>
-                  <p className="text-sm text-[color:var(--muted)]">
+                  <p className="self-center text-sm text-[color:var(--muted)]">
                     {formatDateTime(delivery.deliveredAt)}
                   </p>
-                  <div>
+                  <div className="self-center">
                     <StatusBadge value={delivery.status} />
                   </div>
                 </TableRow>
@@ -809,6 +653,331 @@ export default function DevelopersPage() {
           }
         />
       </Card>
+
+      <Modal
+        open={showCreateKey}
+        onClose={() => setShowCreateKey(false)}
+        title="Create server key"
+        description="Create a backend credential for the selected environment."
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button onClick={() => setShowCreateKey(false)}>Cancel</Button>
+            <Button
+              tone="brand"
+              disabled={isBusy === "create-key" || !newKeyLabel.trim()}
+              onClick={() => void handleCreateKey()}
+            >
+              {isBusy === "create-key" ? "Creating..." : "Create key"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-[color:var(--muted)]">
+            Key label
+          </label>
+          <Input
+            placeholder="Production API key"
+            value={newKeyLabel}
+            onChange={(event) => setNewKeyLabel(event.target.value)}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={showCreateWebhook}
+        onClose={() => setShowCreateWebhook(false)}
+        title="Create webhook"
+        description="Register a real endpoint and choose the events to deliver."
+        size="lg"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button onClick={() => setShowCreateWebhook(false)}>Cancel</Button>
+            <Button
+              tone="brand"
+              disabled={isBusy === "create-webhook" || !canCreateWebhook}
+              onClick={() => void handleCreateWebhook()}
+            >
+              {isBusy === "create-webhook" ? "Creating..." : "Create webhook"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">
+              Webhook label
+            </label>
+            <Input
+              placeholder="Billing events"
+              value={newWebhook.label}
+              onChange={(event) =>
+                setNewWebhook((current) => ({
+                  ...current,
+                  label: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">
+              Endpoint URL
+            </label>
+            <Input
+              placeholder="https://api.acme.example/renew/webhooks"
+              value={newWebhook.endpointUrl}
+              onChange={(event) =>
+                setNewWebhook((current) => ({
+                  ...current,
+                  endpointUrl: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">
+              Events
+            </label>
+            <EventSelector
+              selected={newWebhook.eventTypes}
+              onToggle={(eventType) =>
+                setNewWebhook((current) => ({
+                  ...current,
+                  eventTypes: toggleEventType(current.eventTypes, eventType),
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">
+              Retry policy
+            </label>
+            <Select
+              value={newWebhook.retryPolicy}
+              onChange={(event) =>
+                setNewWebhook((current) => ({
+                  ...current,
+                  retryPolicy: event.target.value as WebhookRecord["retryPolicy"],
+                }))
+              }
+            >
+              <option value="none">No retries</option>
+              <option value="linear">Linear retries</option>
+              <option value="exponential">Exponential retries</option>
+            </Select>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!manageWebhook && !!editingWebhook}
+        onClose={() => {
+          setManageWebhook(null);
+          setEditingWebhook(null);
+        }}
+        title={manageWebhook?.label ?? "Webhook details"}
+        description={manageWebhook?.endpointUrl}
+        size="lg"
+        footer={
+          manageWebhook ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  disabled={isBusy === `rotate-secret:${manageWebhook.id}`}
+                  onClick={() => void handleRotateSecret(manageWebhook)}
+                >
+                  {isBusy === `rotate-secret:${manageWebhook.id}`
+                    ? "Rotating..."
+                    : "Rotate secret"}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={testEventType}
+                    onChange={(event) =>
+                      setTestEventType(event.target.value as SupportedWebhookEvent)
+                    }
+                  >
+                    {supportedWebhookEvents.map((eventType) => (
+                      <option key={eventType} value={eventType}>
+                        {eventType}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button
+                    tone="brand"
+                    disabled={isBusy === `send-test:${manageWebhook.id}`}
+                    onClick={() => void handleSendTest(manageWebhook)}
+                  >
+                    {isBusy === `send-test:${manageWebhook.id}` ? "Sending..." : "Send test"}
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setManageWebhook(null);
+                    setEditingWebhook(null);
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  tone="brand"
+                  disabled={
+                    !canSaveWebhook || isBusy === `save-webhook:${manageWebhook.id}`
+                  }
+                  onClick={() => void handleSaveWebhook()}
+                >
+                  {isBusy === `save-webhook:${manageWebhook.id}` ? "Saving..." : "Save changes"}
+                </Button>
+              </div>
+            </div>
+          ) : null
+        }
+      >
+        {manageWebhook && editingWebhook ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Last delivery" value={formatDateTime(manageWebhook.lastDeliveryAt)} />
+              <Field
+                label="Current status"
+                value={<StatusBadge value={manageWebhook.status} />}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">
+                Webhook label
+              </label>
+              <Input
+                value={editingWebhook.label}
+                onChange={(event) =>
+                  setEditingWebhook((current) =>
+                    current
+                      ? {
+                          ...current,
+                          label: event.target.value,
+                        }
+                      : current
+                  )
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">
+                Endpoint URL
+              </label>
+              <Input
+                value={editingWebhook.endpointUrl}
+                onChange={(event) =>
+                  setEditingWebhook((current) =>
+                    current
+                      ? {
+                          ...current,
+                          endpointUrl: event.target.value,
+                        }
+                      : current
+                  )
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">
+                Events
+              </label>
+              <EventSelector
+                selected={editingWebhook.eventTypes}
+                onToggle={(eventType) =>
+                  setEditingWebhook((current) =>
+                    current
+                      ? {
+                          ...current,
+                          eventTypes: toggleEventType(current.eventTypes, eventType),
+                        }
+                      : current
+                  )
+                }
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-[color:var(--muted)]">
+                  Retry policy
+                </label>
+                <Select
+                  value={editingWebhook.retryPolicy}
+                  onChange={(event) =>
+                    setEditingWebhook((current) =>
+                      current
+                        ? {
+                            ...current,
+                            retryPolicy: event.target.value as WebhookRecord["retryPolicy"],
+                          }
+                        : current
+                    )
+                  }
+                >
+                  <option value="none">No retries</option>
+                  <option value="linear">Linear retries</option>
+                  <option value="exponential">Exponential retries</option>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-[color:var(--muted)]">
+                  Status
+                </label>
+                <Select
+                  value={editingWebhook.status}
+                  onChange={(event) =>
+                    setEditingWebhook((current) =>
+                      current
+                        ? {
+                            ...current,
+                            status: event.target.value as WebhookRecord["status"],
+                          }
+                        : current
+                    )
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="disabled">Disabled</option>
+                </Select>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={!!secretReveal}
+        onClose={() => setSecretReveal(null)}
+        title={secretReveal?.title ?? "Secret"}
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            {secretReveal ? (
+              <Button onClick={() => void handleCopySecret(secretReveal.value)}>Copy</Button>
+            ) : null}
+            <Button tone="brand" onClick={() => setSecretReveal(null)}>
+              Done
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-[color:var(--muted)]">{secretReveal?.note}</p>
+          <div className="rounded-2xl border border-[color:var(--line)] bg-[#faf9f5] px-4 py-3 font-mono text-sm text-[color:var(--ink)] break-all">
+            {secretReveal?.value}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
@@ -509,8 +510,8 @@ export default function SettingsPage() {
               className={cn(
                 "rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all duration-200",
                 activeTab === tab.key
-                  ? "bg-[#0c4a27] text-[#d9f6bc]"
-                  : "border border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-[#f7fbf5]",
+                  ? "bg-[#111111] text-white"
+                  : "border border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-[#f5f4ef]",
               )}
             >
               {tab.label}
@@ -519,7 +520,7 @@ export default function SettingsPage() {
         </div>
 
         {actionMessage ? (
-          <div className="mt-4 rounded-2xl border border-[#0c4a27]/10 bg-[#edf7eb] px-4 py-3 text-sm text-[color:var(--brand)]">
+          <div className="mt-4 rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 text-sm text-[color:var(--brand)]">
             {actionMessage}
           </div>
         ) : null}
@@ -532,154 +533,171 @@ export default function SettingsPage() {
       </Card>
 
       {activeTab === "workspace" ? (
-        <Card title="Business settings">
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-start">
-            <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <SettingsField label="Business name">
-                  <Input
-                    value={businessDraft.name}
-                    onChange={(event) => patchBusiness("name", event.target.value)}
-                  />
-                </SettingsField>
+        <Card title="Workspace">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-start">
+            <div className="space-y-4">
+              <SettingsPanel title="Business profile">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SettingsField label="Business name">
+                    <Input
+                      value={businessDraft.name}
+                      onChange={(event) => patchBusiness("name", event.target.value)}
+                    />
+                  </SettingsField>
 
-                <SettingsField label="Support email">
-                  <Input
-                    type="email"
-                    value={businessDraft.supportEmail}
-                    onChange={(event) => patchBusiness("supportEmail", event.target.value)}
-                  />
-                </SettingsField>
+                  <SettingsField label="Support email">
+                    <Input
+                      type="email"
+                      value={businessDraft.supportEmail}
+                      onChange={(event) => patchBusiness("supportEmail", event.target.value)}
+                    />
+                  </SettingsField>
 
-                <SettingsField label="Primary market">
-                  <Select
-                    value={businessDraft.defaultMarket}
-                    onChange={(event) => patchBusiness("defaultMarket", event.target.value)}
-                  >
-                    {supportedMarketOptions.length === 0 ? (
-                      <option value="">Select a market</option>
-                    ) : null}
-                    {supportedMarketOptions.map((market) => (
-                      <option key={market.currency} value={market.currency}>
-                        {market.currency}
-                      </option>
-                    ))}
-                  </Select>
-                </SettingsField>
+                  <SettingsField label="Invoice prefix">
+                    <Input
+                      value={businessDraft.invoicePrefix}
+                      onChange={(event) =>
+                        patchBusiness("invoicePrefix", event.target.value.toUpperCase())
+                      }
+                    />
+                  </SettingsField>
 
-                <SettingsField label="Invoice prefix">
-                  <Input
-                    value={businessDraft.invoicePrefix}
-                    onChange={(event) => patchBusiness("invoicePrefix", event.target.value.toUpperCase())}
-                  />
-                </SettingsField>
+                  <SettingsField label="Customer billing domain">
+                    <Input
+                      value={businessDraft.customerDomain}
+                      onChange={(event) => patchBusiness("customerDomain", event.target.value)}
+                    />
+                  </SettingsField>
+                </div>
+              </SettingsPanel>
 
-                <SettingsField label="Billing timezone">
-                  <Select
-                    value={businessDraft.billingTimezone}
-                    onChange={(event) => patchBusiness("billingTimezone", event.target.value)}
-                  >
-                    <option value="UTC">UTC</option>
-                    <option value="Africa/Lagos">Africa/Lagos</option>
-                    <option value="Africa/Nairobi">Africa/Nairobi</option>
-                  </Select>
-                </SettingsField>
+              <SettingsPanel title="Billing identity">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SettingsField label="Primary market">
+                    <Select
+                      value={businessDraft.defaultMarket}
+                      onChange={(event) => patchBusiness("defaultMarket", event.target.value)}
+                    >
+                      {supportedMarketOptions.length === 0 ? (
+                        <option value="">Select a market</option>
+                      ) : null}
+                      {supportedMarketOptions.map((market) => (
+                        <option key={market.currency} value={market.currency}>
+                          {market.currency}
+                        </option>
+                      ))}
+                    </Select>
+                  </SettingsField>
 
-                <SettingsField label="Billing display">
-                  <Select
-                    value={businessDraft.billingDisplay}
-                    onChange={(event) => patchBusiness("billingDisplay", event.target.value)}
-                  >
-                    <option value="local-fiat">Customer local fiat</option>
-                    <option value="usd-reference">USD reference</option>
-                  </Select>
-                </SettingsField>
-              </div>
+                  <SettingsField label="Billing timezone">
+                    <Select
+                      value={businessDraft.billingTimezone}
+                      onChange={(event) => patchBusiness("billingTimezone", event.target.value)}
+                    >
+                      <option value="UTC">UTC</option>
+                      <option value="Africa/Lagos">Africa/Lagos</option>
+                      <option value="Africa/Nairobi">Africa/Nairobi</option>
+                    </Select>
+                  </SettingsField>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <SettingsField label="Statement descriptor">
-                  <Input
-                    value={businessDraft.statementDescriptor}
-                    onChange={(event) =>
-                      patchBusiness("statementDescriptor", event.target.value.toUpperCase())
-                    }
-                  />
-                </SettingsField>
+                  <SettingsField label="Billing display">
+                    <Select
+                      value={businessDraft.billingDisplay}
+                      onChange={(event) => patchBusiness("billingDisplay", event.target.value)}
+                    >
+                      <option value="local-fiat">Customer local fiat</option>
+                      <option value="usd-reference">USD reference</option>
+                    </Select>
+                  </SettingsField>
 
-                <SettingsField label="Customer billing domain">
-                  <Input
-                    value={businessDraft.customerDomain}
-                    onChange={(event) => patchBusiness("customerDomain", event.target.value)}
-                  />
-                </SettingsField>
+                  <SettingsField label="Fallback currency">
+                    <Select
+                      value={businessDraft.fallbackCurrency}
+                      onChange={(event) => patchBusiness("fallbackCurrency", event.target.value)}
+                    >
+                      <option value="USDC">USDC</option>
+                      <option value="USD">USD</option>
+                    </Select>
+                  </SettingsField>
 
-                <SettingsField label="Fallback currency">
-                  <Select
-                    value={businessDraft.fallbackCurrency}
-                    onChange={(event) => patchBusiness("fallbackCurrency", event.target.value)}
-                  >
-                    <option value="USDC">USDC</option>
-                    <option value="USD">USD</option>
-                  </Select>
-                </SettingsField>
+                  <SettingsField label="Statement descriptor">
+                    <Input
+                      value={businessDraft.statementDescriptor}
+                      onChange={(event) =>
+                        patchBusiness("statementDescriptor", event.target.value.toUpperCase())
+                      }
+                    />
+                  </SettingsField>
+                </div>
+              </SettingsPanel>
 
-                <SettingsField label="Brand accent">
-                  <Select
-                    value={businessDraft.brandAccent}
-                    onChange={(event) => patchBusiness("brandAccent", event.target.value)}
-                  >
-                    <option value="forest-green">Forest green</option>
-                    <option value="dark-green">Dark green</option>
-                    <option value="neutral">Neutral</option>
-                  </Select>
-                </SettingsField>
-
-                <SettingsField label="Brand logo">
-                  <ImageUpload
-                    token={token}
-                    value={businessDraft.logoUrl}
-                    alt={`${businessDraft.name} logo`}
-                    onChange={(nextValue) => patchBusiness("logoUrl", nextValue)}
-                    disabled={busyAction === "workspace-save"}
-                  />
-                </SettingsField>
-              </div>
-
-
+              <SettingsPanel title="Supported markets">
+                <MarketMultiSelect
+                  options={availableMarkets}
+                  value={supportedMarketsDraft}
+                  onChange={patchSupportedMarkets}
+                  allLabel="All available markets"
+                  placeholder="Select supported markets"
+                />
+              </SettingsPanel>
             </div>
 
-            <div className="space-y-5 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f7fbf5] p-5">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                  Brand preview
-                </p>
-                <div className="mt-4 flex h-20 items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4">
-                  {businessDraft.logoUrl ? (
-                    <img
-                      src={businessDraft.logoUrl}
+            <div className="space-y-4">
+              <SettingsPanel title="Branding">
+                <div className="space-y-4">
+                  <SettingsField label="Brand logo">
+                    <ImageUpload
+                      token={token}
+                      value={businessDraft.logoUrl}
                       alt={`${businessDraft.name} logo`}
-                      className="max-h-10 w-auto object-contain"
+                      onChange={(nextValue) => patchBusiness("logoUrl", nextValue)}
+                      disabled={busyAction === "workspace-save"}
                     />
-                  ) : (
-                    <Logo />
-                  )}
+                  </SettingsField>
+
+                  <SettingsField label="Brand accent">
+                    <Select
+                      value={businessDraft.brandAccent}
+                      onChange={(event) => patchBusiness("brandAccent", event.target.value)}
+                    >
+                      <option value="forest-green">Forest green</option>
+                      <option value="dark-green">Dark green</option>
+                      <option value="neutral">Neutral</option>
+                    </Select>
+                  </SettingsField>
+
+                  <SettingsField label="Invoice footer note">
+                    <textarea
+                      value={businessDraft.invoiceFooter}
+                      onChange={(event) => patchBusiness("invoiceFooter", event.target.value)}
+                      rows={4}
+                      className="w-full resize-none rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm text-[color:var(--ink)] outline-none"
+                    />
+                  </SettingsField>
                 </div>
-              </div>
+              </SettingsPanel>
 
-              <SettingsField label="Invoice footer note">
-                <textarea
-                  value={businessDraft.invoiceFooter}
-                  onChange={(event) => patchBusiness("invoiceFooter", event.target.value)}
-                  rows={4}
-                  className="w-full resize-none rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm text-[color:var(--ink)] outline-none"
-                />
-              </SettingsField>
+              <SettingsPanel title="Preview">
+                <div className="space-y-4">
+                  <div className="flex h-20 items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4">
+                    {businessDraft.logoUrl ? (
+                      <img
+                        src={businessDraft.logoUrl}
+                        alt={`${businessDraft.name} logo`}
+                        className="max-h-10 w-auto object-contain"
+                      />
+                    ) : (
+                      <Logo />
+                    )}
+                  </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <SettingsMiniStat label="Display" value={businessDraft.billingDisplay} />
-                <SettingsMiniStat label="Fallback" value={businessDraft.fallbackCurrency} />
-                <SettingsMiniStat label="Timezone" value={businessDraft.billingTimezone} />
-              </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <SettingsMiniStat label="Display" value={businessDraft.billingDisplay} />
+                    <SettingsMiniStat label="Fallback" value={businessDraft.fallbackCurrency} />
+                    <SettingsMiniStat label="Timezone" value={businessDraft.billingTimezone} />
+                  </div>
+                </div>
+              </SettingsPanel>
             </div>
           </div>
 
@@ -690,7 +708,7 @@ export default function SettingsPage() {
               disabled={busyAction === "workspace-save" || supportedMarketsDraft.length === 0}
               onClick={() => void handleWorkspaceSave()}
             >
-              Save business settings
+              Save workspace
             </Button>
           </div>
         </Card>
@@ -698,7 +716,7 @@ export default function SettingsPage() {
 
       {activeTab === "billing" ? (
         <Card title="Billing defaults">
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-start">
+          <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
             <div className="grid gap-4 md:grid-cols-2">
               <SettingsField label="Retry policy">
                 <Select
@@ -768,7 +786,7 @@ export default function SettingsPage() {
       ) : null}
 
       {activeTab === "wallets" ? (
-        <Card title="Wallet management">
+        <Card title="Wallets">
           <div className="grid gap-6 xl:grid-cols-[1fr_1fr] xl:items-start">
             <div className="space-y-4">
               <SettingsSummaryRow
@@ -790,7 +808,7 @@ export default function SettingsPage() {
               />
 
               {data.wallets.pendingPayoutWallet ? (
-                <div className="rounded-2xl border border-[#d9e7d6] bg-[#edf7eb] p-4">
+                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand)]">
@@ -815,14 +833,14 @@ export default function SettingsPage() {
                 </div>
               ) : null}
 
-              <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f7fbf5] p-5">
+              <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                       Pending treasury operations
                     </p>
                     <p className="mt-2 text-sm text-[color:var(--muted)]">
-                      Advanced approval history now lives in Governance instead of the old Treasury approvals flow.
+                      Approval history now lives in Governance.
                     </p>
                   </div>
                   <Link
@@ -862,14 +880,14 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f7fbf5] p-5">
+            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                     Wallet editor
                   </p>
                   <p className="mt-2 text-sm text-[color:var(--muted)]">
-                    Queue wallet updates through treasury approvals instead of mutating payout addresses directly.
+                    Queue payout changes through approvals instead of editing addresses directly.
                   </p>
                 </div>
                 <Button type="button" onClick={() => setShowWalletEditor((current) => !current)}>
@@ -957,7 +975,7 @@ export default function SettingsPage() {
 
       {activeTab === "notifications" ? (
         <Card title="Notifications">
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-start">
+          <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-2">
                 <SettingsToggle
@@ -1098,7 +1116,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f7fbf5] p-5">
+            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                   Email preview
@@ -1199,7 +1217,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f7fbf5] p-5">
+            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
@@ -1263,6 +1281,23 @@ function SettingsField({
         {label}
       </p>
       {children}
+    </div>
+  );
+}
+
+function SettingsPanel({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+        {title}
+      </p>
+      <div className="mt-4">{children}</div>
     </div>
   );
 }
@@ -1337,7 +1372,7 @@ function SettingsToggle({
           onClick={onToggle}
           className={cn(
             "relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors duration-200",
-            enabled ? "bg-[#0c4a27]" : "bg-[#d9e4d6]",
+            enabled ? "bg-[#111111]" : "bg-[#d9d6cf]",
           )}
           aria-pressed={enabled}
         >

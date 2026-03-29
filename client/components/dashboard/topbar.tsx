@@ -77,7 +77,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   }, [notifOpen, profileOpen]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-[#f4f7f1]/88 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-[#f5f4ef]/88 backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -104,7 +104,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             <input
               type="search"
               placeholder="Search customers, plans, payments"
-              className="h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white/88 pl-11 pr-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#0c4a27]"
+              className="h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white/88 pl-11 pr-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#111111]"
             />
           </span>
         </label>
@@ -119,7 +119,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",
                 mode === "test"
-                  ? "bg-[#0c4a27] text-[#d9f6bc]"
+                  ? "bg-[#111111] text-white"
                   : "text-[color:var(--muted)]"
               )}
             >
@@ -134,7 +134,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",
                 mode === "live"
-                  ? "bg-[#0c4a27] text-[#d9f6bc]"
+                  ? "bg-[#111111] text-white"
                   : "text-[color:var(--muted)]"
               )}
             >
@@ -172,7 +172,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             </button>
 
             {notifOpen ? (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(12,74,39,0.10)]">
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
                 <div className="border-b border-[color:var(--line)] px-5 py-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
                     Protected approvals
@@ -202,7 +202,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                         <Link
                           href={user?.governanceEnabled ? "/dashboard/governance" : "/dashboard/treasury"}
                           onClick={() => setNotifOpen(false)}
-                          className="shrink-0 rounded-xl border border-[color:var(--line)] bg-[#f4f7f1] px-3 py-1.5 text-xs font-semibold tracking-[-0.01em] text-[color:var(--ink)] transition-colors hover:bg-[#edf7eb]"
+                          className="shrink-0 rounded-xl border border-[color:var(--line)] bg-[#f2f1eb] px-3 py-1.5 text-xs font-semibold tracking-[-0.01em] text-[color:var(--ink)] transition-colors hover:bg-[#ebe9e1]"
                         >
                           Review
                         </Link>
@@ -238,7 +238,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
               aria-label="Open account menu"
               aria-expanded={profileOpen}
             >
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#0c4a27] text-xs font-semibold text-[#d9f6bc]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#111111] text-xs font-semibold text-white">
                 {user?.name
                   ? user.name
                     .split(" ")
@@ -262,10 +262,10 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             </button>
 
             {profileOpen ? (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(12,74,39,0.10)]">
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
                 <div className="border-b border-[color:var(--line)] px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0c4a27] text-sm font-semibold text-[#d9f6bc]">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#111111] text-sm font-semibold text-white">
                       {user?.name
                         ? user.name
                           .split(" ")
@@ -289,7 +289,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                   <Link
                     href="/dashboard/settings"
                     onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-[color:var(--ink)] transition-colors hover:bg-[#f4f7f1]"
+                    className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-[color:var(--ink)] transition-colors hover:bg-[#f2f1eb]"
                   >
                     <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4 shrink-0 text-[color:var(--muted)]" fill="none">
                       <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" />

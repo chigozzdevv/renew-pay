@@ -203,7 +203,7 @@ export default function TreasuryPage() {
         />
       </StatGrid>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-6 xl:grid-cols-2">
         <Card
           title="Withdraw"
           description="Batch all eligible unswept settlements into one payout to the approved payout wallet."
@@ -256,7 +256,7 @@ export default function TreasuryPage() {
           </div>
 
           {preview ? (
-            <div className="mt-5 rounded-[1.6rem] border border-[color:var(--line)] bg-[#f7fbf5] p-4">
+            <div className="mt-5 rounded-[1.6rem] border border-[color:var(--line)] bg-[#f5f4ef] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[color:var(--ink)]">

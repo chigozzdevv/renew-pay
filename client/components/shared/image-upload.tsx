@@ -102,7 +102,7 @@ export function ImageUpload({
 
   return (
     <div className="space-y-3">
-      <div className="flex h-24 items-center justify-center rounded-[1.5rem] border border-[color:var(--line)] bg-[#f7fbf5] px-4">
+      <div className="flex h-24 items-center justify-center rounded-[1.5rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4">
         {value ? (
           <img src={value} alt={alt} className="max-h-12 w-auto object-contain" />
         ) : (

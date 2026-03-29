@@ -88,10 +88,10 @@ export function MarketMultiSelect({
         className={cn(
           "flex h-11 w-full items-center justify-between gap-2 rounded-2xl border px-4 text-sm transition-colors disabled:cursor-not-allowed",
           open
-            ? "border-[#0c4a27] bg-white text-[color:var(--ink)]"
-            : "border-[color:var(--line)] bg-white text-[color:var(--ink)] hover:border-[#0c4a27]/40",
+            ? "border-[#111111] bg-white text-[color:var(--ink)]"
+            : "border-[color:var(--line)] bg-white text-[color:var(--ink)] hover:border-black/20",
           value.length === 0 && "text-[color:var(--muted)]",
-          disabled && "border-[color:var(--line)] bg-[#f8faf7] text-[color:var(--muted)] hover:border-[color:var(--line)]"
+          disabled && "border-[color:var(--line)] bg-[#f5f4ef] text-[color:var(--muted)] hover:border-[color:var(--line)]"
         )}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -99,7 +99,7 @@ export function MarketMultiSelect({
         <span className="truncate font-medium tracking-[-0.01em]">{label}</span>
         <span className="flex shrink-0 items-center gap-1.5">
           {value.length > 0 && value.length < optionCodes.length ? (
-            <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#0c4a27] px-1 text-[10px] font-bold text-[#d9f6bc]">
+            <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#111111] px-1 text-[10px] font-bold text-white">
               {value.length}
             </span>
           ) : null}
@@ -124,7 +124,7 @@ export function MarketMultiSelect({
       </button>
 
       {open && !disabled ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-white shadow-[0_12px_40px_rgba(12,74,39,0.10)]">
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-white shadow-[0_12px_40px_rgba(17,17,17,0.08)]">
           {allLabel ? (
             <button
               type="button"
@@ -132,15 +132,15 @@ export function MarketMultiSelect({
               className={cn(
                 "flex w-full items-center gap-3 border-b border-[color:var(--line)] px-4 py-3 text-sm font-semibold transition-colors",
                 allSelected
-                  ? "bg-[#edf7eb] text-[color:var(--brand)]"
-                  : "text-[color:var(--ink)] hover:bg-[#f4f7f1]"
+                  ? "bg-[#f2f1eb] text-[color:var(--brand)]"
+                  : "text-[color:var(--ink)] hover:bg-[#f5f4ef]"
               )}
             >
               <span
                 className={cn(
                   "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border",
                   allSelected
-                    ? "border-[#0c4a27] bg-[#0c4a27]"
+                    ? "border-[#111111] bg-[#111111]"
                     : "border-[color:var(--line)]"
                 )}
               >
@@ -165,15 +165,15 @@ export function MarketMultiSelect({
                   className={cn(
                     "flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors last:rounded-b-2xl",
                     isSelected
-                      ? "bg-[#edf7eb] text-[color:var(--brand)]"
-                      : "text-[color:var(--ink)] hover:bg-[#f4f7f1]"
+                      ? "bg-[#f2f1eb] text-[color:var(--brand)]"
+                      : "text-[color:var(--ink)] hover:bg-[#f5f4ef]"
                   )}
                 >
                   <span
                     className={cn(
                       "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border",
                       isSelected
-                        ? "border-[#0c4a27] bg-[#0c4a27]"
+                        ? "border-[#111111] bg-[#111111]"
                         : "border-[color:var(--line)]"
                     )}
                   >
