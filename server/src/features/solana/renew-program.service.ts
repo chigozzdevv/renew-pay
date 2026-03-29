@@ -1,6 +1,4 @@
 import { createHash } from "crypto";
-import { existsSync, readFileSync } from "fs";
-import path from "path";
 
 import { AnchorProvider, BN, Program, type Idl } from "@coral-xyz/anchor";
 import {
@@ -17,6 +15,7 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { getProtocolRuntimeConfig } from "@/config/protocol.config";
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import bundledRenewProtocolIdl from "@/features/solana/renew_protocol.idl.json";
 
 const CONFIG_SEED = Buffer.from("config");
 const MERCHANT_SEED = Buffer.from("merchant");
@@ -66,25 +65,6 @@ class KeypairWallet implements AnchorWallet {
   }
 }
 
-function resolveIdlPath() {
-  const candidates = [
-    path.resolve(process.cwd(), "../contracts/target/idl/renew_protocol.json"),
-    path.resolve(process.cwd(), "contracts/target/idl/renew_protocol.json"),
-    path.resolve(__dirname, "../../../../contracts/target/idl/renew_protocol.json"),
-  ];
-
-  const idlPath = candidates.find((candidate) => existsSync(candidate));
-
-  if (!idlPath) {
-    throw new HttpError(
-      503,
-      "Renew Solana IDL was not found. Build the program before running protocol execution."
-    );
-  }
-
-  return idlPath;
-}
-
 let cachedIdl: Idl | null = null;
 
 function loadIdl() {
@@ -92,7 +72,7 @@ function loadIdl() {
     return cachedIdl;
   }
 
-  cachedIdl = JSON.parse(readFileSync(resolveIdlPath(), "utf8")) as Idl;
+  cachedIdl = bundledRenewProtocolIdl as Idl;
   return cachedIdl;
 }
 

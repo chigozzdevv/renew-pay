@@ -1,0 +1,3802 @@
+{
+  "address": "fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh",
+  "metadata": {
+    "name": "renew_protocol",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Renew Solana billing and settlement program"
+  },
+  "instructions": [
+    {
+      "name": "cancel_payout_destination_update",
+      "discriminator": [
+        83,
+        200,
+        131,
+        148,
+        147,
+        74,
+        33,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_subscription",
+      "discriminator": [
+        60,
+        139,
+        189,
+        242,
+        191,
+        208,
+        143,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "confirm_payout_destination_update",
+      "discriminator": [
+        221,
+        162,
+        16,
+        208,
+        0,
+        172,
+        151,
+        6
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_merchant",
+      "discriminator": [
+        249,
+        172,
+        245,
+        100,
+        32,
+        117,
+        97,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "payout_token_account"
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "merchant_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "merchant_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "merchant_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "merchant_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "metadata_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_plan",
+      "discriminator": [
+        77,
+        43,
+        141,
+        254,
+        212,
+        118,
+        41,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "plan_code_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "plan_code_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PlanTermsArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_subscription",
+      "discriminator": [
+        65,
+        71,
+        10,
+        60,
+        249,
+        82,
+        197,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "plan.plan_code_hash",
+                "account": "Plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "subscription_ref_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "subscription_ref_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "SubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "fee_collector_token_account"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "settlement_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "protocol_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "payout_change_delay_seconds",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "pause_subscription",
+      "discriminator": [
+        18,
+        180,
+        147,
+        157,
+        114,
+        60,
+        213,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_invoice_settlement",
+      "discriminator": [
+        78,
+        163,
+        205,
+        240,
+        143,
+        216,
+        187,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "charge_receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  114,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "external_charge_ref_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_vault",
+          "writable": true
+        },
+        {
+          "name": "fee_vault",
+          "writable": true
+        },
+        {
+          "name": "settlement_source_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "external_charge_ref_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "commercial_ref_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "local_amount",
+          "type": "u64"
+        },
+        {
+          "name": "fx_quote",
+          "type": {
+            "defined": {
+              "name": "FxQuoteSnapshotArgs"
+            }
+          }
+        },
+        {
+          "name": "usdc_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "record_subscription_charge_failure",
+      "discriminator": [
+        27,
+        37,
+        145,
+        232,
+        225,
+        34,
+        125,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              }
+            ]
+          }
+        },
+        {
+          "name": "charge_receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  114,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "external_charge_ref_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "external_charge_ref_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "billing_period_start",
+          "type": "i64"
+        },
+        {
+          "name": "failure_code_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "record_subscription_charge_success",
+      "discriminator": [
+        161,
+        98,
+        148,
+        78,
+        83,
+        237,
+        210,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              }
+            ]
+          }
+        },
+        {
+          "name": "charge_receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  114,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "external_charge_ref_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cycle_marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  121,
+                  99,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              },
+              {
+                "kind": "arg",
+                "path": "billing_period_start"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_vault",
+          "writable": true
+        },
+        {
+          "name": "fee_vault",
+          "writable": true
+        },
+        {
+          "name": "settlement_source_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "external_charge_ref_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "billing_period_start",
+          "type": "i64"
+        },
+        {
+          "name": "local_amount",
+          "type": "u64"
+        },
+        {
+          "name": "fx_quote",
+          "type": {
+            "defined": {
+              "name": "FxQuoteSnapshotArgs"
+            }
+          }
+        },
+        {
+          "name": "usage_units",
+          "type": "u64"
+        },
+        {
+          "name": "usdc_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_payout_destination_update",
+      "discriminator": [
+        84,
+        4,
+        172,
+        89,
+        85,
+        15,
+        239,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_payout_token_account"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resume_subscription",
+      "discriminator": [
+        122,
+        92,
+        183,
+        0,
+        139,
+        188,
+        185,
+        71
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "next_charge_at",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_merchant_billing_enabled",
+      "discriminator": [
+        35,
+        248,
+        233,
+        130,
+        7,
+        148,
+        234,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "billing_enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "update_fee_collector_destination",
+      "discriminator": [
+        205,
+        136,
+        224,
+        61,
+        87,
+        91,
+        235,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "fee_collector_token_account"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_merchant_authority",
+      "discriminator": [
+        178,
+        81,
+        179,
+        207,
+        166,
+        34,
+        182,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_payout_change_delay",
+      "discriminator": [
+        236,
+        88,
+        17,
+        242,
+        160,
+        252,
+        131,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "payout_change_delay_seconds",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "update_plan",
+      "discriminator": [
+        119,
+        112,
+        58,
+        60,
+        76,
+        205,
+        1,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "plan.plan_code_hash",
+                "account": "Plan"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PlanTermsArgs"
+            }
+          }
+        },
+        {
+          "name": "active",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "update_protocol_fee",
+      "discriminator": [
+        170,
+        136,
+        6,
+        60,
+        43,
+        130,
+        81,
+        96
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "protocol_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "update_settlement_authority",
+      "discriminator": [
+        27,
+        222,
+        189,
+        235,
+        194,
+        140,
+        62,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "settlement_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_subscription_mandate",
+      "discriminator": [
+        125,
+        178,
+        100,
+        142,
+        209,
+        40,
+        27,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscription_ref_hash",
+                "account": "Subscription"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "mandate_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ledger",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  100,
+                  103,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.merchant_id",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_vault",
+          "writable": true
+        },
+        {
+          "name": "payout_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_protocol_fees",
+      "discriminator": [
+        11,
+        68,
+        165,
+        98,
+        18,
+        208,
+        134,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "fee_vault",
+          "writable": true
+        },
+        {
+          "name": "fee_collector_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ChargeReceipt",
+      "discriminator": [
+        12,
+        170,
+        183,
+        40,
+        252,
+        214,
+        217,
+        237
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "CycleMarker",
+      "discriminator": [
+        239,
+        81,
+        231,
+        36,
+        80,
+        49,
+        182,
+        214
+      ]
+    },
+    {
+      "name": "Merchant",
+      "discriminator": [
+        71,
+        235,
+        30,
+        40,
+        231,
+        21,
+        32,
+        64
+      ]
+    },
+    {
+      "name": "MerchantLedger",
+      "discriminator": [
+        39,
+        102,
+        245,
+        144,
+        77,
+        196,
+        169,
+        191
+      ]
+    },
+    {
+      "name": "Plan",
+      "discriminator": [
+        161,
+        231,
+        251,
+        119,
+        2,
+        12,
+        162,
+        2
+      ]
+    },
+    {
+      "name": "Subscription",
+      "discriminator": [
+        64,
+        7,
+        26,
+        135,
+        102,
+        132,
+        98,
+        33
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ChargeFailed",
+      "discriminator": [
+        17,
+        201,
+        32,
+        203,
+        7,
+        12,
+        24,
+        135
+      ]
+    },
+    {
+      "name": "ChargeRecorded",
+      "discriminator": [
+        189,
+        216,
+        74,
+        148,
+        65,
+        177,
+        1,
+        158
+      ]
+    },
+    {
+      "name": "MerchantAuthorityUpdated",
+      "discriminator": [
+        174,
+        181,
+        183,
+        43,
+        135,
+        189,
+        84,
+        154
+      ]
+    },
+    {
+      "name": "MerchantBillingUpdated",
+      "discriminator": [
+        40,
+        85,
+        147,
+        99,
+        91,
+        78,
+        196,
+        57
+      ]
+    },
+    {
+      "name": "MerchantCreated",
+      "discriminator": [
+        238,
+        186,
+        198,
+        159,
+        163,
+        130,
+        196,
+        86
+      ]
+    },
+    {
+      "name": "MerchantWithdrawn",
+      "discriminator": [
+        173,
+        197,
+        88,
+        97,
+        136,
+        157,
+        241,
+        147
+      ]
+    },
+    {
+      "name": "PayoutDestinationUpdateCancelled",
+      "discriminator": [
+        57,
+        150,
+        88,
+        242,
+        21,
+        157,
+        221,
+        200
+      ]
+    },
+    {
+      "name": "PayoutDestinationUpdateRequested",
+      "discriminator": [
+        121,
+        157,
+        155,
+        234,
+        75,
+        5,
+        236,
+        174
+      ]
+    },
+    {
+      "name": "PayoutDestinationUpdated",
+      "discriminator": [
+        114,
+        105,
+        172,
+        13,
+        81,
+        239,
+        159,
+        163
+      ]
+    },
+    {
+      "name": "PlanCreated",
+      "discriminator": [
+        215,
+        11,
+        135,
+        121,
+        208,
+        119,
+        149,
+        149
+      ]
+    },
+    {
+      "name": "PlanUpdated",
+      "discriminator": [
+        49,
+        51,
+        198,
+        31,
+        170,
+        70,
+        253,
+        195
+      ]
+    },
+    {
+      "name": "ProtocolFeesWithdrawn",
+      "discriminator": [
+        202,
+        213,
+        134,
+        216,
+        108,
+        14,
+        84,
+        99
+      ]
+    },
+    {
+      "name": "SettlementCredited",
+      "discriminator": [
+        169,
+        1,
+        72,
+        60,
+        226,
+        165,
+        93,
+        161
+      ]
+    },
+    {
+      "name": "SubscriptionCreated",
+      "discriminator": [
+        215,
+        63,
+        169,
+        25,
+        179,
+        200,
+        180,
+        105
+      ]
+    },
+    {
+      "name": "SubscriptionMandateUpdated",
+      "discriminator": [
+        10,
+        190,
+        35,
+        132,
+        172,
+        219,
+        190,
+        26
+      ]
+    },
+    {
+      "name": "SubscriptionStatusChanged",
+      "discriminator": [
+        155,
+        214,
+        195,
+        61,
+        65,
+        15,
+        210,
+        54
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow."
+    },
+    {
+      "code": 6001,
+      "name": "BillingDisabled",
+      "msg": "Billing is disabled for this merchant."
+    },
+    {
+      "code": 6002,
+      "name": "ChargeAmountMismatch",
+      "msg": "The charge amount does not match the subscription terms."
+    },
+    {
+      "code": 6003,
+      "name": "InvalidAuthority",
+      "msg": "Invalid authority."
+    },
+    {
+      "code": 6004,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidFailureCode",
+      "msg": "Invalid failure code."
+    },
+    {
+      "code": 6006,
+      "name": "InvalidFxRate",
+      "msg": "Invalid FX rate."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidIdentifier",
+      "msg": "Invalid identifier."
+    },
+    {
+      "code": 6008,
+      "name": "InvalidPayoutDelay",
+      "msg": "Invalid payout delay."
+    },
+    {
+      "code": 6009,
+      "name": "InvalidProtocolFee",
+      "msg": "Invalid protocol fee."
+    },
+    {
+      "code": 6010,
+      "name": "InvalidTimestamp",
+      "msg": "Invalid timestamp."
+    },
+    {
+      "code": 6011,
+      "name": "InsufficientMerchantBalance",
+      "msg": "Insufficient merchant balance."
+    },
+    {
+      "code": 6012,
+      "name": "InsufficientProtocolFees",
+      "msg": "Insufficient protocol fee balance."
+    },
+    {
+      "code": 6013,
+      "name": "MerchantMismatch",
+      "msg": "Merchant account mismatch."
+    },
+    {
+      "code": 6014,
+      "name": "NoPendingPayoutDestination",
+      "msg": "No pending payout destination."
+    },
+    {
+      "code": 6015,
+      "name": "PayoutChangeAlreadyPending",
+      "msg": "A payout destination change is already pending."
+    },
+    {
+      "code": 6016,
+      "name": "PayoutChangeNotReady",
+      "msg": "Payout change is not ready yet."
+    },
+    {
+      "code": 6017,
+      "name": "PayoutDestinationUnchanged",
+      "msg": "The payout destination is unchanged."
+    },
+    {
+      "code": 6018,
+      "name": "PlanInactive",
+      "msg": "Plan is inactive."
+    },
+    {
+      "code": 6019,
+      "name": "RetryLimitReached",
+      "msg": "Retry limit reached."
+    },
+    {
+      "code": 6020,
+      "name": "SettlementMintMismatch",
+      "msg": "Settlement mint mismatch."
+    },
+    {
+      "code": 6021,
+      "name": "SubscriptionCancelled",
+      "msg": "Subscription is cancelled."
+    },
+    {
+      "code": 6022,
+      "name": "SubscriptionNotChargeable",
+      "msg": "Subscription is not chargeable."
+    },
+    {
+      "code": 6023,
+      "name": "Unauthorized",
+      "msg": "Unauthorized."
+    }
+  ],
+  "types": [
+    {
+      "name": "BillingMode",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Fixed"
+          },
+          {
+            "name": "Metered"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChargeFailed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_kind",
+            "type": {
+              "defined": {
+                "name": "ChargeSourceKind"
+              }
+            }
+          },
+          {
+            "name": "subscription",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "commercial_ref_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "external_charge_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "failure_code_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "billing_period_start",
+            "type": "i64"
+          },
+          {
+            "name": "retry_count",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "SubscriptionStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChargeReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_kind",
+            "type": {
+              "defined": {
+                "name": "ChargeSourceKind"
+              }
+            }
+          },
+          {
+            "name": "subscription",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "commercial_ref_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "external_charge_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "failure_code_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "settlement_source",
+            "type": "pubkey"
+          },
+          {
+            "name": "local_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fx_rate_in_micros",
+            "type": "u64"
+          },
+          {
+            "name": "fx_quote_ref_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "fx_provider_ref_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "quote_generated_at",
+            "type": "i64"
+          },
+          {
+            "name": "quote_expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_units",
+            "type": "u64"
+          },
+          {
+            "name": "billing_period_start",
+            "type": "i64"
+          },
+          {
+            "name": "processed_at",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ChargeStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChargeRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_kind",
+            "type": {
+              "defined": {
+                "name": "ChargeSourceKind"
+              }
+            }
+          },
+          {
+            "name": "subscription",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "commercial_ref_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "external_charge_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "local_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fx_rate_in_micros",
+            "type": "u64"
+          },
+          {
+            "name": "fx_quote_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "fx_provider_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_units",
+            "type": "u64"
+          },
+          {
+            "name": "billing_period_start",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChargeSourceKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Subscription"
+          },
+          {
+            "name": "Invoice"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChargeStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Executed"
+          },
+          {
+            "name": "Failed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlement_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlement_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_collector_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "protocol_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "payout_change_delay_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_authority_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CycleMarker",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "billing_period_start",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FxQuoteSnapshotArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fx_rate_in_micros",
+            "type": "u64"
+          },
+          {
+            "name": "fx_quote_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "fx_provider_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "quote_generated_at",
+            "type": "i64"
+          },
+          {
+            "name": "quote_expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Merchant",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_payout_token_account",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "metadata_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "billing_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "payout_change_ready_at",
+            "type": "i64"
+          },
+          {
+            "name": "vault_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantAuthorityUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantBillingUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "billing_enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_token_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantLedger",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "available_balance",
+            "type": "u64"
+          },
+          {
+            "name": "total_settled",
+            "type": "u64"
+          },
+          {
+            "name": "total_withdrawn",
+            "type": "u64"
+          },
+          {
+            "name": "last_settlement_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_available_balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayoutDestinationUpdateCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_payout_token_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayoutDestinationUpdateRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "current_payout_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_payout_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayoutDestinationUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_token_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Plan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan_code_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "fixed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_rate",
+            "type": "u64"
+          },
+          {
+            "name": "billing_interval_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "trial_period_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "retry_window_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_retry_count",
+            "type": "u8"
+          },
+          {
+            "name": "billing_mode",
+            "type": {
+              "defined": {
+                "name": "BillingMode"
+              }
+            }
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan_code_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "billing_mode",
+            "type": {
+              "defined": {
+                "name": "BillingMode"
+              }
+            }
+          },
+          {
+            "name": "fixed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_rate",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanTermsArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_rate",
+            "type": "u64"
+          },
+          {
+            "name": "billing_interval_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "trial_period_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "retry_window_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_retry_count",
+            "type": "u8"
+          },
+          {
+            "name": "billing_mode",
+            "type": {
+              "defined": {
+                "name": "BillingMode"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "billing_mode",
+            "type": {
+              "defined": {
+                "name": "BillingMode"
+              }
+            }
+          },
+          {
+            "name": "fixed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_rate",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolFeesWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_collector_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SettlementCredited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_kind",
+            "type": {
+              "defined": {
+                "name": "ChargeSourceKind"
+              }
+            }
+          },
+          {
+            "name": "commercial_ref_hash",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "external_charge_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "local_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fx_rate_in_micros",
+            "type": "u64"
+          },
+          {
+            "name": "fx_quote_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "fx_provider_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscription",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscription_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "customer_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "mandate_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "billing_currency",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "SubscriptionStatus"
+              }
+            }
+          },
+          {
+            "name": "billing_mode",
+            "type": {
+              "defined": {
+                "name": "BillingMode"
+              }
+            }
+          },
+          {
+            "name": "fixed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "usage_rate",
+            "type": "u64"
+          },
+          {
+            "name": "local_amount_snapshot",
+            "type": "u64"
+          },
+          {
+            "name": "billing_interval_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "retry_window_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_retry_count",
+            "type": "u8"
+          },
+          {
+            "name": "retry_count",
+            "type": "u8"
+          },
+          {
+            "name": "next_charge_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_charge_at",
+            "type": "i64"
+          },
+          {
+            "name": "retry_available_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "customer_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "billing_currency",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "first_charge_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "local_amount_snapshot",
+            "type": "u64"
+          },
+          {
+            "name": "mandate_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscription_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "customer_ref_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "next_charge_at",
+            "type": "i64"
+          },
+          {
+            "name": "billing_mode",
+            "type": {
+              "defined": {
+                "name": "BillingMode"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionMandateUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "mandate_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "RetryExhausted"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "SubscriptionStatus"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
