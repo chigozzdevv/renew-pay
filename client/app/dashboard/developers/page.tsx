@@ -452,7 +452,6 @@ export default function DevelopersPage() {
           label="Server keys"
           value={String(metrics.keys)}
           note={`${metrics.activeKeys} active on page`}
-          tone="brand"
         />
         <MetricCard
           label="Webhooks"

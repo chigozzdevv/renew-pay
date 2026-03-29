@@ -120,39 +120,22 @@ export function MetricCard({
   label,
   value,
   note,
-  tone = "neutral",
 }: {
   label: string;
   value: string;
   note: string;
-  tone?: "brand" | "neutral";
 }) {
   return (
     <div
-      className={cn(
-        "rounded-[1.6rem] border p-4",
-        tone === "brand"
-          ? "border-[color:var(--line)] bg-[#f2f1eb] text-[color:var(--ink)]"
-          : "border-[color:var(--line)] bg-white/82 text-[color:var(--ink)]"
-      )}
+      className="rounded-[1.6rem] border border-[color:var(--line)] bg-white p-4 text-[color:var(--ink)]"
     >
-      <p
-        className={cn(
-          "text-[11px] font-semibold uppercase tracking-[0.16em]",
-          tone === "brand" ? "text-[color:var(--muted)]" : "text-[color:var(--muted)]"
-        )}
-      >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
         {label}
       </p>
       <p className="mt-3 font-display text-2xl font-semibold tracking-[-0.05em]">
         {value}
       </p>
-      <p
-        className={cn(
-          "mt-2 text-sm leading-6",
-          tone === "brand" ? "text-[color:var(--muted)]" : "text-[color:var(--muted)]"
-        )}
-      >
+      <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
         {note}
       </p>
     </div>

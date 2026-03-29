@@ -644,7 +644,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Invoices" value={String(metrics.total)} note="Visible page" tone="brand" />
+        <MetricCard label="Invoices" value={String(metrics.total)} note="Visible page" />
         <MetricCard
           label="Issued"
           value={String(metrics.issued)}

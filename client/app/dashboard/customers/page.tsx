@@ -216,7 +216,7 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Customers" value={String(metrics.total)} note="Directory records" tone="brand" />
+        <MetricCard label="Customers" value={String(metrics.total)} note="Directory records" />
         <MetricCard label="Active" value={String(metrics.active)} note="Visible page" />
         <MetricCard label="At risk" value={String(metrics.atRisk)} note="Visible page" />
         <MetricCard label="Markets" value={String(metrics.markets)} note="Visible page" />

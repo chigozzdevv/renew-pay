@@ -67,7 +67,6 @@ export default function OverviewPage() {
           label="Customers"
           value={formatCompactNumber(data.stats.totalCustomers)}
           note={`${data.stats.atRiskCustomers} need follow-up`}
-          tone="brand"
         />
         <MetricCard
           label="Plans"

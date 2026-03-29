@@ -151,7 +151,7 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Charges" value={String(metrics.total)} note="Recorded payment attempts" tone="brand" />
+        <MetricCard label="Charges" value={String(metrics.total)} note="Recorded payment attempts" />
         <MetricCard label="Settled" value={formatCurrency(metrics.settled)} note="Visible page" />
         <MetricCard label="Pending" value={String(metrics.pending)} note="Visible page" />
         <MetricCard label="Failed" value={String(metrics.failed)} note="Visible page" />

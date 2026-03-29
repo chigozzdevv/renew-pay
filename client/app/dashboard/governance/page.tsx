@@ -19,7 +19,6 @@ import {
   Badge,
   Button,
   Card,
-  DarkCard,
   MetricCard,
   PageState,
   StatGrid,
@@ -340,13 +339,36 @@ export default function GovernancePage() {
 
   return (
     <div className="space-y-6">
-      <DarkCard
-        title="Advanced governance"
-        description="Governance stays hidden in the default workspace. Turn it on only when treasury actions need more than one human approval."
+      <StatGrid>
+        <MetricCard
+          label="Mode"
+          value={data.mode === "multisig" ? "Multisig" : "Single owner"}
+          note={data.enabled ? "Governance enabled" : "Default mode"}
+        />
+        <MetricCard
+          label="Operator wallet"
+          value={formatAddress(data.controllerWalletAddress)}
+          note="Operator authority"
+        />
+        <MetricCard
+          label="Payout wallet"
+          value={formatAddress(data.payoutWallet)}
+          note="Withdraw destination"
+        />
+        <MetricCard
+          label="Approval policy"
+          value={`${data.threshold}/${Math.max(data.activeSignerCount, 1)}`}
+          note="Required approvals"
+        />
+      </StatGrid>
+
+      <Card
+        title="Governance"
+        description="Multi-approval controls for treasury actions."
         action={
           <div className="flex items-center gap-3">
             <Badge tone={data.enabled ? "brand" : "neutral"}>
-              {data.enabled ? "Enabled" : "Hidden by default"}
+              {data.enabled ? "Enabled" : "Disabled"}
             </Badge>
             <Button
               tone={data.enabled ? "neutral" : "brand"}
@@ -358,149 +380,80 @@ export default function GovernancePage() {
                 : busyAction === "disable"
                   ? "Disabling..."
                   : data.enabled
-                    ? "Disable governance"
-                    : "Enable governance"}
+                    ? "Disable"
+                    : "Enable"}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           {message ? (
-            <div className="rounded-[1.1rem] border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 text-sm text-[color:var(--ink)]">
-              {message}
-            </div>
+            <p className="text-sm text-[color:var(--brand)]">{message}</p>
           ) : null}
           {errorMessage ? (
-            <div className="rounded-[1.1rem] border border-[#f0ccc3] bg-[#fff6f4] px-4 py-3 text-sm text-[#9b3b2d]">
-              {errorMessage}
-            </div>
+            <p className="text-sm text-[#a8382b]">{errorMessage}</p>
           ) : null}
-          <StatGrid>
-            <MetricCard
-              label="Mode"
-              value={data.mode === "multisig" ? "Multisig" : "Single owner"}
-              note={data.enabled ? "Advanced controls enabled" : "Default workspace mode"}
-              tone={data.enabled ? "brand" : "neutral"}
-            />
-            <MetricCard
-              label="Operator wallet"
-              value={formatAddress(data.controllerWalletAddress)}
-              note="Privy-provisioned operator authority"
-            />
-            <MetricCard
-              label="Payout wallet"
-              value={formatAddress(data.payoutWallet)}
-              note="Treasury withdraw destination"
-            />
-            <MetricCard
-              label="Approval policy"
-              value={`${data.threshold}/${Math.max(data.activeSignerCount, 1)}`}
-              note="Recommended live approval threshold"
-            />
-          </StatGrid>
-        </div>
-      </DarkCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card
-          title="Control model"
-          description="Routine billing and settlement stay on the operator lane. Governance only applies to sensitive changes and large treasury actions."
-        >
-          <div className="space-y-3 text-sm leading-7 text-[color:var(--muted)]">
-            <p>
-              The operator wallet handles day-to-day plan, subscription, invoice, and payout flows.
-              Governance adds an approval layer on top of that instead of becoming the default path
-              for every action.
-            </p>
-            <p>
-              When governance is off, the workspace stays in single-owner mode. When governance is
-              on, approvers can be enrolled gradually and the navigation remains optional for teams
-              that do not need it day to day.
-            </p>
-          </div>
-        </Card>
-
-        <Card
-          title="Readiness"
-          description="The important thing is whether the workspace can safely move from single-owner control into shared approvals."
-        >
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
-              <span className="text-sm font-medium text-[color:var(--ink)]">
-                Onboarding status
-              </span>
+              <span className="text-sm font-medium text-[color:var(--ink)]">Onboarding</span>
               <Badge tone={data.onboardingStatus === "workspace_active" ? "brand" : "warning"}>
                 {data.onboardingStatus.replace(/_/g, " ")}
               </Badge>
             </div>
             <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
-              <span className="text-sm font-medium text-[color:var(--ink)]">
-                Active approvers
-              </span>
+              <span className="text-sm font-medium text-[color:var(--ink)]">Active approvers</span>
               <span className="text-sm font-semibold text-[color:var(--ink)]">
                 {activeApprovers.length}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3">
-              <span className="text-sm font-medium text-[color:var(--ink)]">
-                Current owner session
-              </span>
+              <span className="text-sm font-medium text-[color:var(--ink)]">Current session</span>
               <span className="text-sm font-semibold text-[color:var(--ink)]">
                 {user?.name ?? "Unknown"}
               </span>
             </div>
-            <div className="rounded-[1rem] border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-[color:var(--ink)]">
-                      Treasury signer wallet
-                    </p>
-                    <Badge tone={signerStatusTone}>{signerStatusLabel}</Badge>
-                  </div>
-                  <p className="font-mono text-xs text-[color:var(--muted)]">
-                    {formatAddress(activeWalletAddress)}
-                  </p>
-                  <p className="text-xs leading-6 text-[color:var(--muted)]">
-                    Renew uses the signed-in Privy Solana wallet for signer verification. Owners
-                    do not need to pick or paste a wallet manually.
-                  </p>
-                  {currentSigner?.status === "active" && !currentWalletMatchesSigner ? (
-                    <p className="text-xs leading-6 text-[#8a5313]">
-                      Your current Privy wallet is different from the wallet already bound for
-                      approvals. Verifying again will rotate treasury approvals to this session
-                      wallet.
-                    </p>
-                  ) : null}
-                  {!currentSigner && user?.role !== "owner" ? (
-                    <p className="text-xs leading-6 text-[color:var(--muted)]">
-                      Only owners can bind a treasury signer.
-                    </p>
-                  ) : null}
-                </div>
-                <Button
-                  tone="brand"
-                  disabled={signerActionDisabled}
-                  onClick={() => void runSignerVerification()}
-                >
-                  {signerActionLabel}
-                </Button>
-              </div>
-            </div>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Treasury signer"
+        description="Verify your Privy wallet for treasury approvals."
+        action={
+          <Button
+            tone="brand"
+            disabled={signerActionDisabled}
+            onClick={() => void runSignerVerification()}
+          >
+            {signerActionLabel}
+          </Button>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone={signerStatusTone}>{signerStatusLabel}</Badge>
+          <span className="font-mono text-xs text-[color:var(--muted)]">
+            {formatAddress(activeWalletAddress)}
+          </span>
+        </div>
+        {currentSigner?.status === "active" && !currentWalletMatchesSigner ? (
+          <p className="mt-3 text-xs text-[#8a5313]">
+            Current wallet differs from the bound signer. Re-verifying will rotate approvals.
+          </p>
+        ) : null}
+        {!currentSigner && user?.role !== "owner" ? (
+          <p className="mt-3 text-xs text-[color:var(--muted)]">Only owners can bind a signer.</p>
+        ) : null}
+      </Card>
 
       <Card
         title="Approvers"
-        description="Approvers are owners with a verified treasury signer binding. They are staged here even when governance stays hidden from the main dashboard."
+        description="Owners with a verified treasury signer."
       >
         {data.approvers.length === 0 ? (
-          <PageState
-            title="No approvers yet"
-            message="Add an owner, verify that owner's Privy signer wallet, then enable governance when you actually need shared approvals."
-            tone="neutral"
-          />
+          <p className="py-6 text-center text-sm text-[color:var(--muted)]">
+            No approvers yet. Verify an owner's signer wallet to add them.
+          </p>
         ) : (
           <Table columns={["Approver", "Wallet", "Status", "Verified"]}>
             {data.approvers.map((approver) => (

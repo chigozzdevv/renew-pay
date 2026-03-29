@@ -9,11 +9,15 @@ import {
   Badge,
   Button,
   Card,
+  Field,
   Input,
   MetricCard,
+  Modal,
   PageState,
   Select,
   StatGrid,
+  Table,
+  TableRow,
 } from "@/components/dashboard/ui";
 import { ApiError } from "@/lib/api";
 import {
@@ -26,14 +30,8 @@ import {
 } from "@/lib/treasury";
 
 function toErrorMessage(error: unknown) {
-  if (error instanceof ApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
   return "Request failed.";
 }
 
@@ -45,10 +43,7 @@ function formatUsdc(value: number) {
 }
 
 function formatDateTime(value: string | null) {
-  if (!value) {
-    return "Not executed";
-  }
-
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en-GB", {
     month: "short",
     day: "2-digit",
@@ -60,10 +55,7 @@ function formatDateTime(value: string | null) {
 }
 
 function formatAddress(value: string) {
-  if (value.length < 12) {
-    return value;
-  }
-
+  if (value.length < 12) return value;
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
@@ -92,14 +84,8 @@ function createSettingsDraft(data: TreasuryPayoutOverview): PayoutSettingsDraft 
 }
 
 function statusTone(status: string) {
-  if (status === "executed") {
-    return "brand" as const;
-  }
-
-  if (status === "pending_governance") {
-    return "warning" as const;
-  }
-
+  if (status === "executed") return "brand" as const;
+  if (status === "pending_governance") return "warning" as const;
   return "neutral" as const;
 }
 
@@ -108,32 +94,34 @@ export default function TreasuryPage() {
   const { mode } = useWorkspaceMode();
   const { data, isLoading, error, reload } = useResource(
     async ({ token, merchantId }) =>
-      loadPayoutWorkspace({
-        token,
-        merchantId,
-        environment: mode,
-      }),
+      loadPayoutWorkspace({ token, merchantId, environment: mode }),
     [mode]
   );
   const [preview, setPreview] = useState<PayoutBatch | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<PayoutSettingsDraft | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!data) {
-      return;
-    }
-
+    if (!data) return;
     setSettingsDraft(createSettingsDraft(data));
   }, [data]);
+
+  useEffect(() => {
+    if (!actionMessage && !actionError) return;
+    const timeout = window.setTimeout(() => {
+      setActionMessage(null);
+      setActionError(null);
+    }, 3000);
+    return () => window.clearTimeout(timeout);
+  }, [actionMessage, actionError]);
 
   async function runAction(actionKey: string, runner: () => Promise<void>) {
     setBusyAction(actionKey);
     setActionMessage(null);
     setActionError(null);
-
     try {
       await runner();
       await reload();
@@ -148,7 +136,7 @@ export default function TreasuryPage() {
     return (
       <PageState
         title="Loading treasury"
-        message="Fetching available balance, payout settings, and payout batch history."
+        message="Fetching balance, payout settings, and batch history."
       />
     );
   }
@@ -168,19 +156,17 @@ export default function TreasuryPage() {
     );
   }
 
+  const openBatches = data.batches.filter(
+    (b) => b.status === "open" || b.status === "pending_governance"
+  ).length;
+
   return (
     <section className="space-y-6">
-      {actionMessage ? <PageState title="Updated" message={actionMessage} /> : null}
-      {actionError ? (
-        <PageState title="Action failed" message={actionError} tone="danger" />
-      ) : null}
-
       <StatGrid>
         <MetricCard
           label="Available balance"
           value={`${formatUsdc(data.availableBalanceUsdc)} USDC`}
           note="Eligible to withdraw now"
-          tone="brand"
         />
         <MetricCard
           label="Pending settlement"
@@ -203,11 +189,12 @@ export default function TreasuryPage() {
         />
       </StatGrid>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card
-          title="Withdraw"
-          description="Batch all eligible unswept settlements into one payout to the approved payout wallet."
-          action={
+      <Card
+        title="Withdraw"
+        description="Batch eligible settlements into a single payout."
+        action={
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setShowSettings(true)}>Payout settings</Button>
             <Button
               type="button"
               tone="brand"
@@ -231,185 +218,114 @@ export default function TreasuryPage() {
             >
               {busyAction === "preview" ? "Preparing..." : "Preview withdraw"}
             </Button>
-          }
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                Destination
-              </p>
-              <p className="mt-2 text-sm font-semibold text-[color:var(--ink)]">
-                {data.payoutWallet}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                Open payout batches
-              </p>
-              <p className="mt-2 text-sm font-semibold text-[color:var(--ink)]">
-                {
-                  data.batches.filter((batch) => batch.status === "open" || batch.status === "pending_governance")
-                    .length
-                }
-              </p>
-            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {actionMessage ? <p className="text-sm text-[color:var(--brand)]">{actionMessage}</p> : null}
+          {actionError ? <p className="text-sm text-[#a8382b]">{actionError}</p> : null}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Destination" value={<span className="truncate">{data.payoutWallet}</span>} />
+            <Field label="Open batches" value={String(openBatches)} />
+            <Field
+              label="Threshold"
+              value={
+                data.thresholdPayoutEnabled
+                  ? `${formatUsdc(data.autoPayoutThresholdUsdc ?? 0)} USDC`
+                  : "Disabled"
+              }
+            />
           </div>
 
           {preview ? (
-            <div className="mt-5 rounded-[1.6rem] border border-[color:var(--line)] bg-[#f5f4ef] p-4">
+            <div className="rounded-[1.4rem] border border-[color:var(--line)] bg-[#faf9f5] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[color:var(--ink)]">
                     {preview.settlementCount} settlement{preview.settlementCount === 1 ? "" : "s"} ready
                   </p>
                   <p className="mt-1 text-sm text-[color:var(--muted)]">
-                    Gross {formatUsdc(preview.grossUsdc)} USDC, fees {formatUsdc(preview.feeUsdc)} USDC,
-                    net {formatUsdc(preview.netUsdc)} USDC
+                    Gross {formatUsdc(preview.grossUsdc)}, fees {formatUsdc(preview.feeUsdc)}, net {formatUsdc(preview.netUsdc)} USDC
                   </p>
                 </div>
-                <Badge tone={statusTone(preview.status)}>{preview.status.replace(/_/g, " ")}</Badge>
-              </div>
-              <div className="mt-4">
-                <Button
-                  type="button"
-                  tone="brand"
-                  disabled={busyAction === "withdraw"}
-                  onClick={() =>
-                    void runAction("withdraw", async () => {
-                      const result = await withdrawTreasuryBalance({
-                        token,
-                        merchantId: data.merchantId,
-                        environment: mode,
-                        trigger: "manual",
-                      });
-                      setPreview(result.batch);
-                      setActionMessage(
-                        result.batch.status === "pending_governance"
-                          ? "Withdrawal batch queued for governance approval."
-                          : "Withdrawal batch executed."
-                      );
-                    })
-                  }
-                >
-                  {busyAction === "withdraw" ? "Withdrawing..." : "Withdraw now"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Badge tone={statusTone(preview.status)}>{preview.status.replace(/_/g, " ")}</Badge>
+                  <Button
+                    type="button"
+                    tone="brand"
+                    disabled={busyAction === "withdraw"}
+                    onClick={() =>
+                      void runAction("withdraw", async () => {
+                        const result = await withdrawTreasuryBalance({
+                          token,
+                          merchantId: data.merchantId,
+                          environment: mode,
+                          trigger: "manual",
+                        });
+                        setPreview(result.batch);
+                        setActionMessage(
+                          result.batch.status === "pending_governance"
+                            ? "Withdrawal queued for governance approval."
+                            : "Withdrawal executed."
+                        );
+                      })
+                    }
+                  >
+                    {busyAction === "withdraw" ? "Withdrawing..." : "Withdraw now"}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
-        </Card>
+        </div>
+      </Card>
 
-        <Card
-          title="Auto-Payout Settings"
-          description="Manual stays default. Automatic payouts can run on a merchant-chosen frequency with an optional threshold trigger."
-        >
-          <div className="space-y-4">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Payout mode</span>
-              <Select
-                value={settingsDraft.payoutMode}
-                onChange={(event) =>
-                  setSettingsDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          payoutMode: event.target.value === "automatic" ? "automatic" : "manual",
-                        }
-                      : current
-                  )
-                }
-              >
-                <option value="manual">Manual</option>
-                <option value="automatic">Automatic</option>
-              </Select>
-            </label>
+      <Card
+        title="Payout history"
+        description="Completed and pending withdrawal batches."
+      >
+        {data.batches.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[color:var(--muted)]">
+            No payout batches yet. Withdraw to create the first batch.
+          </p>
+        ) : (
+          <Table columns={["Batch", "Net amount", "Destination", "Status"]}>
+            {data.batches.map((batch) => (
+              <TableRow key={batch.id} columns={4}>
+                <div>
+                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                    {batch.settlementCount} settlement{batch.settlementCount === 1 ? "" : "s"}
+                  </p>
+                  <p className="mt-1 text-sm text-[color:var(--muted)]">
+                    {formatDateTime(batch.executedAt ?? batch.openedAt)} · {batch.trigger}
+                  </p>
+                </div>
+                <p className="self-center text-sm font-semibold text-[color:var(--ink)]">
+                  {formatUsdc(batch.netUsdc)} USDC
+                </p>
+                <p className="self-center text-sm text-[color:var(--muted)]">
+                  {formatAddress(batch.destinationWallet)}
+                </p>
+                <div className="self-center">
+                  <Badge tone={statusTone(batch.status)}>
+                    {batch.status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+              </TableRow>
+            ))}
+          </Table>
+        )}
+      </Card>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Frequency</span>
-              <Select
-                value={settingsDraft.autoPayoutFrequency ?? ""}
-                disabled={settingsDraft.payoutMode !== "automatic"}
-                onChange={(event) =>
-                  setSettingsDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          autoPayoutFrequency:
-                            event.target.value === "daily" ||
-                            event.target.value === "weekly" ||
-                            event.target.value === "monthly"
-                              ? event.target.value
-                              : null,
-                        }
-                      : current
-                  )
-                }
-              >
-                <option value="">Select frequency</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </Select>
-            </label>
-
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Time</span>
-              <Input
-                value={settingsDraft.autoPayoutTimeLocal}
-                disabled={settingsDraft.payoutMode !== "automatic"}
-                onChange={(event) =>
-                  setSettingsDraft((current) =>
-                    current ? { ...current, autoPayoutTimeLocal: event.target.value } : current
-                  )
-                }
-                placeholder="09:00"
-              />
-            </label>
-
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">
-                Threshold trigger
-              </span>
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  tone={settingsDraft.thresholdPayoutEnabled ? "brand" : "neutral"}
-                  onClick={() =>
-                    setSettingsDraft((current) =>
-                      current ? { ...current, thresholdPayoutEnabled: true } : current
-                    )
-                  }
-                >
-                  Enabled
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    setSettingsDraft((current) =>
-                      current ? { ...current, thresholdPayoutEnabled: false } : current
-                    )
-                  }
-                >
-                  Disabled
-                </Button>
-              </div>
-            </label>
-
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">
-                Threshold amount (USDC)
-              </span>
-              <Input
-                value={settingsDraft.autoPayoutThresholdUsdc}
-                disabled={!settingsDraft.thresholdPayoutEnabled}
-                onChange={(event) =>
-                  setSettingsDraft((current) =>
-                    current ? { ...current, autoPayoutThresholdUsdc: event.target.value } : current
-                  )
-                }
-                placeholder="250"
-              />
-            </label>
-
+      <Modal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Payout settings"
+        description="Configure automatic payout rules."
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button onClick={() => setShowSettings(false)}>Cancel</Button>
             <Button
               type="button"
               tone="brand"
@@ -431,56 +347,106 @@ export default function TreasuryPage() {
                       ? Number(settingsDraft.autoPayoutThresholdUsdc || "0")
                       : null,
                   });
-                  setActionMessage("Treasury payout settings saved.");
+                  setShowSettings(false);
+                  setActionMessage("Payout settings saved.");
                 })
               }
             >
-              {busyAction === "settings" ? "Saving..." : "Save payout settings"}
+              {busyAction === "settings" ? "Saving..." : "Save settings"}
             </Button>
           </div>
-        </Card>
-      </div>
-
-      <Card
-        title="Payout Batch History"
-        description="Individual settlements remain the reconciliation layer. Withdrawals operate on merchant payout batches."
+        }
       >
-        {data.batches.length === 0 ? (
-          <PageState
-            title="No payout batches yet"
-            message="Once settlements reach the treasury and you withdraw, the payout history will show up here."
-          />
-        ) : (
-          <div className="space-y-3">
-            {data.batches.map((batch) => (
-              <div
-                key={batch.id}
-                className="rounded-[1.5rem] border border-[color:var(--line)] bg-white px-4 py-4"
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">Payout mode</label>
+              <Select
+                value={settingsDraft.payoutMode}
+                onChange={(e) =>
+                  setSettingsDraft((c) =>
+                    c ? { ...c, payoutMode: e.target.value === "automatic" ? "automatic" : "manual" } : c
+                  )
+                }
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-[color:var(--ink)]">
-                        {batch.settlementCount} settlement{batch.settlementCount === 1 ? "" : "s"}
-                      </p>
-                      <Badge tone={statusTone(batch.status)}>
-                        {batch.status.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-[color:var(--muted)]">
-                      Net {formatUsdc(batch.netUsdc)} USDC to {formatAddress(batch.destinationWallet)}
-                    </p>
-                  </div>
-                  <div className="text-right text-sm text-[color:var(--muted)]">
-                    <p>{formatDateTime(batch.executedAt ?? batch.openedAt)}</p>
-                    <p className="mt-1 uppercase tracking-[0.12em]">{batch.trigger}</p>
-                  </div>
-                </div>
+                <option value="manual">Manual</option>
+                <option value="automatic">Automatic</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">Frequency</label>
+              <Select
+                value={settingsDraft.autoPayoutFrequency ?? ""}
+                disabled={settingsDraft.payoutMode !== "automatic"}
+                onChange={(e) =>
+                  setSettingsDraft((c) =>
+                    c
+                      ? {
+                          ...c,
+                          autoPayoutFrequency:
+                            e.target.value === "daily" || e.target.value === "weekly" || e.target.value === "monthly"
+                              ? e.target.value
+                              : null,
+                        }
+                      : c
+                  )
+                }
+              >
+                <option value="">Select frequency</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">Time</label>
+              <Input
+                value={settingsDraft.autoPayoutTimeLocal}
+                disabled={settingsDraft.payoutMode !== "automatic"}
+                onChange={(e) =>
+                  setSettingsDraft((c) => (c ? { ...c, autoPayoutTimeLocal: e.target.value } : c))
+                }
+                placeholder="09:00"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[color:var(--muted)]">Threshold trigger</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  tone={settingsDraft.thresholdPayoutEnabled ? "brand" : "neutral"}
+                  className="flex-1"
+                  onClick={() =>
+                    setSettingsDraft((c) => (c ? { ...c, thresholdPayoutEnabled: true } : c))
+                  }
+                >
+                  Enabled
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={() =>
+                    setSettingsDraft((c) => (c ? { ...c, thresholdPayoutEnabled: false } : c))
+                  }
+                >
+                  Disabled
+                </Button>
               </div>
-            ))}
+            </div>
           </div>
-        )}
-      </Card>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">Threshold amount (USDC)</label>
+            <Input
+              value={settingsDraft.autoPayoutThresholdUsdc}
+              disabled={!settingsDraft.thresholdPayoutEnabled}
+              onChange={(e) =>
+                setSettingsDraft((c) => (c ? { ...c, autoPayoutThresholdUsdc: e.target.value } : c))
+              }
+              placeholder="250"
+            />
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }

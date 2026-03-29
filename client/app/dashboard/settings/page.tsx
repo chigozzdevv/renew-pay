@@ -477,7 +477,6 @@ export default function SettingsPage() {
           label="Primary market"
           value={data.business.defaultMarket}
           note="Workspace billing default"
-          tone="brand"
         />
         <MetricCard
           label="Treasury control"

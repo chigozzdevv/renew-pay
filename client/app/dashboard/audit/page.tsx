@@ -9,10 +9,11 @@ import {
 import { useResource } from "@/components/dashboard/use-resource";
 import {
   Card,
-  DarkCard,
-  DarkField,
+  Field,
   MetricCard,
+  Modal,
   PageState,
+  PaginationControls,
   Select,
   StatGrid,
   Table,
@@ -21,23 +22,18 @@ import {
 } from "@/components/dashboard/ui";
 import { loadAuditLogs, type AuditCategory, type AuditStatus } from "@/lib/audit";
 
+type AuditItem = NonNullable<Awaited<ReturnType<typeof loadAuditLogs>>>["items"][number];
+
 export default function AuditPage() {
   const [category, setCategory] = useState<AuditCategory | "all">("all");
   const [status, setStatus] = useState<AuditStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailItem, setDetailItem] = useState<AuditItem | null>(null);
 
   const { data, isLoading, error, reload } = useResource(
     async ({ token, merchantId }) =>
-      loadAuditLogs({
-        token,
-        merchantId,
-        category,
-        status,
-        search,
-        page,
-      }),
+      loadAuditLogs({ token, merchantId, category, status, search, page }),
     [category, page, search, status]
   );
 
@@ -48,32 +44,20 @@ export default function AuditPage() {
     total: items.length,
     totalPages: 1,
   };
-  const selectedItem = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
 
   useEffect(() => {
-    if (!selectedItem) {
-      setSelectedId(null);
-      return;
-    }
-
-    setSelectedId(selectedItem.id);
-  }, [selectedItem?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    setPage(1);
+  }, [category, status, search]);
 
   const metrics = useMemo(() => {
     const warning = items.filter((item) => item.status === "warning").length;
     const errorCount = items.filter((item) => item.status === "error").length;
     const treasury = items.filter((item) => item.category === "treasury").length;
-
-    return {
-      total: pagination.total,
-      warning,
-      error: errorCount,
-      treasury,
-    };
+    return { total: pagination.total, warning, error: errorCount, treasury };
   }, [items, pagination.total]);
 
   if (isLoading && !data) {
-    return <PageState title="Loading audit log" message="Fetching real audit events." />;
+    return <PageState title="Loading audit log" message="Fetching audit events." />;
   }
 
   if (error || !data) {
@@ -90,123 +74,91 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Audit events" value={String(metrics.total)} note="Matched records" tone="brand" />
+        <MetricCard label="Audit events" value={String(metrics.total)} note="Matched records" />
         <MetricCard label="Warnings" value={String(metrics.warning)} note="Current page" />
         <MetricCard label="Errors" value={String(metrics.error)} note="Current page" />
         <MetricCard label="Treasury" value={String(metrics.treasury)} note="Treasury-linked events" />
       </StatGrid>
 
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card title="Audit log" description="Real workspace, billing, treasury, and developer events.">
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <Select value={category} onChange={(event) => { setCategory(event.target.value as AuditCategory | "all"); setPage(1); }}>
-                <option value="all">All categories</option>
-                <option value="workspace">Workspace</option>
-                <option value="team">Team</option>
-                <option value="billing">Billing</option>
-                <option value="security">Security</option>
-                <option value="developer">Developer</option>
-                <option value="payments">Payments</option>
-                <option value="treasury">Treasury</option>
-                <option value="protocol">Protocol</option>
-              </Select>
-              <Select value={status} onChange={(event) => { setStatus(event.target.value as AuditStatus | "all"); setPage(1); }}>
-                <option value="all">All statuses</option>
-                <option value="ok">OK</option>
-                <option value="warning">Warning</option>
-                <option value="error">Error</option>
-              </Select>
-              <Input placeholder="Search actor, target, or action" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-            </div>
+      <Card title="Audit log" description="Workspace, billing, treasury, and developer events.">
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Select value={category} onChange={(e) => { setCategory(e.target.value as AuditCategory | "all"); setPage(1); }}>
+              <option value="all">All categories</option>
+              <option value="workspace">Workspace</option>
+              <option value="team">Team</option>
+              <option value="billing">Billing</option>
+              <option value="security">Security</option>
+              <option value="developer">Developer</option>
+              <option value="payments">Payments</option>
+              <option value="treasury">Treasury</option>
+              <option value="protocol">Protocol</option>
+            </Select>
+            <Select value={status} onChange={(e) => { setStatus(e.target.value as AuditStatus | "all"); setPage(1); }}>
+              <option value="all">All statuses</option>
+              <option value="ok">OK</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+            </Select>
+            <Input placeholder="Search actor, target, or action" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          </div>
 
-            <Table columns={["Actor", "Action", "Category", "Time", "Status"]}>
-              {items.map((item) => (
-                <button key={item.id} type="button" className="text-left" onClick={() => setSelectedId(item.id)}>
-                  <TableRow columns={5}>
-                    <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{item.actor}</p>
-                    <div>
-                      <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{item.action}</p>
-                      <p className="mt-1 text-sm text-[color:var(--muted)]">{item.target ?? item.detail}</p>
-                    </div>
-                    <p className="text-sm text-[color:var(--muted)]">{item.category}</p>
-                    <p className="text-sm text-[color:var(--muted)]">{formatDateTime(item.createdAt)}</p>
-                    <div><StatusBadge value={item.status} /></div>
-                  </TableRow>
+          <Table columns={["Actor", "Action", "Category", "Time", "Status"]}>
+            {items.map((item) => (
+              <TableRow key={item.id} columns={5}>
+                <button type="button" className="text-left outline-none" onClick={() => setDetailItem(item)}>
+                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{item.actor}</p>
                 </button>
-              ))}
-            </Table>
+                <div>
+                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{item.action}</p>
+                  <p className="mt-1 text-sm text-[color:var(--muted)]">{item.target ?? item.detail}</p>
+                </div>
+                <p className="self-center text-sm text-[color:var(--muted)]">{item.category}</p>
+                <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(item.createdAt)}</p>
+                <div className="self-center"><StatusBadge value={item.status} /></div>
+              </TableRow>
+            ))}
+          </Table>
 
-            <div className="flex items-center justify-between gap-3">
-              <button
-                className="text-sm font-semibold text-[color:var(--ink)] disabled:opacity-40"
-                disabled={page <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                Previous
-              </button>
-              <p className="text-sm text-[color:var(--muted)]">
-                Page {pagination.page} of {pagination.totalPages}
+          <PaginationControls
+            page={pagination.page}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPrevious={() => setPage((c) => Math.max(1, c - 1))}
+            onNext={() => setPage((c) => Math.min(pagination.totalPages, c + 1))}
+          />
+        </div>
+      </Card>
+
+      <Modal
+        open={!!detailItem}
+        onClose={() => setDetailItem(null)}
+        title={detailItem?.action ?? "Audit detail"}
+        description={detailItem?.detail}
+        size="lg"
+      >
+        {detailItem ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Actor" value={detailItem.actor} />
+              <Field label="Status" value={<StatusBadge value={detailItem.status} />} />
+              <Field label="Category" value={detailItem.category} />
+              <Field label="Time" value={formatDateTime(detailItem.createdAt)} />
+            </div>
+            {detailItem.target ? (
+              <Field label="Target" value={detailItem.target} />
+            ) : null}
+            <div className="rounded-2xl border border-[color:var(--line)] bg-[#faf9f5] px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                Metadata
               </p>
-              <button
-                className="text-sm font-semibold text-[color:var(--ink)] disabled:opacity-40"
-                disabled={page >= pagination.totalPages}
-                onClick={() =>
-                  setPage((current) => Math.min(pagination.totalPages, current + 1))
-                }
-              >
-                Next
-              </button>
+              <pre className="mt-3 overflow-x-auto rounded-xl border border-[color:var(--line)] bg-white p-3 text-xs leading-6 text-[color:var(--ink)]">
+                {JSON.stringify(detailItem.metadata, null, 2)}
+              </pre>
             </div>
           </div>
-        </Card>
-
-        <DarkCard
-          title={selectedItem?.action ?? "Audit detail"}
-          description={selectedItem?.detail ?? "Select an audit event to inspect it."}
-        >
-          {selectedItem ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <DarkField label="Actor" value={selectedItem.actor} />
-                <DarkField
-                  label="Status"
-                  value={<StatusBadge value={selectedItem.status} />}
-                />
-                <DarkField label="Category" value={selectedItem.category} />
-                <DarkField
-                  label="Time"
-                  value={formatDateTime(selectedItem.createdAt)}
-                />
-              </div>
-
-              {selectedItem.target ? (
-                <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/46">
-                    Target
-                  </p>
-                  <p className="mt-2 text-sm leading-7 text-white/82">
-                    {selectedItem.target}
-                  </p>
-                </div>
-              ) : null}
-
-              <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/46">
-                  Metadata
-                </p>
-                <pre className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-6 text-white/80">
-                  {JSON.stringify(selectedItem.metadata, null, 2)}
-                </pre>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm leading-7 text-white/66">
-              No audit event matches the current filter.
-            </p>
-          )}
-        </DarkCard>
-      </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

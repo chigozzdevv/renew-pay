@@ -399,7 +399,6 @@ export default function SubscriptionsPage() {
           label="Subscriptions"
           value={String(metrics.total)}
           note="Tracked billing records"
-          tone="brand"
         />
         <MetricCard label="Active" value={String(metrics.active)} note="Visible page" />
         <MetricCard label="Past due" value={String(metrics.pastDue)} note="Visible page" />

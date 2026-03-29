@@ -339,7 +339,6 @@ export default function TeamsPage() {
           label="Members"
           value={String(metrics.total)}
           note="Workspace access records"
-          tone="brand"
         />
         <MetricCard label="Active" value={String(metrics.active)} note="Visible page" />
         <MetricCard label="Invited" value={String(metrics.invited)} note="Visible page" />

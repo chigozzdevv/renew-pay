@@ -388,7 +388,7 @@ export default function PlansPage() {
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Plans" value={String(metrics.total)} note="Configured billing plans" tone="brand" />
+        <MetricCard label="Plans" value={String(metrics.total)} note="Configured billing plans" />
         <MetricCard label="Active" value={String(metrics.active)} note="Visible page" />
         <MetricCard label="Metered" value={String(metrics.metered)} note="Visible page" />
         <MetricCard label="Markets" value={String(metrics.markets)} note="Visible page" />
