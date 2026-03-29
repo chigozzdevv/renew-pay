@@ -347,10 +347,10 @@ export async function saveOnboardingBusiness(input: {
     environment: input.payload.environment,
   });
 
-  const [merchant, owner, setting] = await Promise.all([
+  const [merchant, owner, existingSetting] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
     getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
-    getOrCreateSetting(input.merchantId),
+    loadSetting(input.merchantId),
   ]);
 
   owner.name = input.payload.ownerName;
@@ -358,18 +358,25 @@ export async function saveOnboardingBusiness(input: {
   merchant.name = input.payload.name;
   merchant.supportEmail = input.payload.supportEmail;
   merchant.supportedMarkets = input.payload.supportedMarkets;
+  merchant.billingTimezone = merchant.billingTimezone?.trim()
+    ? merchant.billingTimezone
+    : "UTC";
+
+  await Promise.all([owner.save(), merchant.save()]);
+
+  const setting = existingSetting ?? (await getOrCreateSetting(input.merchantId));
+
   setting.business.name = input.payload.name;
   setting.business.supportEmail = input.payload.supportEmail;
   setting.business.logoUrl = input.payload.logoUrl?.trim()
     ? input.payload.logoUrl.trim()
     : null;
   setting.business.defaultMarket = input.payload.supportedMarkets[0] ?? "NGN";
-  merchant.billingTimezone = merchant.billingTimezone?.trim() ? merchant.billingTimezone : "UTC";
   setting.business.billingTimezone = setting.business.billingTimezone?.trim()
     ? setting.business.billingTimezone
     : "UTC";
 
-  await Promise.all([owner.save(), merchant.save(), setting.save()]);
+  await setting.save();
 
   await appendAuditLog({
     merchantId: input.merchantId,
