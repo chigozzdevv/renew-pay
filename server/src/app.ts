@@ -11,6 +11,7 @@ import { developerRouter } from "@/features/developers/developer.routes";
 import { invoiceRouter, publicInvoiceRouter } from "@/features/invoices/invoice.routes";
 import { kycRouter } from "@/features/kyc/kyc.routes";
 import { merchantRouter } from "@/features/merchants/merchant.routes";
+import { mediaRouter } from "@/features/media/media.routes";
 import { notificationRouter } from "@/features/notifications/notification.routes";
 import { onboardingRouter } from "@/features/onboarding/onboarding.routes";
 import { paymentRailRouter } from "@/features/payment-rails/payment-rails.routes";
@@ -81,6 +82,11 @@ export function createApp() {
     app.use(`${apiBasePath}/invoices/public`, publicInvoiceRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
     app.use(`${apiBasePath}/payment-rails`, paymentRailRouter);
+    app.use(
+      `${apiBasePath}/media`,
+      requirePlatformAuth,
+      mediaRouter
+    );
     app.use(
       `${apiBasePath}/merchants`,
       requirePlatformAuth,

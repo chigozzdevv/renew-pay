@@ -113,6 +113,10 @@ const envSchema = z
     PARTNA_API_USER_LIVE: z.string().trim().default(""),
     PARTNA_WEBHOOK_PUBLIC_KEY_LIVE: z.string().trim().default(""),
     PARTNA_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    CLOUDINARY_CLOUD_NAME: z.string().trim().default(""),
+    CLOUDINARY_API_KEY: z.string().trim().default(""),
+    CLOUDINARY_API_SECRET: z.string().trim().default(""),
+    CLOUDINARY_UPLOAD_FOLDER: z.string().trim().default("renew"),
     SUMSUB_BASE_URL_TEST: z
       .string()
       .trim()

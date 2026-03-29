@@ -16,6 +16,7 @@ import {
   Select,
   StatGrid,
 } from "@/components/dashboard/ui";
+import { ImageUpload } from "@/components/shared/image-upload";
 import { Logo } from "@/components/shared/logo";
 import { ApiError } from "@/lib/api";
 import { loadBillingMarketCatalog } from "@/lib/markets";
@@ -633,16 +634,13 @@ export default function SettingsPage() {
                   </Select>
                 </SettingsField>
 
-                <SettingsField label="Logo URL">
-                  <Input
-                    value={businessDraft.logoUrl ?? ""}
-                    placeholder="https://cdn.renew.sh/brand/logo.png"
-                    onChange={(event) =>
-                      patchBusiness(
-                        "logoUrl",
-                        event.target.value.trim() ? event.target.value : null
-                      )
-                    }
+                <SettingsField label="Brand logo">
+                  <ImageUpload
+                    token={token}
+                    value={businessDraft.logoUrl}
+                    alt={`${businessDraft.name} logo`}
+                    onChange={(nextValue) => patchBusiness("logoUrl", nextValue)}
+                    disabled={busyAction === "workspace-save"}
                   />
                 </SettingsField>
               </div>

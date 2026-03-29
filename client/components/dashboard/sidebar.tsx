@@ -56,7 +56,7 @@ export function DashboardSidebar({
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold tracking-[-0.02em] transition-all duration-200",
                 isActive
-                  ? "bg-[#0c4a27] text-[#d9f6bc]"
+                  ? "bg-[color:var(--ink)] text-white"
                   : "text-[color:var(--muted)] hover:bg-black/4 hover:text-[color:var(--ink)]",
               )}
             >
@@ -64,7 +64,7 @@ export function DashboardSidebar({
                 className={cn(
                   "inline-flex h-9 w-9 items-center justify-center rounded-2xl",
                   isActive
-                    ? "bg-white/10 text-[#d9f6bc]"
+                    ? "bg-white/12 text-white"
                     : "bg-black/4 text-[color:var(--muted)]",
                 )}
               >

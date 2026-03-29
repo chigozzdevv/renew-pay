@@ -13,7 +13,12 @@ export function DashboardAccessGate({
   const { user } = useDashboardSession();
 
   if (user?.onboardingStatus !== "workspace_active") {
-    return <OnboardingPage />;
+    return (
+      <>
+        {children}
+        <OnboardingPage />
+      </>
+    );
   }
 
   return <>{children}</>;

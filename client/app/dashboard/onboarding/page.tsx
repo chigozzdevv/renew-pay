@@ -12,7 +12,8 @@ import {
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
-import { Badge, Button, Card, Input, PageState } from "@/components/dashboard/ui";
+import { Badge, Button, Input } from "@/components/dashboard/ui";
+import { ImageUpload } from "@/components/shared/image-upload";
 import { ApiError } from "@/lib/api";
 import {
   registerOnboardingMerchant,
@@ -29,6 +30,27 @@ import {
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim() ?? "";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+const STEP_KEYS = ["business", "verification", "payout", "register"] as const;
+
+const STEP_META: Record<string, { title: string; subtitle: string }> = {
+  business: {
+    title: "Business basics",
+    subtitle: "Tell us about your business so we can set up your workspace.",
+  },
+  verification: {
+    title: "Verification",
+    subtitle: "Complete identity verification to activate your account.",
+  },
+  payout: {
+    title: "Payout",
+    subtitle: "Set up where you want to receive your funds.",
+  },
+  register: {
+    title: "Register",
+    subtitle: "Finalize your merchant registration.",
+  },
+};
 
 type PrivyWalletRecord = {
   address: string;
@@ -300,7 +322,314 @@ function useOnboardingWorkspace() {
   };
 }
 
-function OnboardingContent(input: {
+function StepIndicator({
+  steps,
+  activeIndex,
+  onStepClick,
+}: {
+  steps: OnboardingState["steps"];
+  activeIndex: number;
+  onStepClick: (index: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {steps.map((step, index) => {
+        const isComplete = step.status === "complete";
+        const isActive = index === activeIndex;
+
+        return (
+          <button
+            key={step.key}
+            type="button"
+            onClick={() => onStepClick(index)}
+            className="flex items-center gap-2"
+          >
+            <span
+              className={
+                "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors " +
+                (isComplete
+                  ? "bg-[color:var(--ink)] text-white"
+                  : isActive
+                    ? "border-2 border-[color:var(--ink)] text-[color:var(--ink)]"
+                    : "border border-[color:var(--line)] text-[color:var(--muted)]")
+              }
+            >
+              {isComplete ? (
+                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                index + 1
+              )}
+            </span>
+            {index < steps.length - 1 && (
+              <span
+                className={
+                  "hidden h-px w-6 sm:block " +
+                  (isComplete ? "bg-[color:var(--ink)]" : "bg-[color:var(--line)]")
+                }
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BusinessStep({
+  token,
+  businessDraft,
+  setBusinessDraft,
+  busyAction,
+  onSave,
+}: {
+  token: string;
+  businessDraft: OnboardingState["business"];
+  setBusinessDraft: (updater: (current: OnboardingState["business"] | null) => OnboardingState["business"] | null) => void;
+  busyAction: string | null;
+  onSave: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <label className="grid gap-1.5">
+        <span className="text-sm font-medium text-[color:var(--ink)]">Your name</span>
+        <Input
+          value={businessDraft.ownerName}
+          onChange={(event) =>
+            setBusinessDraft((current) =>
+              current ? { ...current, ownerName: event.target.value } : current
+            )
+          }
+          placeholder="Full name"
+        />
+      </label>
+      <label className="grid gap-1.5">
+        <span className="text-sm font-medium text-[color:var(--ink)]">Business name</span>
+        <Input
+          value={businessDraft.name}
+          onChange={(event) =>
+            setBusinessDraft((current) =>
+              current ? { ...current, name: event.target.value } : current
+            )
+          }
+          placeholder="Your company"
+        />
+      </label>
+      <label className="grid gap-1.5">
+        <span className="text-sm font-medium text-[color:var(--ink)]">Email</span>
+        <Input
+          type="email"
+          value={businessDraft.supportEmail}
+          onChange={(event) =>
+            setBusinessDraft((current) =>
+              current ? { ...current, supportEmail: event.target.value } : current
+            )
+          }
+          placeholder="support@company.com"
+        />
+      </label>
+      <div className="grid gap-1.5">
+        <span className="text-sm font-medium text-[color:var(--ink)]">Brand logo</span>
+        <ImageUpload
+          token={token}
+          value={businessDraft.logoUrl || null}
+          alt={`${businessDraft.name || "Renew"} logo`}
+          onChange={(nextValue) =>
+            setBusinessDraft((current) =>
+              current ? { ...current, logoUrl: nextValue ?? "" } : current
+            )
+          }
+          disabled={busyAction === "business"}
+        />
+      </div>
+      <label className="grid gap-1.5">
+        <span className="text-sm font-medium text-[color:var(--ink)]">Supported markets</span>
+        <Input
+          value={businessDraft.supportedMarkets.join(", ")}
+          onChange={(event) =>
+            setBusinessDraft((current) =>
+              current
+                ? {
+                    ...current,
+                    supportedMarkets: event.target.value
+                      .split(",")
+                      .map((entry) => entry.trim().toUpperCase())
+                      .filter(Boolean),
+                  }
+                : current
+            )
+          }
+          placeholder="NGN, GHS, KES"
+        />
+      </label>
+      <Button
+        type="button"
+        tone="brand"
+        className="mt-2 w-full"
+        disabled={busyAction === "business"}
+        onClick={onSave}
+      >
+        {busyAction === "business" ? "Saving..." : "Save and continue"}
+      </Button>
+    </div>
+  );
+}
+
+function VerificationStep({
+  data,
+  mode,
+  busyAction,
+  onStartKyc,
+  onStartKyb,
+  onRefresh,
+}: {
+  data: OnboardingState;
+  mode: "test" | "live";
+  busyAction: string | null;
+  onStartKyc: () => void;
+  onStartKyb: () => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/4">
+            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-[color:var(--ink)]">
+              <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.7" />
+              <path d="M4.5 16C5.3 13.2 7.4 11.5 10 11.5C12.6 11.5 14.7 13.2 15.5 16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-[color:var(--ink)]">Owner KYC</p>
+            <Badge tone={toBadgeTone(data.verification.ownerKyc.status)}>
+              {data.verification.ownerKyc.status.replace(/_/g, " ")}
+            </Badge>
+          </div>
+        </div>
+        <Button
+          type="button"
+          disabled={busyAction === "owner-kyc"}
+          onClick={onStartKyc}
+        >
+          {busyAction === "owner-kyc" ? "Starting..." : "Start KYC"}
+        </Button>
+      </div>
+
+      {mode === "live" ? (
+        <div className="flex items-center justify-between rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3.5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/4">
+              <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-[color:var(--ink)]">
+                <rect x="4" y="4" width="12" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
+                <path d="M7 9.5L9 11.5L13 7.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[color:var(--ink)]">Merchant KYB</p>
+              <Badge tone={toBadgeTone(data.verification.merchantKyb.status)}>
+                {data.verification.merchantKyb.status.replace(/_/g, " ")}
+              </Badge>
+            </div>
+          </div>
+          <Button
+            type="button"
+            disabled={busyAction === "merchant-kyb"}
+            onClick={onStartKyb}
+          >
+            {busyAction === "merchant-kyb" ? "Starting..." : "Start KYB"}
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
+          KYB is only required in live mode.
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onRefresh}
+        className="text-sm font-medium text-[color:var(--muted)] transition-colors hover:text-[color:var(--ink)]"
+      >
+        Refresh status
+      </button>
+    </div>
+  );
+}
+
+function PayoutStep({
+  payoutWallet,
+  setPayoutWallet,
+  busyAction,
+  onSave,
+}: {
+  payoutWallet: string;
+  setPayoutWallet: (value: string) => void;
+  busyAction: string | null;
+  onSave: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <label className="grid gap-1.5">
+        <span className="text-sm font-medium text-[color:var(--ink)]">Payout wallet</span>
+        <Input
+          value={payoutWallet}
+          onChange={(event) => setPayoutWallet(event.target.value)}
+          placeholder="Solana wallet address"
+        />
+      </label>
+      <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
+        Bank transfer payout is coming soon.
+      </div>
+      <Button
+        type="button"
+        tone="brand"
+        className="w-full"
+        disabled={busyAction === "payout"}
+        onClick={onSave}
+      >
+        {busyAction === "payout" ? "Saving..." : "Save and continue"}
+      </Button>
+    </div>
+  );
+}
+
+function RegisterStep({
+  registerCard,
+}: {
+  registerCard: RegisterCardState;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+          Privy signer
+        </p>
+        <p className="mt-1.5 text-sm font-semibold text-[color:var(--ink)]">
+          {registerCard.signerLabel}
+        </p>
+        <p className="mt-1 text-xs text-[color:var(--muted)]">
+          {registerCard.signerNote}
+        </p>
+      </div>
+      <Button
+        type="button"
+        tone="brand"
+        className="w-full"
+        disabled={registerCard.disabled}
+        onClick={registerCard.onRegister}
+      >
+        {registerCard.label}
+      </Button>
+    </div>
+  );
+}
+
+function OnboardingModal({
+  state,
+  registerCard,
+}: {
   state: ReturnType<typeof useOnboardingWorkspace>;
   registerCard: RegisterCardState;
 }) {
@@ -319,11 +648,21 @@ function OnboardingContent(input: {
     payoutWallet,
     setPayoutWallet,
     runAction,
-  } = input.state;
+  } = state;
+
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [sumsubLaunch, setSumsubLaunch] = useState<SumsubLaunchState | null>(null);
   const [sumsubError, setSumsubError] = useState<string | null>(null);
   const sumsubContainerRef = useRef<HTMLDivElement | null>(null);
   const sumsubInstanceRef = useRef<{ destroy?: () => void } | null>(null);
+
+  useEffect(() => {
+    if (!data) return;
+    const currentIndex = STEP_KEYS.indexOf(data.currentStepKey as typeof STEP_KEYS[number]);
+    if (currentIndex >= 0) {
+      setActiveStepIndex(currentIndex);
+    }
+  }, [data?.currentStepKey]);
 
   async function refreshSumsubAccessToken(subject: VerificationSubject) {
     if (!token) {
@@ -448,312 +787,224 @@ function OnboardingContent(input: {
 
   if (isLoading || !businessDraft || !data || !token) {
     return (
-      <PageState
-        title="Preparing onboarding"
-        message="Loading your workspace setup."
-      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0b0a]/40 backdrop-blur-sm">
+        <div className="w-[min(100%,480px)] rounded-[2rem] border border-[color:var(--line)] bg-white p-8 shadow-[0_40px_120px_rgba(0,0,0,0.12)]">
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--line)] border-t-[color:var(--ink)]" />
+            <p className="text-sm text-[color:var(--muted)]">Loading setup...</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <PageState
-        title="Unable to load onboarding"
-        message={error}
-        tone="danger"
-        action={
-          <Button type="button" tone="brand" onClick={() => void reload()}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0b0a]/40 backdrop-blur-sm">
+        <div className="w-[min(100%,480px)] rounded-[2rem] border border-[color:var(--line)] bg-white p-8 shadow-[0_40px_120px_rgba(0,0,0,0.12)]">
+          <h2 className="font-display text-xl font-semibold tracking-[-0.04em] text-[color:var(--ink)]">
+            Unable to load
+          </h2>
+          <p className="mt-2 text-sm text-[color:var(--muted)]">{error}</p>
+          <Button type="button" tone="brand" className="mt-5" onClick={() => void reload()}>
             Retry
           </Button>
-        }
-      />
+        </div>
+      </div>
     );
   }
 
+  const activeStepKey = STEP_KEYS[activeStepIndex];
+  const meta = STEP_META[activeStepKey];
+
+  function goNext() {
+    setActiveStepIndex((current) => Math.min(current + 1, STEP_KEYS.length - 1));
+  }
+
+  function goBack() {
+    setActiveStepIndex((current) => Math.max(current - 1, 0));
+  }
+
   return (
-    <section className="space-y-6">
-      <div className="overflow-hidden rounded-[2.4rem] border border-[#d3e4cf] bg-[radial-gradient(circle_at_top_left,_rgba(217,246,188,0.78),_rgba(244,247,241,0.96)_52%,_rgba(255,255,255,0.98)_100%)] p-6 shadow-[0_24px_80px_rgba(12,74,39,0.08)] sm:p-7">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge tone="brand">{mode === "live" ? "Live" : "Test"}</Badge>
-            {data.steps.map((step) => (
-              <Badge key={step.key} tone={toBadgeTone(step.status)}>
-                {step.label}
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0b0a]/40 p-4 backdrop-blur-sm">
+        <div className="flex max-h-[min(92vh,720px)] w-[min(100%,480px)] flex-col rounded-[2rem] border border-[color:var(--line)] bg-white shadow-[0_40px_120px_rgba(0,0,0,0.12)]">
+          <div className="shrink-0 border-b border-[color:var(--line)] px-6 pt-6 pb-5">
+            <div className="flex items-center justify-between">
+              <Badge tone={mode === "live" ? "brand" : "neutral"}>
+                {mode === "live" ? "Live" : "Test"}
               </Badge>
-            ))}
-          </div>
-          <div className="space-y-2">
-            <h1 className="font-display text-3xl font-semibold tracking-[-0.06em] text-[color:var(--ink)] sm:text-[2.6rem]">
-              Finish merchant setup.
-            </h1>
-            <p className="max-w-2xl text-sm leading-7 text-[color:var(--muted)]">
-              Add your business details, clear verification, set payouts, then register.
+              <StepIndicator
+                steps={data.steps}
+                activeIndex={activeStepIndex}
+                onStepClick={setActiveStepIndex}
+              />
+            </div>
+            <h2 className="mt-4 font-display text-xl font-semibold tracking-[-0.04em] text-[color:var(--ink)]">
+              {meta.title}
+            </h2>
+            <p className="mt-1 text-sm text-[color:var(--muted)]">
+              {meta.subtitle}
             </p>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {actionMessage && (
+              <div className="mb-4 rounded-xl border border-[#c2ddb8] bg-[#f0f8ec] px-4 py-2.5 text-sm text-[#2d5a1e]">
+                {actionMessage}
+              </div>
+            )}
+            {actionError && (
+              <div className="mb-4 rounded-xl border border-[#ecd0cc] bg-[#fff6f5] px-4 py-2.5 text-sm text-[#9b3d31]">
+                {actionError}
+              </div>
+            )}
+
+            {activeStepKey === "business" && (
+              <BusinessStep
+                token={token}
+                businessDraft={businessDraft}
+                setBusinessDraft={setBusinessDraft}
+                busyAction={busyAction}
+                onSave={() =>
+                  void runAction("business", async () => {
+                    await saveOnboardingBusiness({
+                      token,
+                      environment: mode,
+                      logoUrl: businessDraft.logoUrl,
+                      ownerName: businessDraft.ownerName,
+                      name: businessDraft.name,
+                      supportEmail: businessDraft.supportEmail,
+                      supportedMarkets: businessDraft.supportedMarkets,
+                    });
+                    goNext();
+                    return "Business basics saved.";
+                  })
+                }
+              />
+            )}
+
+            {activeStepKey === "verification" && (
+              <VerificationStep
+                data={data}
+                mode={mode}
+                busyAction={busyAction}
+                onStartKyc={() =>
+                  void runAction("owner-kyc", async () => {
+                    const result = await startOnboardingVerification({
+                      token,
+                      environment: mode,
+                      subject: "owner_kyc",
+                    });
+                    const accessToken = result.sdkAccessToken?.trim();
+
+                    if (!accessToken) {
+                      throw new Error("Sumsub did not return a WebSDK access token.");
+                    }
+
+                    setSumsubLaunch({
+                      subject: "owner_kyc",
+                      accessToken,
+                      title: "Owner KYC",
+                    });
+                    return "Owner KYC started.";
+                  })
+                }
+                onStartKyb={() =>
+                  void runAction("merchant-kyb", async () => {
+                    const result = await startOnboardingVerification({
+                      token,
+                      environment: mode,
+                      subject: "merchant_kyb",
+                    });
+                    const accessToken = result.sdkAccessToken?.trim();
+
+                    if (!accessToken) {
+                      throw new Error("Sumsub did not return a WebSDK access token.");
+                    }
+
+                    setSumsubLaunch({
+                      subject: "merchant_kyb",
+                      accessToken,
+                      title: "Merchant KYB",
+                    });
+                    return "Merchant KYB started.";
+                  })
+                }
+                onRefresh={() => void reload()}
+              />
+            )}
+
+            {activeStepKey === "payout" && (
+              <PayoutStep
+                payoutWallet={payoutWallet}
+                setPayoutWallet={setPayoutWallet}
+                busyAction={busyAction}
+                onSave={() =>
+                  void runAction("payout", async () => {
+                    await saveOnboardingPayout({
+                      token,
+                      environment: mode,
+                      payoutWallet,
+                    });
+                    goNext();
+                    return "Payout saved.";
+                  })
+                }
+              />
+            )}
+
+            {activeStepKey === "register" && (
+              <RegisterStep registerCard={registerCard} />
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-[color:var(--line)] px-6 py-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={goBack}
+                className={
+                  "text-sm font-medium transition-colors " +
+                  (activeStepIndex === 0
+                    ? "cursor-default text-transparent"
+                    : "text-[color:var(--muted)] hover:text-[color:var(--ink)]")
+                }
+                disabled={activeStepIndex === 0}
+              >
+                Back
+              </button>
+              <div className="flex items-center gap-1.5">
+                {STEP_KEYS.map((_, index) => (
+                  <span
+                    key={index}
+                    className={
+                      "h-1.5 rounded-full transition-all " +
+                      (index === activeStepIndex
+                        ? "w-4 bg-[color:var(--ink)]"
+                        : "w-1.5 bg-[color:var(--line)]")
+                    }
+                  />
+                ))}
+              </div>
+              {activeStepKey !== "register" ? (
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="text-sm font-medium text-[color:var(--muted)] transition-colors hover:text-[color:var(--ink)]"
+                >
+                  Skip
+                </button>
+              ) : (
+                <span className="text-sm text-transparent">Skip</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {actionMessage ? <PageState title="Updated" message={actionMessage} /> : null}
-      {actionError ? (
-        <PageState title="Action failed" message={actionError} tone="danger" />
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Business basics" description="Owner, logo, business details, and markets.">
-          <div className="grid gap-4">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Logo URL</span>
-              <Input
-                type="url"
-                value={businessDraft.logoUrl}
-                onChange={(event) =>
-                  setBusinessDraft((current) =>
-                    current ? { ...current, logoUrl: event.target.value } : current
-                  )
-                }
-                placeholder="https://..."
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Your name</span>
-              <Input
-                value={businessDraft.ownerName}
-                onChange={(event) =>
-                  setBusinessDraft((current) =>
-                    current ? { ...current, ownerName: event.target.value } : current
-                  )
-                }
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Business name</span>
-              <Input
-                value={businessDraft.name}
-                onChange={(event) =>
-                  setBusinessDraft((current) =>
-                    current ? { ...current, name: event.target.value } : current
-                  )
-                }
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Email</span>
-              <Input
-                type="email"
-                value={businessDraft.supportEmail}
-                onChange={(event) =>
-                  setBusinessDraft((current) =>
-                    current ? { ...current, supportEmail: event.target.value } : current
-                  )
-                }
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">
-                Supported markets
-              </span>
-              <Input
-                value={businessDraft.supportedMarkets.join(", ")}
-                onChange={(event) =>
-                  setBusinessDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          supportedMarkets: event.target.value
-                            .split(",")
-                            .map((entry) => entry.trim().toUpperCase())
-                            .filter(Boolean),
-                        }
-                      : current
-                  )
-                }
-                placeholder="NGN, GHS, KES"
-              />
-            </label>
-          </div>
-          <div className="mt-5">
-            <Button
-              type="button"
-              tone="brand"
-              disabled={busyAction === "business"}
-              onClick={() =>
-                void runAction("business", async () => {
-                  await saveOnboardingBusiness({
-                    token,
-                    environment: mode,
-                    logoUrl: businessDraft.logoUrl,
-                    ownerName: businessDraft.ownerName,
-                    name: businessDraft.name,
-                    supportEmail: businessDraft.supportEmail,
-                    supportedMarkets: businessDraft.supportedMarkets,
-                  });
-                  return "Business basics saved.";
-                })
-              }
-            >
-              {busyAction === "business" ? "Saving..." : "Save basics"}
-            </Button>
-          </div>
-        </Card>
-
-        <Card
-          title="Verification"
-          description={
-            mode === "live"
-              ? "KYC first, then KYB before registration."
-              : "KYC only in test mode. KYB is required in live."
-          }
-        >
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-[color:var(--ink)]">Owner KYC</p>
-                <Badge tone={toBadgeTone(data.verification.ownerKyc.status)}>
-                  {data.verification.ownerKyc.status.replace(/_/g, " ")}
-                </Badge>
-              </div>
-                <Button
-                  type="button"
-                  disabled={busyAction === "owner-kyc"}
-                  onClick={() =>
-                    void runAction("owner-kyc", async () => {
-                      const result = await startOnboardingVerification({
-                        token,
-                        environment: mode,
-                        subject: "owner_kyc",
-                      });
-                      const accessToken = result.sdkAccessToken?.trim();
-
-                      if (!accessToken) {
-                        throw new Error("Sumsub did not return a WebSDK access token.");
-                      }
-
-                      setSumsubLaunch({
-                        subject: "owner_kyc",
-                        accessToken,
-                        title: "Owner KYC",
-                      });
-                      return "Owner KYC started.";
-                    })
-                  }
-                >
-                {busyAction === "owner-kyc" ? "Starting..." : "Start KYC"}
-              </Button>
-            </div>
-
-            {mode !== "live" ? (
-              <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
-                KYB is only required when you switch this workspace to live mode.
-              </div>
-            ) : null}
-
-            {mode === "live" ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-[color:var(--ink)]">Merchant KYB</p>
-                  <Badge tone={toBadgeTone(data.verification.merchantKyb.status)}>
-                    {data.verification.merchantKyb.status.replace(/_/g, " ")}
-                  </Badge>
-                </div>
-                <Button
-                  type="button"
-                  disabled={busyAction === "merchant-kyb"}
-                  onClick={() =>
-                    void runAction("merchant-kyb", async () => {
-                      const result = await startOnboardingVerification({
-                        token,
-                        environment: mode,
-                        subject: "merchant_kyb",
-                      });
-                      const accessToken = result.sdkAccessToken?.trim();
-
-                      if (!accessToken) {
-                        throw new Error("Sumsub did not return a WebSDK access token.");
-                      }
-
-                      setSumsubLaunch({
-                        subject: "merchant_kyb",
-                        accessToken,
-                        title: "Merchant KYB",
-                      });
-                      return "Merchant KYB started.";
-                    })
-                  }
-                >
-                  {busyAction === "merchant-kyb" ? "Starting..." : "Start KYB"}
-                </Button>
-              </div>
-            ) : null}
-
-            <Button type="button" onClick={() => void reload()}>
-              Refresh status
-            </Button>
-          </div>
-        </Card>
-
-        <Card title="Payout" description="Wallet first. Bank transfer is coming soon.">
-          <div className="space-y-4">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-[color:var(--ink)]">Payout wallet</span>
-              <Input
-                value={payoutWallet}
-                onChange={(event) => setPayoutWallet(event.target.value)}
-                placeholder="Enter Solana wallet"
-              />
-            </label>
-            <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8faf7] px-4 py-3 text-sm text-[color:var(--muted)]">
-              Bank transfer payout is coming soon.
-            </div>
-            <Button
-              type="button"
-              tone="brand"
-              disabled={busyAction === "payout"}
-              onClick={() =>
-                void runAction("payout", async () => {
-                  await saveOnboardingPayout({
-                    token,
-                    environment: mode,
-                    payoutWallet,
-                  });
-                  return "Payout wallet saved.";
-                })
-              }
-            >
-              {busyAction === "payout" ? "Saving..." : "Save payout"}
-            </Button>
-          </div>
-        </Card>
-
-        <Card
-          title="Register"
-          description="Verify your Privy signer, initialize approvals, and register the merchant."
-        >
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                Privy signer
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[color:var(--ink)]">
-                {input.registerCard.signerLabel}
-              </p>
-              <p className="mt-1 text-xs text-[color:var(--muted)]">
-                {input.registerCard.signerNote}
-              </p>
-            </div>
-            <Button
-              type="button"
-              tone="brand"
-              disabled={input.registerCard.disabled}
-              onClick={input.registerCard.onRegister}
-            >
-              {input.registerCard.label}
-            </Button>
-          </div>
-        </Card>
-      </div>
-
-      {sumsubLaunch ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,12,8,0.58)] p-4">
+      {sumsubLaunch && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(6,12,8,0.58)] p-4">
           <div className="flex h-[min(92vh,860px)] w-[min(100%,1080px)] flex-col overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-white shadow-[0_40px_140px_rgba(4,12,8,0.28)]">
             <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] px-5 py-4">
               <div>
@@ -772,11 +1023,11 @@ function OnboardingContent(input: {
               </Button>
             </div>
 
-            {sumsubError ? (
+            {sumsubError && (
               <div className="border-b border-[#ecd0cc] bg-[#fff6f5] px-5 py-3 text-sm text-[#9b3d31]">
                 {sumsubError}
               </div>
-            ) : null}
+            )}
 
             <div className="min-h-0 flex-1 overflow-auto bg-[#f7faf6] p-4">
               <div
@@ -786,8 +1037,8 @@ function OnboardingContent(input: {
             </div>
           </div>
         </div>
-      ) : null}
-    </section>
+      )}
+    </>
   );
 }
 
@@ -820,7 +1071,7 @@ function PrivyOnboardingSurface() {
     setIsProvisioningWallet(true);
 
     void createWallet()
-      .catch((walletError) => {
+      .catch(() => {
         if (cancelled) {
           return;
         }
@@ -902,14 +1153,14 @@ function PrivyOnboardingSurface() {
       }),
   };
 
-  return <OnboardingContent state={state} registerCard={registerCard} />;
+  return <OnboardingModal state={state} registerCard={registerCard} />;
 }
 
 function FallbackOnboardingSurface() {
   const state = useOnboardingWorkspace();
 
   return (
-    <OnboardingContent
+    <OnboardingModal
       state={state}
       registerCard={{
         label: "Register merchant",
