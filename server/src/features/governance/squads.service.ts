@@ -11,6 +11,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SystemProgram,
   TransactionMessage,
   type TransactionInstruction,
 } from "@solana/web3.js";
@@ -35,6 +36,8 @@ type OperatorSnapshot = {
   operatorVaultAddress: string;
   operatorVaultIndex: number;
 };
+
+const MIN_SQUADS_VAULT_BALANCE_LAMPORTS = 20_000_000;
 
 function getConnection(mode: RuntimeMode) {
   const config = getProtocolRuntimeConfig(mode);
@@ -99,6 +102,31 @@ async function getSquadsProgramTreasury(connection: Connection) {
   );
 
   return programConfig.treasury;
+}
+
+async function ensureSquadsVaultFunding(input: {
+  connection: Connection;
+  environment: RuntimeMode;
+  admin: Keypair;
+  vaultPda: PublicKey;
+}) {
+  const currentBalance = await input.connection.getBalance(input.vaultPda, "confirmed");
+
+  if (currentBalance >= MIN_SQUADS_VAULT_BALANCE_LAMPORTS) {
+    return;
+  }
+
+  await sendSponsoredTransaction({
+    mode: input.environment,
+    authority: input.admin,
+    instructions: [
+      SystemProgram.transfer({
+        fromPubkey: input.admin.publicKey,
+        toPubkey: input.vaultPda,
+        lamports: MIN_SQUADS_VAULT_BALANCE_LAMPORTS - currentBalance,
+      }),
+    ],
+  });
 }
 
 export async function loadSquadsGovernanceSnapshot(input: {
@@ -241,6 +269,12 @@ export async function executeSquadsVaultInstructions(input: {
     multisigPda,
     index: input.vaultIndex,
   })[0];
+  await ensureSquadsVaultFunding({
+    connection,
+    environment: input.environment,
+    admin,
+    vaultPda,
+  });
   const latestBlockhash = await connection.getLatestBlockhash("confirmed");
   const transactionMessage = new TransactionMessage({
     payerKey: vaultPda,
