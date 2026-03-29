@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { usePrivy } from "@privy-io/react-auth";
+
 import {
   ApiError,
   clearAccessToken,
@@ -61,6 +63,7 @@ export function DashboardSessionProvider({
 }: {
   children: ReactNode;
 }) {
+  const { logout } = usePrivy();
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthenticatedDashboardUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,11 +140,18 @@ export function DashboardSessionProvider({
           setError("Dashboard session ended.");
         });
         if (typeof window !== "undefined") {
-          window.location.href = "/";
+          void (async () => {
+            try {
+              await logout?.();
+            } catch {
+            } finally {
+              window.location.href = "/";
+            }
+          })();
         }
       },
     }),
-    [error, isLoading, token, user]
+    [error, isLoading, logout, token, user]
   );
 
   return (

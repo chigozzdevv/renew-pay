@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getAccessToken,
@@ -13,7 +13,7 @@ import {
   useWallets as useSolanaWallets,
 } from "@privy-io/react-auth/solana";
 
-import { accessTokenStorageKey, ApiError } from "@/lib/api";
+import { accessTokenStorageKey, ApiError, readAccessToken } from "@/lib/api";
 import { exchangePrivySession } from "@/lib/auth";
 
 function extractPrivyEmail(user: unknown) {
@@ -150,13 +150,14 @@ type PrivySessionCardProps = {
 
 export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   const router = useRouter();
-  const { ready, user, logout } = usePrivy();
+  const { ready, authenticated, user, logout } = usePrivy();
   const { wallets } = useSolanaWallets();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldExchange, setShouldExchange] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const shouldExchangeRef = useRef(false);
   const exchangeStartedRef = useRef(false);
+  const autoResumeAttemptedRef = useRef(false);
 
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
   const embeddedWalletAddress = useMemo(() => extractEmbeddedWalletAddress(wallets), [wallets]);
@@ -203,7 +204,9 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
       exchangeStartedRef.current = false;
       setError(toErrorMessage(exchangeError));
       setShouldExchange(false);
-      await logout?.();
+      try {
+        await logout?.();
+      } catch {}
     } finally {
       setIsSubmitting(false);
     }
@@ -221,9 +224,31 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
       shouldExchangeRef.current = false;
       exchangeStartedRef.current = false;
       setShouldExchange(false);
+      setIsSubmitting(false);
       setError("Unable to continue with Privy.");
     },
   });
+
+  useEffect(() => {
+    if (!ready || !authenticated || shouldExchangeRef.current || exchangeStartedRef.current) {
+      return;
+    }
+
+    if (readAccessToken()) {
+      router.replace(nextPath);
+      return;
+    }
+
+    if (autoResumeAttemptedRef.current) {
+      return;
+    }
+
+    autoResumeAttemptedRef.current = true;
+    shouldExchangeRef.current = true;
+    setShouldExchange(true);
+    setError(null);
+    void finishExchange(user);
+  }, [authenticated, nextPath, ready, router, user]);
 
   if (!appId) {
     return null;
@@ -252,10 +277,22 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
         type="button"
         disabled={!ready || isBusy}
         onClick={() => {
+          if (!ready) {
+            return;
+          }
+
           shouldExchangeRef.current = true;
           setShouldExchange(true);
           setError(null);
           exchangeStartedRef.current = false;
+          autoResumeAttemptedRef.current = true;
+
+          if (authenticated) {
+            void finishExchange(user);
+            return;
+          }
+
+          setIsSubmitting(true);
           login();
         }}
         className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#111111] text-sm font-semibold text-white transition-colors hover:bg-[#222222] disabled:cursor-not-allowed disabled:opacity-50"
