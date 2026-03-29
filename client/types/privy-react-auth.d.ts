@@ -44,6 +44,19 @@ declare module "@privy-io/react-auth" {
     logout: () => Promise<void> | void;
   };
 
+  export function useLogin(callbacks?: {
+    onComplete?: (params: {
+      user: PrivyUser;
+      isNewUser: boolean;
+      wasAlreadyAuthenticated: boolean;
+      loginMethod: string | null;
+      loginAccount: PrivyLinkedAccount | null;
+    }) => void;
+    onError?: (error: string) => void;
+  }): {
+    login: (options?: unknown) => void;
+  };
+
   export function useWallets(): {
     ready: boolean;
     wallets: PrivyWallet[];

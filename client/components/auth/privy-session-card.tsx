@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   getAccessToken,
   getIdentityToken,
+  useLogin,
   usePrivy,
 } from "@privy-io/react-auth";
 import {
@@ -80,6 +81,57 @@ function extractEmbeddedWalletAddress(wallets: Array<{
   return wallet?.address?.trim() ?? null;
 }
 
+function extractPrivyEmbeddedWalletAddress(user: unknown) {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  const linkedAccounts =
+    "linkedAccounts" in user && Array.isArray(user.linkedAccounts)
+      ? user.linkedAccounts
+      : "linked_accounts" in user && Array.isArray(user.linked_accounts)
+        ? user.linked_accounts
+        : [];
+
+  for (const account of linkedAccounts) {
+    if (!account || typeof account !== "object") {
+      continue;
+    }
+
+    const accountType =
+      "type" in account && typeof account.type === "string"
+        ? account.type.trim().toLowerCase()
+        : null;
+    const walletClientType =
+      "walletClientType" in account && typeof account.walletClientType === "string"
+        ? account.walletClientType.trim().toLowerCase()
+        : "wallet_client_type" in account && typeof account.wallet_client_type === "string"
+          ? account.wallet_client_type.trim().toLowerCase()
+          : null;
+    const chainType =
+      "chainType" in account && typeof account.chainType === "string"
+        ? account.chainType.trim().toLowerCase()
+        : "chain_type" in account && typeof account.chain_type === "string"
+          ? account.chain_type.trim().toLowerCase()
+          : null;
+    const address =
+      "address" in account && typeof account.address === "string" && account.address.trim()
+        ? account.address.trim()
+        : null;
+
+    if (
+      accountType === "wallet" &&
+      address &&
+      chainType === "solana" &&
+      (walletClientType === "privy" || walletClientType === "privy-v2")
+    ) {
+      return address;
+    }
+  }
+
+  return null;
+}
+
 function toErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
     return error.message;
@@ -98,20 +150,20 @@ type PrivySessionCardProps = {
 
 export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   const router = useRouter();
-  const { ready, authenticated, user, login, logout } = usePrivy();
+  const { ready, user, logout } = usePrivy();
   const { wallets } = useSolanaWallets();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldExchange, setShouldExchange] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shouldExchangeRef = useRef(false);
   const exchangeStartedRef = useRef(false);
 
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
   const embeddedWalletAddress = useMemo(() => extractEmbeddedWalletAddress(wallets), [wallets]);
-  const operatorWalletAddress = embeddedWalletAddress;
 
   const isBusy = isSubmitting || shouldExchange;
 
-  async function finishExchange() {
+  async function finishExchange(sourceUser?: unknown) {
     if (exchangeStartedRef.current) {
       return;
     }
@@ -134,16 +186,20 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
         throw new Error("Privy did not return an access token.");
       }
 
+      const operatorWalletAddress =
+        extractPrivyEmbeddedWalletAddress(sourceUser ?? user) ?? embeddedWalletAddress;
+
       const session = await exchangePrivySession({
         authToken,
         identityToken,
-        email: extractPrivyEmail(user) ?? undefined,
+        email: extractPrivyEmail(sourceUser ?? user) ?? undefined,
         operatorWalletAddress: operatorWalletAddress ?? undefined,
       });
 
       window.localStorage.setItem(accessTokenStorageKey, session.accessToken);
       router.replace(nextPath);
     } catch (exchangeError) {
+      shouldExchangeRef.current = false;
       exchangeStartedRef.current = false;
       setError(toErrorMessage(exchangeError));
       setShouldExchange(false);
@@ -153,18 +209,21 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
     }
   }
 
-  useEffect(() => {
-    if (!ready || !authenticated || !shouldExchange) {
-      return;
-    }
+  const { login } = useLogin({
+    onComplete: ({ user: completedUser }) => {
+      if (!shouldExchangeRef.current) {
+        return;
+      }
 
-    void finishExchange();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    ready,
-    authenticated,
-    shouldExchange,
-  ]);
+      void finishExchange(completedUser);
+    },
+    onError: () => {
+      shouldExchangeRef.current = false;
+      exchangeStartedRef.current = false;
+      setShouldExchange(false);
+      setError("Unable to continue with Privy.");
+    },
+  });
 
   if (!appId) {
     return null;
@@ -191,26 +250,13 @@ export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
 
       <button
         type="button"
-        disabled={
-          !ready ||
-          isBusy
-        }
-        onClick={async () => {
+        disabled={!ready || isBusy}
+        onClick={() => {
+          shouldExchangeRef.current = true;
           setShouldExchange(true);
           setError(null);
           exchangeStartedRef.current = false;
-
-          if (authenticated) {
-            return;
-          }
-
-          try {
-            await login();
-          } catch (loginError) {
-            exchangeStartedRef.current = false;
-            setError(toErrorMessage(loginError));
-            setShouldExchange(false);
-          }
+          login();
         }}
         className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#111111] text-sm font-semibold text-white transition-colors hover:bg-[#222222] disabled:cursor-not-allowed disabled:opacity-50"
       >

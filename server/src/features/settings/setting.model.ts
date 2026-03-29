@@ -115,8 +115,8 @@ const walletSettingsSchema = new Schema(
   {
     primaryWallet: {
       type: String,
-      required: true,
       trim: true,
+      default: null,
     },
     reserveWallet: {
       type: String,

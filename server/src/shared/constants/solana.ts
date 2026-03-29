@@ -22,5 +22,5 @@ export function isConfiguredWalletAddress(value: string | null | undefined) {
 }
 
 export function createUnconfiguredWalletAddress() {
-  return "";
+  return null;
 }

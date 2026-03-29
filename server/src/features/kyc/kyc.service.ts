@@ -493,6 +493,9 @@ export async function startTeamMemberKycSession(input: StartTeamMemberKycInput) 
   if (mode === "live") {
     assertLiveOnboardingEnabled("starting team member KYC");
   }
+  if (!member.name?.trim()) {
+    throw new HttpError(409, "Save business details before starting team member verification.");
+  }
   const config = getSumsubConfig(mode);
   const sumsubProvider = getSumsubProvider(mode);
   const levelName = input.levelName ?? config.levelNameKyc;

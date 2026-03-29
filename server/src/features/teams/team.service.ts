@@ -32,7 +32,7 @@ import {
 function toTeamMemberResponse(document: {
   _id: { toString(): string };
   merchantId: { toString(): string };
-  name: string;
+  name?: string | null;
   email: string;
   role: string;
   status: string;
@@ -44,11 +44,12 @@ function toTeamMemberResponse(document: {
   updatedAt: Date;
 }) {
   const permissions = normalizePermissions(document.permissions);
+  const displayName = document.name?.trim() || document.email;
 
   return {
     id: document._id.toString(),
     merchantId: document.merchantId.toString(),
-    name: document.name,
+    name: displayName,
     email: document.email,
     role: document.role,
     status: document.status,

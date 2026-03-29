@@ -19,8 +19,6 @@ export async function exchangePrivySession(input: {
   authToken: string;
   identityToken?: string | null;
   email?: string;
-  billingTimezone?: string;
-  supportedMarkets?: string[];
   operatorWalletAddress?: string | null;
 }) {
   const body: Record<string, unknown> = {
@@ -33,14 +31,6 @@ export async function exchangePrivySession(input: {
 
   if (input.email) {
     body.email = input.email;
-  }
-
-  if (input.billingTimezone) {
-    body.billingTimezone = input.billingTimezone;
-  }
-
-  if (input.supportedMarkets?.length) {
-    body.supportedMarkets = input.supportedMarkets;
   }
 
   if (input.operatorWalletAddress) {

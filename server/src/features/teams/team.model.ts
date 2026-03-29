@@ -9,8 +9,8 @@ const teamMemberSchema = new Schema(
     },
     name: {
       type: String,
-      required: true,
       trim: true,
+      default: null,
     },
     email: {
       type: String,

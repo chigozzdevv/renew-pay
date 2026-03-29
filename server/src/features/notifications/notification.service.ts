@@ -121,6 +121,13 @@ function createSupportMailto(email: string, merchantName: string) {
   )}`;
 }
 
+function resolveRecipientName(input: {
+  name?: string | null;
+  email: string;
+}) {
+  return input.name?.trim() || input.email.trim();
+}
+
 function resolveMerchantLabel(input: {
   name?: string | null;
   supportEmail?: string | null;
@@ -765,10 +772,10 @@ export async function queueTeamInviteNotification(input: {
     category: "team",
     recipient: {
       email: member.email,
-      name: member.name,
+      name: resolveRecipientName(member),
     },
     payload: {
-      recipientName: member.name,
+      recipientName: resolveRecipientName(member),
       role: member.role,
       inviteUrl: `${getAppBaseUrl()}/login`,
       supportUrl: createSupportMailto(

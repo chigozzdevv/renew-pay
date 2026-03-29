@@ -107,6 +107,13 @@ function normalizeAddress(value: string) {
   return normalized;
 }
 
+function resolveTeamMemberActor(member: {
+  name?: string | null;
+  email: string;
+}) {
+  return member.name?.trim() || member.email.trim();
+}
+
 function toNullableString(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -1947,7 +1954,7 @@ export async function createTreasurySignerChallenge(input: {
 
   await appendAuditLog({
     merchantId: input.merchantId,
-    actor: member.name,
+    actor: resolveTeamMemberActor(member),
     action: "Requested treasury signer challenge",
     category: "security",
     status: "ok",
@@ -2006,7 +2013,7 @@ export async function verifyTreasurySigner(input: {
 
   await appendAuditLog({
     merchantId: input.merchantId,
-    actor: member.name,
+    actor: resolveTeamMemberActor(member),
     action: "Verified treasury signer",
     category: "security",
     status: "ok",
@@ -2024,7 +2031,7 @@ export async function verifyTreasurySigner(input: {
     merchantId: input.merchantId,
     teamMemberId: input.teamMemberId,
     requesterTeamMemberId: input.teamMemberId,
-    actor: member.name,
+    actor: resolveTeamMemberActor(member),
   });
 
   return toTreasurySignerResponse(signerBinding);
@@ -2206,6 +2213,10 @@ export async function bootstrapTreasuryAccount(input: {
   }
 
   if (!treasuryAccount) {
+    if (!merchant.payoutWallet) {
+      throw new HttpError(409, "Merchant payout wallet is not configured.");
+    }
+
     treasuryAccount = await createTreasuryAccountFromGovernanceVault({
       merchantId: input.merchantId,
       environment: input.payload.environment,
@@ -2451,7 +2462,7 @@ export async function addTreasuryOwner(input: {
     targetTeamMemberId: input.payload.teamMemberId,
     metadata: {
       teamMemberId: input.payload.teamMemberId,
-      teamMemberName: member.name,
+      teamMemberName: resolveTeamMemberActor(member),
       teamMemberEmail: member.email,
       walletAddress: ownerWallet,
       nextThreshold: threshold,
@@ -2522,7 +2533,7 @@ export async function removeTreasuryOwner(input: {
     targetTeamMemberId: input.teamMemberId,
     metadata: {
       teamMemberId: input.teamMemberId,
-      teamMemberName: member.name,
+      teamMemberName: resolveTeamMemberActor(member),
       teamMemberEmail: member.email,
       walletAddress: ownerWallet,
       nextThreshold: threshold,
@@ -2664,6 +2675,10 @@ export async function queueMerchantRegistrationOperation(input: {
 
   if (existingOperation) {
     return toTreasuryOperationResponse(existingOperation);
+  }
+
+  if (!merchant.payoutWallet) {
+    throw new HttpError(409, "Merchant payout wallet is not configured.");
   }
 
   return createWalletOperation({
@@ -3480,7 +3495,7 @@ export async function approveTreasuryOperation(input: {
 
   operation.signatures.push({
     teamMemberId: input.teamMemberId,
-    name: member.name,
+    name: resolveTeamMemberActor(member),
     email: member.email,
     role: member.role,
     walletAddress: signerBinding.walletAddress,

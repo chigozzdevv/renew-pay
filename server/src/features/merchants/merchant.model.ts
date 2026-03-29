@@ -18,8 +18,8 @@ const merchantSchema = new Schema(
     },
     payoutWallet: {
       type: String,
-      required: true,
       trim: true,
+      default: null,
     },
     reserveWallet: {
       type: String,
@@ -33,9 +33,9 @@ const merchantSchema = new Schema(
     },
     supportEmail: {
       type: String,
-      required: true,
       trim: true,
       lowercase: true,
+      default: null,
     },
     billingTimezone: {
       type: String,

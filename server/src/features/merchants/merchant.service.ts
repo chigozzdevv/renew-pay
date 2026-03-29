@@ -13,7 +13,7 @@ import { normalizeSolanaAddress } from "@/shared/constants/solana";
 function toMerchantResponse(document: {
   _id: { toString(): string };
   merchantAccount: string;
-  payoutWallet: string;
+  payoutWallet?: string | null;
   reserveWallet?: string | null;
   name?: string | null;
   supportEmail?: string | null;
@@ -27,7 +27,7 @@ function toMerchantResponse(document: {
   return {
     id: document._id.toString(),
     merchantAccount: document.merchantAccount,
-    payoutWallet: document.payoutWallet,
+    payoutWallet: document.payoutWallet ?? "",
     reserveWallet: document.reserveWallet ?? null,
     name: document.name ?? "",
     supportEmail: document.supportEmail ?? "",
@@ -60,7 +60,7 @@ export async function createMerchant(input: CreateMerchantInput) {
 
   const createdMerchant = await MerchantModel.create({
     merchantAccount,
-    payoutWallet: normalizeSolanaAddress(input.payoutWallet) ?? "",
+    payoutWallet: normalizeSolanaAddress(input.payoutWallet),
     reserveWallet: normalizeSolanaAddress(input.reserveWallet),
     name: input.name,
     supportEmail: input.supportEmail,
@@ -124,7 +124,7 @@ export async function updateMerchant(
   }
 
   if (input.payoutWallet !== undefined) {
-    merchant.payoutWallet = normalizeSolanaAddress(input.payoutWallet) ?? "";
+    merchant.payoutWallet = normalizeSolanaAddress(input.payoutWallet);
   }
 
   if (input.reserveWallet !== undefined) {

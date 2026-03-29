@@ -723,6 +723,12 @@ async function createInvoicePaymentAttempt(
     processedAt: new Date(),
   });
 
+  const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
+
+  if (!destinationWallet) {
+    throw new HttpError(409, "Merchant payout wallet is not configured.");
+  }
+
   const settlement = await createSettlement({
     merchantId: invoice.merchantId.toString(),
     environment: runtimeEnvironment,
@@ -733,7 +739,7 @@ async function createInvoicePaymentAttempt(
     grossUsdc: Number(invoice.usdcAmount.toFixed(2)),
     feeUsdc: feeAmount,
     netUsdc: Number(Math.max(0.01, invoice.usdcAmount - feeAmount).toFixed(2)),
-    destinationWallet: treasury.account?.payoutWallet ?? merchant.payoutWallet,
+    destinationWallet,
     localAmount: invoice.localAmount,
     fxRate: invoice.fxRate,
     status: "queued",

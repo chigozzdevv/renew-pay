@@ -39,7 +39,7 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
         meterApproval: true,
       },
       wallets: {
-        primaryWallet: merchant.payoutWallet,
+        primaryWallet: merchant.payoutWallet ?? null,
         reserveWallet: merchant.reserveWallet ?? null,
         walletAlerts: true,
       },

@@ -5,6 +5,7 @@ import { PrivyClient } from "@privy-io/node";
 import { env } from "@/config/env.config";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
+import { SettingModel } from "@/features/settings/setting.model";
 import { TeamMemberModel } from "@/features/teams/team.model";
 import type {
   ActivateInviteInput,
@@ -85,23 +86,6 @@ function issueAccessToken(input: {
 
 function createUnconfiguredAddress() {
   return createUnconfiguredWalletAddress();
-}
-
-const defaultPrivyBillingTimezone = "UTC";
-const defaultPrivySupportedMarkets = ["NGN"] as const;
-
-function resolvePrivyBillingTimezone(value?: string | null) {
-  return value?.trim() || defaultPrivyBillingTimezone;
-}
-
-function resolvePrivySupportedMarkets(markets?: string[] | null) {
-  const normalized = (markets ?? [])
-    .map((market) => market.trim().toUpperCase())
-    .filter(Boolean);
-
-  return normalized.length > 0
-    ? [...new Set(normalized)]
-    : [...defaultPrivySupportedMarkets];
 }
 
 function getPrivyClient() {
@@ -268,6 +252,44 @@ async function resolveMerchantSessionMeta(merchantId: string) {
   }
 
   return merchant;
+}
+
+async function cleanupLegacyPrivyBootstrapState(input: {
+  merchantId: string;
+  ownerTeamMemberId?: string | null;
+}) {
+  const [merchant, owner, settingExists] = await Promise.all([
+    MerchantModel.findById(input.merchantId).exec(),
+    input.ownerTeamMemberId
+      ? TeamMemberModel.findById(input.ownerTeamMemberId).exec()
+      : TeamMemberModel.findOne({ merchantId: input.merchantId, role: "owner" }).exec(),
+    SettingModel.exists({ merchantId: input.merchantId }),
+  ]);
+
+  if (!merchant || settingExists) {
+    return;
+  }
+
+  const shouldCleanupBootstrapFields =
+    !merchant.name?.trim() &&
+    !merchant.payoutWallet &&
+    merchant.onboardingStatus === "business";
+
+  if (!shouldCleanupBootstrapFields) {
+    return;
+  }
+
+  if (merchant.supportEmail || (merchant.supportedMarkets ?? []).length > 0) {
+    merchant.supportEmail = null;
+    merchant.supportedMarkets = [];
+    await merchant.save();
+  }
+
+  if (owner && (owner.name?.trim() || owner.markets.length > 0)) {
+    owner.name = null;
+    owner.markets = [];
+    await owner.save();
+  }
 }
 
 export async function signupWithPassword(input: SignupInput) {
@@ -486,8 +508,6 @@ export async function exchangePrivySession(input: PrivySessionInput) {
   const authClaims = await verifyPrivyJwt(input.authToken);
   const identityClaims = await verifyPrivyIdentityToken(input.identityToken);
   const providerUserId = authClaims.user_id?.trim() || null;
-  const billingTimezone = resolvePrivyBillingTimezone(input.billingTimezone);
-  const supportedMarkets = resolvePrivySupportedMarkets(input.supportedMarkets);
 
   if (!providerUserId) {
     throw new HttpError(401, "Privy session is missing a subject.");
@@ -513,11 +533,6 @@ export async function exchangePrivySession(input: PrivySessionInput) {
 
     const resolvedName =
       resolvedProfile.name?.trim() || resolvedEmail;
-
-    await assertSupportedBillingMarkets({
-      markets: supportedMarkets,
-      environment: env.PAYMENT_ENV,
-    });
 
     const existingMerchant = await MerchantModel.findOne({
       authProvider: "privy",
@@ -545,26 +560,7 @@ export async function exchangePrivySession(input: PrivySessionInput) {
         member.passwordSalt = null;
         member.passwordUpdatedAt = null;
 
-        if (!member.name?.trim() && resolvedName) {
-          member.name = resolvedName;
-        }
-
         await member.save();
-      }
-
-      const merchantPatch: Record<string, unknown> = {};
-      if (!existingMerchant.supportEmail?.trim()) {
-        merchantPatch.supportEmail = resolvedEmail;
-      }
-      if (!existingMerchant.billingTimezone?.trim()) {
-        merchantPatch.billingTimezone = billingTimezone;
-      }
-      if ((existingMerchant.supportedMarkets ?? []).length === 0) {
-        merchantPatch.supportedMarkets = supportedMarkets;
-      }
-
-      if (Object.keys(merchantPatch).length > 0) {
-        await MerchantModel.findByIdAndUpdate(existingMerchant._id, merchantPatch).exec();
       }
     }
 
@@ -598,10 +594,6 @@ export async function exchangePrivySession(input: PrivySessionInput) {
         member.passwordSalt = null;
         member.passwordUpdatedAt = null;
 
-        if (!member.name?.trim() && resolvedName) {
-          member.name = resolvedName;
-        }
-
         await member.save();
 
         if (member.role === "owner") {
@@ -622,9 +614,6 @@ export async function exchangePrivySession(input: PrivySessionInput) {
             payoutWallet: createUnconfiguredAddress(),
             reserveWallet: null,
             name: null,
-            supportEmail: resolvedEmail,
-            billingTimezone,
-            supportedMarkets,
             metadataHash: "0x0",
             status: "active",
             authProvider: "privy",
@@ -640,11 +629,11 @@ export async function exchangePrivySession(input: PrivySessionInput) {
         const permissions = getPermissionsForRole("owner");
         member = await TeamMemberModel.create({
           merchantId: merchant._id,
-          name: resolvedName,
+          name: null,
           email: resolvedEmail,
           role: "owner",
           status: "active",
-          markets: supportedMarkets,
+          markets: [],
           permissions,
           inviteToken: null,
           inviteSentAt: null,
@@ -664,11 +653,10 @@ export async function exchangePrivySession(input: PrivySessionInput) {
             category: "workspace",
             status: "ok",
             target: resolvedEmail,
-            detail: `${resolvedName} started a workspace with Privy.`,
+            detail: `${resolvedEmail} started workspace onboarding with Privy.`,
             metadata: {
               role: "owner",
               authProvider: "privy",
-              supportedMarkets,
             },
             ipAddress: null,
             userAgent: null,
@@ -682,6 +670,14 @@ export async function exchangePrivySession(input: PrivySessionInput) {
     throw new HttpError(401, "Unable to resolve a team member for this Privy session.");
   }
 
+  await cleanupLegacyPrivyBootstrapState({
+    merchantId: member.merchantId.toString(),
+    ownerTeamMemberId: member.role === "owner" ? member._id.toString() : null,
+  });
+
+  member =
+    (await TeamMemberModel.findById(member._id).exec()) ??
+    member;
   member.lastActiveAt = new Date();
   await member.save();
 

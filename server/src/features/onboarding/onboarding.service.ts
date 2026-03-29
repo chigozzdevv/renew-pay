@@ -184,6 +184,7 @@ async function resolveOnboardingState(input: {
     owner.name.trim().length > 1 &&
     typeof merchant.name === "string" &&
     merchant.name.trim().length > 1 &&
+    typeof merchant.supportEmail === "string" &&
     merchant.supportEmail.trim().length > 3 &&
     merchant.supportedMarkets.length > 0;
   const ownerKycComplete = ownerKyc.status === "approved";
@@ -273,7 +274,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
       logoUrl: input.setting?.business.logoUrl ?? "",
       ownerName: input.owner.name ?? "",
       name: input.merchant.name ?? "",
-      supportEmail: input.merchant.supportEmail,
+      supportEmail: input.merchant.supportEmail ?? "",
       supportedMarkets: input.merchant.supportedMarkets,
     },
     verification: {
@@ -285,7 +286,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
       },
     },
     payout: {
-      payoutWallet: input.merchant.payoutWallet,
+      payoutWallet: input.merchant.payoutWallet ?? "",
       payoutConfigured: isConfiguredWalletAddress(input.merchant.payoutWallet),
       bankTransferStatus: "coming_soon" as const,
     },
@@ -343,6 +344,7 @@ export async function saveOnboardingBusiness(input: {
   ]);
 
   owner.name = input.payload.ownerName;
+  owner.markets = input.payload.supportedMarkets;
   merchant.name = input.payload.name;
   merchant.supportEmail = input.payload.supportEmail;
   merchant.supportedMarkets = input.payload.supportedMarkets;
@@ -389,25 +391,34 @@ export async function startOnboardingVerification(input: {
   actor: string;
   payload: OnboardingVerificationStartInput;
 }) {
+  const [merchant, owner] = await Promise.all([
+    getMerchantOrThrow(input.merchantId),
+    getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
+  ]);
+
+  const hasBusinessBasics =
+    typeof owner.name === "string" &&
+    owner.name.trim().length > 1 &&
+    typeof merchant.name === "string" &&
+    merchant.name.trim().length > 1 &&
+    typeof merchant.supportEmail === "string" &&
+    merchant.supportEmail.trim().length > 3 &&
+    merchant.supportedMarkets.length > 0;
+
+  if (!hasBusinessBasics) {
+    throw new HttpError(409, "Save business details before starting verification.");
+  }
+
   const subject =
     input.payload.subject ??
     (input.payload.environment === "live" ? "owner_kyc" : "owner_kyc");
 
   if (subject === "merchant_kyb") {
-    const merchant = await getMerchantOrThrow(input.merchantId);
-
-    if (!merchant.name?.trim()) {
-      throw new HttpError(
-        409,
-        "Save business details before starting merchant verification."
-      );
-    }
-
     return startMerchantKybSession({
       merchantId: input.merchantId,
       actor: input.actor,
       environment: input.payload.environment,
-      companyName: merchant.name,
+      companyName: merchant.name ?? undefined,
       registrationNumber: input.payload.registrationNumber,
       country: input.payload.country,
       taxId: input.payload.taxId,
@@ -490,13 +501,18 @@ export async function registerOnboardingMerchant(input: {
     merchantId: input.merchantId,
     teamMemberId: input.teamMemberId,
   });
+  const merchantPayoutWallet = state.merchant.payoutWallet;
+
+  if (!merchantPayoutWallet) {
+    throw new HttpError(409, "Configure a payout wallet before registering the workspace.");
+  }
 
   await ensureOnboardingProtocolReady({
     merchantId: input.merchantId,
     teamMemberId: input.teamMemberId,
     actor: input.actor,
     environment: input.payload.environment,
-    merchantPayoutWallet: state.merchant.payoutWallet,
+    merchantPayoutWallet,
     metadataHash: state.merchant.metadataHash,
   });
 

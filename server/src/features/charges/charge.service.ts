@@ -256,6 +256,11 @@ async function runPartnaSubscriptionChargeJob(input: {
   ).catch(() => ({
     account: null,
   }));
+  const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
+
+  if (!destinationWallet) {
+    throw new HttpError(409, "Merchant payout wallet is not configured.");
+  }
   const protocolMerchantAddress = deriveProtocolMerchantAddress({
     environment: toStoredRuntimeMode(input.environment),
     merchantId: merchant._id.toString(),
@@ -302,7 +307,7 @@ async function runPartnaSubscriptionChargeJob(input: {
     grossUsdc: Number(usdcAmount.toFixed(2)),
     feeUsdc: feeAmount,
     netUsdc,
-    destinationWallet: treasury.account?.payoutWallet ?? merchant.payoutWallet,
+    destinationWallet,
     sourceKind: "subscription",
     commercialRef: null,
     localAmount,
@@ -871,6 +876,11 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
   ).catch(() => ({
     account: null,
   }));
+  const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
+
+  if (!destinationWallet) {
+    throw new HttpError(409, "Merchant payout wallet is not configured.");
+  }
   const protocolMerchantAddress = deriveProtocolMerchantAddress({
     environment: toStoredRuntimeMode(environment),
     merchantId: merchant._id.toString(),
@@ -977,7 +987,7 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     grossUsdc: Number(usdcAmount.toFixed(2)),
     feeUsdc: feeAmount,
     netUsdc,
-    destinationWallet: treasury.account?.payoutWallet ?? merchant.payoutWallet,
+    destinationWallet,
     sourceKind: "subscription",
     commercialRef: null,
     localAmount,

@@ -62,7 +62,8 @@ function toSettingResponse(
       meterApproval: document.billing.meterApproval,
     },
     wallets: {
-      primaryWallet: treasury?.account?.payoutWallet ?? document.wallets.primaryWallet,
+      primaryWallet:
+        treasury?.account?.payoutWallet ?? document.wallets.primaryWallet ?? "",
       reserveWallet: treasury?.account?.reserveWallet ?? document.wallets.reserveWallet ?? null,
       walletAlerts: document.wallets.walletAlerts,
       governanceVaultAddress: treasury?.account?.governanceVaultAddress ?? null,
@@ -339,7 +340,7 @@ export async function updateSettingsByMerchantId(
     action: "Updated workspace settings",
     category: "workspace",
     status: "ok",
-    target: merchant.supportEmail,
+    target: merchant.supportEmail ?? null,
     detail: "Workspace settings were updated.",
     metadata: {
       business: Boolean(input.business),
