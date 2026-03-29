@@ -7,6 +7,11 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 contracts/target/
+!contracts/target/
+contracts/target/*
+!contracts/target/idl/
+contracts/target/idl/*
+!contracts/target/idl/renew_protocol.json
 contracts/keys/*.json
 !contracts/keys/.gitkeep
 contracts/.anchor/

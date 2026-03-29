@@ -21,7 +21,7 @@ export function RenewPrivyProvider({ children }: { children: ReactNode }) {
         loginMethods: ["google", "passkey", "email"],
         appearance: {
           theme: "light",
-          accentColor: "#0c4a27",
+          accentColor: "#111111",
         },
         embeddedWallets: {
           solana: {
