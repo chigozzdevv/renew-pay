@@ -41,6 +41,21 @@ function toSafeNumber(value: unknown, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function resolveChargeStatusFromSettlement(settlementStatus: string) {
+  switch (settlementStatus) {
+    case "queued":
+      return "awaiting_settlement" as const;
+    case "confirming":
+      return "confirming" as const;
+    case "settled":
+      return "settled" as const;
+    case "reversed":
+      return "reversed" as const;
+    default:
+      return "failed" as const;
+  }
+}
+
 const PARTNA_CRYPTO_NETWORKS = new Set([
   "avalanche",
   "binance",
@@ -1213,6 +1228,7 @@ export async function processYellowCardWebhook(
   const previousChargeStatus = charge.status;
   let nextChargeStatus = charge.status;
   let nextFailureCode = charge.failureCode ?? null;
+  let finalSettlement = linkedSettlement;
 
   if (
     state.includes("failed") ||
@@ -1276,6 +1292,11 @@ export async function processYellowCardWebhook(
         merchantId: linkedSettlement.merchantId.toString(),
         environment,
       });
+
+      finalSettlement = await SettlementModel.findById(linkedSettlement._id).exec();
+      nextChargeStatus = finalSettlement
+        ? resolveChargeStatusFromSettlement(finalSettlement.status)
+        : "settled";
     }
 
     if (previousChargeStatus !== "settled" && previousChargeStatus !== "awaiting_settlement") {
@@ -1328,8 +1349,8 @@ export async function processYellowCardWebhook(
     state,
     chargeId: charge._id.toString(),
     chargeStatus: charge.status,
-    settlementId: linkedSettlement?._id.toString() ?? null,
-    settlementStatus: linkedSettlement?.status ?? null,
+    settlementId: finalSettlement?._id.toString() ?? null,
+    settlementStatus: finalSettlement?.status ?? null,
   };
 
   if (webhookEvent) {

@@ -37,6 +37,7 @@ import { getPartnaProvider } from "@/features/payment-rails/providers/partna/par
 import { PlanModel } from "@/features/plans/plan.model";
 import {
   createSettlement,
+  queueSettlementBridge,
 } from "@/features/settlements/settlement.service";
 import {
   SettlementModel,
@@ -47,6 +48,7 @@ import {
   getTreasuryByMerchantId,
   ensureMerchantSubscriptionOperatorReady,
   queueSubscriptionProtocolCreate,
+  queueSubscriptionProtocolResume,
 } from "@/features/treasury/treasury.service";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import {
@@ -83,6 +85,22 @@ function buildCustomerRef(email: string) {
 
 function addDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function addMilliseconds(date: Date, milliseconds: number) {
+  return new Date(date.getTime() + milliseconds);
+}
+
+async function waitForTimestamp(value: Date | null | undefined) {
+  if (!(value instanceof Date)) {
+    return;
+  }
+
+  const remainingMs = value.getTime() - Date.now();
+
+  if (remainingMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remainingMs + 250));
+  }
 }
 
 function deriveSessionStatus(input: {
@@ -852,6 +870,65 @@ async function createYellowCardCheckoutPaymentAttempt(input: {
   }
 }
 
+async function ensureYellowCardCheckoutSubscriptionReady(input: {
+  session: Awaited<ReturnType<typeof ensureCheckoutSession>>;
+  environment: RuntimeMode;
+}) {
+  if (!input.session.subscriptionId) {
+    return null;
+  }
+
+  const subscription = await SubscriptionModel.findById(input.session.subscriptionId).exec();
+
+  if (!subscription) {
+    throw new HttpError(404, "Checkout subscription was not found.");
+  }
+
+  const dueAt = addMilliseconds(new Date(), 5_000);
+  subscription.nextChargeAt = dueAt;
+  await subscription.save();
+
+  if (
+    subscription.status === "active" &&
+    subscription.protocolSubscriptionId &&
+    subscription.protocolSyncStatus === "synced"
+  ) {
+    const resumed = await queueSubscriptionProtocolResume({
+      merchantId: input.session.merchantId.toString(),
+      actor: input.session.customerDraft?.email ?? "checkout",
+      environment: input.environment,
+      subscriptionId: subscription._id.toString(),
+    });
+
+    if (!resumed) {
+      throw new HttpError(
+        409,
+        "Checkout subscription could not be rescheduled on-chain for settlement."
+      );
+    }
+
+    return SubscriptionModel.findById(subscription._id).exec();
+  }
+
+  const activation = await queueSubscriptionProtocolCreate({
+    merchantId: input.session.merchantId.toString(),
+    actor: input.session.customerDraft?.email ?? "checkout",
+    environment: input.environment,
+    subscriptionId: subscription._id.toString(),
+    checkoutSessionId: input.session._id.toString(),
+    triggerInitialCharge: false,
+  });
+
+  if (!activation) {
+    throw new HttpError(
+      409,
+      "Checkout subscription could not be activated on-chain for settlement."
+    );
+  }
+
+  return SubscriptionModel.findById(subscription._id).exec();
+}
+
 export async function submitCheckoutCustomer(
   sessionId: string,
   input: SubmitCheckoutCustomerInput
@@ -1196,22 +1273,34 @@ export async function completeCheckoutTestPayment(sessionId: string) {
   }
 
   if (session.paymentSnapshot.provider === "yellow_card") {
-    if (session.subscriptionId) {
-      const activation = await queueSubscriptionProtocolCreate({
-        merchantId: session.merchantId.toString(),
-        actor: session.customerDraft?.email ?? "checkout",
+    const [existingCharge, existingSettlement] = await Promise.all([
+      session.chargeId ? ChargeModel.findById(session.chargeId).exec() : Promise.resolve(null),
+      session.settlementId
+        ? SettlementModel.findById(session.settlementId).exec()
+        : Promise.resolve(null),
+    ]);
+
+    const readySubscription = await ensureYellowCardCheckoutSubscriptionReady({
+      session,
+      environment: "test",
+    });
+
+    await waitForTimestamp(readySubscription?.nextChargeAt ?? null);
+
+    if (
+      existingCharge &&
+      existingSettlement &&
+      (existingCharge.status === "awaiting_settlement" ||
+        existingCharge.status === "confirming" ||
+        existingSettlement.status === "queued" ||
+        existingSettlement.status === "confirming")
+    ) {
+      await queueSettlementBridge(existingSettlement._id.toString(), {
+        merchantId: existingSettlement.merchantId.toString(),
         environment: "test",
-        subscriptionId: session.subscriptionId.toString(),
-        checkoutSessionId: session._id.toString(),
-        triggerInitialCharge: false,
       });
 
-      if (!activation) {
-        throw new HttpError(
-          409,
-          "Checkout subscription could not be activated on-chain for settlement."
-        );
-      }
+      return getCheckoutSession(sessionId);
     }
 
     const acceptedCollection = await acceptCollectionRequest(

@@ -1,6 +1,12 @@
 import { BN } from "@coral-xyz/anchor";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { SystemProgram } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAccount,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
+import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
 
 import {
   createFxQuoteArgs,
@@ -11,12 +17,17 @@ import {
   hashProgramIdentifier,
   loadMerchantContext,
   loadSubscriptionContext,
+  getRenewProgramRuntime,
   sendSponsoredTransaction,
   toFixed6Bn,
   toUnixSeconds,
 } from "@/features/solana/renew-program.service";
-import { getSolanaSettlementAuthorityKeypair } from "@/features/solana/solana-keypair.service";
+import {
+  getSolanaAdminKeypair,
+  getSolanaSettlementAuthorityKeypair,
+} from "@/features/solana/solana-keypair.service";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { HttpError } from "@/shared/errors/http-error";
 
 type ProtocolChargeExecutionInput =
   | {
@@ -40,6 +51,107 @@ type ProtocolChargeExecutionInput =
       fxRate: number;
       amountUsdc: number;
     };
+
+async function buildSettlementSourceAtaInstruction(input: {
+  settlementAuthority: ReturnType<typeof getSolanaSettlementAuthorityKeypair>;
+  settlementMint: PublicKey;
+  settlementSourceTokenAccount: PublicKey;
+  connection: Connection;
+}) {
+  const existingAccount = await input.connection.getAccountInfo(
+    input.settlementSourceTokenAccount
+  );
+
+  if (existingAccount) {
+    return [];
+  }
+
+  return [
+    createAssociatedTokenAccountInstruction(
+      input.settlementAuthority.publicKey,
+      input.settlementSourceTokenAccount,
+      input.settlementAuthority.publicKey,
+      input.settlementMint
+    ),
+  ];
+}
+
+async function ensureSettlementSourceBalance(input: {
+  environment: RuntimeMode;
+  settlementAuthority: ReturnType<typeof getSolanaSettlementAuthorityKeypair>;
+  settlementMint: PublicKey;
+  settlementSourceTokenAccount: PublicKey;
+  connection: Connection;
+  amountUsdc: number;
+}) {
+  const requiredAmount = BigInt(Math.round(input.amountUsdc * 1_000_000));
+
+  if (requiredAmount <= 0n) {
+    return;
+  }
+
+  const admin = getSolanaAdminKeypair(input.environment);
+  const adminRuntime = getRenewProgramRuntime(input.environment, admin);
+  const adminTokenAccount = getAssociatedTokenAddressSync(
+    input.settlementMint,
+    admin.publicKey
+  );
+  const settlementAccountInfo = await input.connection.getAccountInfo(
+    input.settlementSourceTokenAccount
+  );
+
+  const currentSettlementBalance = settlementAccountInfo
+    ? (await getAccount(input.connection, input.settlementSourceTokenAccount)).amount
+    : 0n;
+
+  if (currentSettlementBalance >= requiredAmount) {
+    return;
+  }
+
+  const adminAccountInfo = await adminRuntime.connection.getAccountInfo(adminTokenAccount);
+
+  if (!adminAccountInfo) {
+    throw new HttpError(
+      409,
+      `Sandbox settlement funding is missing. Fund admin wallet ${admin.publicKey.toBase58()} with test USDC.`
+    );
+  }
+
+  const adminBalance = (await getAccount(adminRuntime.connection, adminTokenAccount)).amount;
+  const topUpAmount = requiredAmount - currentSettlementBalance;
+
+  if (adminBalance < topUpAmount) {
+    throw new HttpError(
+      409,
+      `Sandbox settlement funding is insufficient. Fund admin wallet ${admin.publicKey.toBase58()} with at least ${Number(topUpAmount) / 1_000_000} test USDC.`
+    );
+  }
+
+  const topUpInstructions = [
+    ...(settlementAccountInfo
+      ? []
+      : [
+          createAssociatedTokenAccountInstruction(
+            admin.publicKey,
+            input.settlementSourceTokenAccount,
+            input.settlementAuthority.publicKey,
+            input.settlementMint
+          ),
+        ]),
+    createTransferInstruction(
+      adminTokenAccount,
+      input.settlementSourceTokenAccount,
+      admin.publicKey,
+      topUpAmount
+    ),
+  ];
+
+  await sendSponsoredTransaction({
+    mode: input.environment,
+    authority: admin,
+    instructions: topUpInstructions,
+  });
+}
 
 export async function executeProtocolSettlement(
   input: ProtocolChargeExecutionInput & {
@@ -69,6 +181,20 @@ export async function executeProtocolSettlement(
       context.subscriptionRefHash,
       billingPeriodStart
     );
+    await ensureSettlementSourceBalance({
+      environment: input.environment,
+      settlementAuthority,
+      settlementMint: context.runtime.settlementMint,
+      settlementSourceTokenAccount: context.settlementSourceTokenAccount,
+      connection: context.runtime.connection,
+      amountUsdc: input.usdcAmount,
+    });
+    const preInstructions = await buildSettlementSourceAtaInstruction({
+      settlementAuthority,
+      settlementMint: context.runtime.settlementMint,
+      settlementSourceTokenAccount: context.settlementSourceTokenAccount,
+      connection: context.runtime.connection,
+    });
     const instruction = await context.runtime.program.methods
       .recordSubscriptionChargeSuccess(
         Array.from(externalChargeRefHash),
@@ -101,7 +227,7 @@ export async function executeProtocolSettlement(
     const execution = await sendSponsoredTransaction({
       mode: input.environment,
       authority: settlementAuthority,
-      instructions: [instruction],
+      instructions: [...preInstructions, instruction],
     });
 
     return {
@@ -125,6 +251,20 @@ export async function executeProtocolSettlement(
     context.merchantId,
     externalChargeRefHash
   );
+  await ensureSettlementSourceBalance({
+    environment: input.environment,
+    settlementAuthority,
+    settlementMint: context.runtime.settlementMint,
+    settlementSourceTokenAccount: context.settlementSourceTokenAccount,
+    connection: context.runtime.connection,
+    amountUsdc: input.amountUsdc,
+  });
+  const preInstructions = await buildSettlementSourceAtaInstruction({
+    settlementAuthority,
+    settlementMint: context.runtime.settlementMint,
+    settlementSourceTokenAccount: context.settlementSourceTokenAccount,
+    connection: context.runtime.connection,
+  });
   const instruction = await context.runtime.program.methods
     .recordInvoiceSettlement(
       Array.from(externalChargeRefHash),
@@ -154,7 +294,7 @@ export async function executeProtocolSettlement(
   const execution = await sendSponsoredTransaction({
     mode: input.environment,
     authority: settlementAuthority,
-    instructions: [instruction],
+    instructions: [...preInstructions, instruction],
   });
 
   return {

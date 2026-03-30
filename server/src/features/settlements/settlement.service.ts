@@ -668,7 +668,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     providerRef: sourceCharge.paymentProvider ?? "yellow_card",
     externalChargeId: sourceCharge.externalChargeId,
     protocolSubscriptionId: subscription.protocolSubscriptionId,
-    billingPeriodStart: sourceCharge.createdAt,
+    billingPeriodStart: subscription.nextChargeAt,
     localAmount: sourceCharge.localAmount,
     fxRate: sourceCharge.fxRate,
     usageUnits: 0,
