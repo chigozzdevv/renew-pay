@@ -15,9 +15,11 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueSubscriptionCreatedNotifications } from "@/features/notifications/notification.service";
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
+  buildPartnaPhoneVerificationSnapshot,
   buildPartnaOtpVerificationSnapshot,
   buildPartnaVerificationSnapshot,
   completePartnaCustomerPaymentProfileVerification,
+  continuePartnaCustomerPaymentProfileVerificationAfterPhone,
   hasActivePartnaPaymentProfile,
   processPartnaWebhook,
   startPartnaCustomerPaymentProfileVerification,
@@ -765,11 +767,56 @@ export async function submitCheckoutVerification(
     });
 
     session.status = "pending_verification";
+    session.verificationSnapshot = pendingVerification.phoneConfirmationRequired
+      ? buildPartnaPhoneVerificationSnapshot({
+          currency: customer.market,
+          accountName: pendingVerification.accountName ?? "",
+          verificationMethod: pendingVerification.verificationMethod ?? "email",
+          instructions: pendingVerification.phoneConfirmationMessage,
+        })
+      : buildPartnaOtpVerificationSnapshot({
+          currency: customer.market,
+          accountName: pendingVerification.accountName ?? "",
+          verificationMethod: pendingVerification.verificationMethod ?? "email",
+          verificationHint: pendingVerification.verificationHint,
+        });
+    await session.save();
+
+    return getCheckoutSession(sessionId);
+  }
+
+  if (input.phone?.trim()) {
+    const accountName = session.verificationSnapshot?.accountName ?? null;
+    const verificationMethod = session.verificationSnapshot?.verificationMethod ?? null;
+
+    session.verificationSnapshot = {
+      provider: "partna",
+      status: "processing",
+      country: "NG",
+      currency: customer.market,
+      instructions: "Confirming phone number and sending verification code.",
+      accountName,
+      verificationMethod,
+      requiredFields: [],
+    };
+    await session.save();
+
+    const phoneVerification = await continuePartnaCustomerPaymentProfileVerificationAfterPhone({
+      customerId: customer._id.toString(),
+      environment: runtimeEnvironment,
+      verification: {
+        phone: input.phone,
+      },
+      accountName,
+      verificationMethod,
+    });
+
+    session.status = "pending_verification";
     session.verificationSnapshot = buildPartnaOtpVerificationSnapshot({
       currency: customer.market,
-      accountName: pendingVerification.accountName ?? "",
-      verificationMethod: pendingVerification.verificationMethod ?? "email",
-      verificationHint: pendingVerification.verificationHint,
+      accountName: accountName ?? "",
+      verificationMethod: phoneVerification.verificationMethod ?? verificationMethod ?? "email",
+      verificationHint: phoneVerification.verificationHint,
     });
     await session.save();
 

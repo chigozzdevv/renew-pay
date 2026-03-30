@@ -21,6 +21,11 @@ export type PartnaHandleBvnOtpMethodInput = {
   bankCode?: string | null;
 };
 
+export type PartnaConfirmPhoneInput = {
+  accountName: string;
+  phone: string;
+};
+
 export type PartnaConfirmBvnOtpInput = {
   accountName: string;
   currency: string;
@@ -148,6 +153,7 @@ export interface PartnaProvider {
     input: PartnaInitiateBvnKycInput
   ): Promise<PartnaBvnVerificationMethod[]>;
   handleBvnOtpMethod(input: PartnaHandleBvnOtpMethodInput): Promise<Record<string, unknown>>;
+  confirmPhone(input: PartnaConfirmPhoneInput): Promise<Record<string, unknown>>;
   confirmBvnOtp(input: PartnaConfirmBvnOtpInput): Promise<Record<string, unknown>>;
   createBankAccount(
     input: PartnaCreateBankAccountInput

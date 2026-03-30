@@ -22,6 +22,7 @@ type FormState = {
 
 type VerificationFormState = {
   bvn: string;
+  phone: string;
   otp: string;
 };
 
@@ -377,6 +378,7 @@ function createInitialFormState(session: RenewCheckoutSession | null): FormState
 function createInitialVerificationState(): VerificationFormState {
   return {
     bvn: "",
+    phone: "",
     otp: "",
   };
 }
@@ -551,6 +553,7 @@ export function RenewCheckoutModal({
       : formState.market
         ? [formState.market]
         : [];
+  const requiresPhone = currentSession.verification?.requiredFields.includes("phone") ?? false;
   const requiresOtp = currentSession.verification?.requiredFields.includes("otp") ?? false;
 
   const handleSubmitCustomer = async () => {
@@ -568,7 +571,9 @@ export function RenewCheckoutModal({
 
   const handleSubmitVerification = async () => {
     await submitVerification({
-      ...(requiresOtp
+      ...(requiresPhone
+        ? { phone: verificationState.phone.trim() }
+        : requiresOtp
         ? { otp: verificationState.otp.trim() }
         : { bvn: verificationState.bvn.trim() }),
     });
@@ -754,17 +759,23 @@ export function RenewCheckoutModal({
               <div className="renew-modal__stack">
                 <div>
                   <h3 className="renew-modal__section-title">
-                    {requiresOtp ? "Enter verification code" : "Verify to get payment details"}
+                    {requiresPhone
+                      ? "Confirm phone number"
+                      : requiresOtp
+                        ? "Enter verification code"
+                        : "Verify to get payment details"}
                   </h3>
                   <p className="renew-modal__copy">
                     {currentSession.verification?.instructions ??
-                      (requiresOtp
+                      (requiresPhone
+                        ? "Enter the phone number linked to your BVN to continue."
+                        : requiresOtp
                         ? "Enter the verification code Partna sent to you."
                         : "Enter your BVN to verify and unlock payment details.")}
                   </p>
                 </div>
 
-                {!requiresOtp ? (
+                {!requiresPhone && !requiresOtp ? (
                   <label className="renew-modal__field">
                     <span className="renew-modal__label">BVN</span>
                     <input
@@ -777,6 +788,22 @@ export function RenewCheckoutModal({
                       }
                       className="renew-modal__input"
                       placeholder="Enter BVN"
+                    />
+                  </label>
+                ) : requiresPhone ? (
+                  <label className="renew-modal__field">
+                    <span className="renew-modal__label">Phone number</span>
+                    <input
+                      type="tel"
+                      value={verificationState.phone}
+                      onChange={(event) =>
+                        setVerificationState((current) => ({
+                          ...current,
+                          phone: event.target.value,
+                        }))
+                      }
+                      className="renew-modal__input"
+                      placeholder="Enter phone number"
                     />
                   </label>
                 ) : (
@@ -801,7 +828,9 @@ export function RenewCheckoutModal({
                   onClick={() => void handleSubmitVerification()}
                   disabled={
                     isSubmittingVerification ||
-                    (requiresOtp
+                    (requiresPhone
+                      ? !verificationState.phone.trim()
+                      : requiresOtp
                       ? !verificationState.otp.trim()
                       : !verificationState.bvn.trim())
                   }
@@ -809,8 +838,16 @@ export function RenewCheckoutModal({
                   style={hiddenButtonStyle}
                 >
                   {isSubmittingVerification
-                    ? (requiresOtp ? "Verifying code..." : "Sending code...")
-                    : (requiresOtp ? "Verify and get payment details" : "Get payment details")}
+                    ? (requiresPhone
+                        ? "Confirming phone..."
+                        : requiresOtp
+                          ? "Verifying code..."
+                          : "Sending code...")
+                    : (requiresPhone
+                        ? "Continue"
+                        : requiresOtp
+                          ? "Verify and get payment details"
+                          : "Get payment details")}
                 </button>
               </div>
             ) : (

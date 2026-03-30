@@ -20,10 +20,12 @@ import {
 } from "@/features/notifications/notification.service";
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
+  buildPartnaPhoneVerificationSnapshot,
   buildPartnaOtpVerificationSnapshot,
   buildPartnaVerificationSnapshot,
   createPartnaChargeInstruction,
   completePartnaCustomerPaymentProfileVerification,
+  continuePartnaCustomerPaymentProfileVerificationAfterPhone,
   derivePartnaFeeAmountUsdc,
   hasActivePartnaPaymentProfile,
   processPartnaWebhook,
@@ -1254,11 +1256,55 @@ export async function submitPublicInvoiceVerification(
       },
     });
 
+    invoice.verificationSnapshot = pendingVerification.phoneConfirmationRequired
+      ? buildPartnaPhoneVerificationSnapshot({
+          currency: invoice.billingCurrency,
+          accountName: pendingVerification.accountName ?? "",
+          verificationMethod: pendingVerification.verificationMethod ?? "email",
+          instructions: pendingVerification.phoneConfirmationMessage,
+        })
+      : buildPartnaOtpVerificationSnapshot({
+          currency: invoice.billingCurrency,
+          accountName: pendingVerification.accountName ?? "",
+          verificationMethod: pendingVerification.verificationMethod ?? "email",
+          verificationHint: pendingVerification.verificationHint,
+        });
+    await invoice.save();
+
+    return getPublicInvoiceByToken(publicToken);
+  }
+
+  if (input.phone?.trim()) {
+    const accountName = invoice.verificationSnapshot?.accountName ?? null;
+    const verificationMethod = invoice.verificationSnapshot?.verificationMethod ?? null;
+
+    invoice.verificationSnapshot = {
+      provider: "partna",
+      status: "processing",
+      country: "NG",
+      currency: invoice.billingCurrency,
+      instructions: "Confirming phone number and sending verification code.",
+      accountName,
+      verificationMethod,
+      requiredFields: [],
+    };
+    await invoice.save();
+
+    const phoneVerification = await continuePartnaCustomerPaymentProfileVerificationAfterPhone({
+      customerId: invoice.customerId.toString(),
+      environment: toStoredRuntimeMode(invoice.environment),
+      verification: {
+        phone: input.phone,
+      },
+      accountName,
+      verificationMethod,
+    });
+
     invoice.verificationSnapshot = buildPartnaOtpVerificationSnapshot({
       currency: invoice.billingCurrency,
-      accountName: pendingVerification.accountName ?? "",
-      verificationMethod: pendingVerification.verificationMethod ?? "email",
-      verificationHint: pendingVerification.verificationHint,
+      accountName: accountName ?? "",
+      verificationMethod: phoneVerification.verificationMethod ?? verificationMethod ?? "email",
+      verificationHint: phoneVerification.verificationHint,
     });
     await invoice.save();
 

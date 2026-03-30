@@ -169,5 +169,6 @@ export type SubmitCheckoutCustomerInput = {
 
 export type SubmitCheckoutVerificationInput = {
   readonly bvn?: string;
+  readonly phone?: string;
   readonly otp?: string;
 };

@@ -122,6 +122,8 @@ export const PARTNA_CHECKOUT_VERIFICATION_FIELDS = [
   "bvn",
 ] as const;
 
+export const PARTNA_CHECKOUT_PHONE_FIELDS = ["phone"] as const;
+
 export const PARTNA_CHECKOUT_OTP_FIELDS = ["otp"] as const;
 
 function pickPreferredPartnaVerificationMethod(methods: PartnaBvnVerificationMethod[]) {
@@ -156,6 +158,15 @@ function buildPartnaCustomerAccountName(customer: {
   return accountName || `renew${suffix}`;
 }
 
+function readPartnaResponseMessage(payload: Record<string, unknown> | null) {
+  return readString(payload?.message);
+}
+
+function responseRequiresPartnaPhoneConfirmation(payload: Record<string, unknown> | null) {
+  const message = readPartnaResponseMessage(payload)?.toLowerCase() ?? "";
+  return message.includes("confirm phone");
+}
+
 export function buildPartnaVerificationSnapshot(currency: string) {
   return {
     provider: "partna" as const,
@@ -182,6 +193,25 @@ export function buildPartnaOtpVerificationSnapshot(input: {
       input.verificationHint?.trim() ||
       "Enter the verification code Partna sent to you.",
     requiredFields: [...PARTNA_CHECKOUT_OTP_FIELDS],
+    accountName: input.accountName,
+    verificationMethod: input.verificationMethod,
+  };
+}
+
+export function buildPartnaPhoneVerificationSnapshot(input: {
+  currency: string;
+  accountName: string;
+  verificationMethod: string;
+  instructions?: string | null;
+}) {
+  return {
+    provider: "partna" as const,
+    status: "phone_required",
+    country: "NG",
+    currency: input.currency,
+    instructions:
+      input.instructions?.trim() || "Enter the phone number linked to your BVN to continue.",
+    requiredFields: [...PARTNA_CHECKOUT_PHONE_FIELDS],
     accountName: input.accountName,
     verificationMethod: input.verificationMethod,
   };
@@ -254,10 +284,11 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
     );
   }
 
-  await provider.handleBvnOtpMethod({
+  const otpDispatchResult = await provider.handleBvnOtpMethod({
     accountName,
     verificationMethod: selectedMethod.method,
   });
+  const phoneConfirmationRequired = responseRequiresPartnaPhoneConfirmation(otpDispatchResult);
 
   const existingRaw =
     customer.paymentProfile?.partna?.raw &&
@@ -279,10 +310,11 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
       callbackUrl: buildPartnaCallbackUrl(input.environment),
       raw: {
         ...existingRaw,
-        kycStatus: "otp_pending",
+        kycStatus: phoneConfirmationRequired ? "phone_confirmation_required" : "otp_pending",
         verificationMethods: methods,
         selectedVerificationMethod: selectedMethod.method,
         selectedVerificationHint: selectedMethod.hint,
+        otpDispatchMessage: readPartnaResponseMessage(otpDispatchResult),
       },
     },
   };
@@ -292,6 +324,94 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
     accountName,
     verificationMethod: selectedMethod.method,
     verificationHint: selectedMethod.hint,
+    phoneConfirmationRequired,
+    phoneConfirmationMessage: readPartnaResponseMessage(otpDispatchResult),
+  };
+}
+
+export async function continuePartnaCustomerPaymentProfileVerificationAfterPhone(input: {
+  customerId: string;
+  environment: RuntimeMode;
+  verification: {
+    phone: string;
+  };
+  accountName?: string | null;
+  verificationMethod?: string | null;
+}) {
+  const customer = await CustomerModel.findById(input.customerId).exec();
+
+  if (!customer) {
+    throw new HttpError(404, "Customer was not found.");
+  }
+
+  if (hasActivePartnaPaymentProfile(customer, customer.market)) {
+    return {
+      verificationMethod:
+        readString(
+          (customer.paymentProfile?.partna?.raw as Record<string, unknown> | null)
+            ?.selectedVerificationMethod
+        ) ?? input.verificationMethod ?? null,
+      verificationHint:
+        readString(
+          (customer.paymentProfile?.partna?.raw as Record<string, unknown> | null)
+            ?.selectedVerificationHint
+        ) ?? null,
+    };
+  }
+
+  const provider = getPartnaProvider(input.environment);
+  const accountName =
+    sanitizePartnaAccountName(input.accountName ?? "") ||
+    sanitizePartnaAccountName(customer.paymentProfile?.partna?.accountName ?? "") ||
+    buildPartnaCustomerAccountName(customer);
+  const existingRaw =
+    customer.paymentProfile?.partna?.raw &&
+    typeof customer.paymentProfile.partna.raw === "object" &&
+    customer.paymentProfile.partna.raw !== null
+      ? (customer.paymentProfile.partna.raw as Record<string, unknown>)
+      : {};
+  const selectedVerificationMethod =
+    input.verificationMethod?.trim() ||
+    readString(existingRaw.selectedVerificationMethod) ||
+    "email";
+
+  await provider.confirmPhone({
+    accountName,
+    phone: input.verification.phone,
+  });
+
+  const otpDispatchResult = await provider.handleBvnOtpMethod({
+    accountName,
+    verificationMethod: selectedVerificationMethod,
+  });
+
+  customer.paymentProvider = "partna";
+  customer.paymentProfile = {
+    provider: "partna",
+    status: "pending",
+    verifiedAt: null,
+    bankTransfer: null,
+    partna: {
+      email: normalizeEmail(customer.email),
+      fullName: customer.name,
+      accountName,
+      bvnLast4: customer.paymentProfile?.partna?.bvnLast4 ?? null,
+      callbackUrl: buildPartnaCallbackUrl(input.environment),
+      raw: {
+        ...existingRaw,
+        kycStatus: "otp_pending",
+        selectedVerificationMethod,
+        phoneConfirmedAt: new Date().toISOString(),
+        confirmedPhone: input.verification.phone.trim(),
+        otpDispatchMessage: readPartnaResponseMessage(otpDispatchResult),
+      },
+    },
+  };
+  await customer.save();
+
+  return {
+    verificationMethod: selectedVerificationMethod,
+    verificationHint: readString(existingRaw.selectedVerificationHint),
   };
 }
 

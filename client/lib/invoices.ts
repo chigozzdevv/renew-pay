@@ -331,6 +331,7 @@ export async function submitPublicInvoiceVerification(input: {
   invoiceToken: string;
   payload: {
     bvn?: string;
+    phone?: string;
     otp?: string;
   };
 }) {

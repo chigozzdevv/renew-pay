@@ -9,6 +9,7 @@ import {
 } from "@renew.sh/sdk/core";
 
 import { ApiError, fetchApi, getApiOrigin, readAccessToken, type WorkspaceMode } from "@/lib/api";
+import { loadInvoicesPage, type InvoiceRecord } from "@/lib/invoices";
 
 export type PlaygroundWorkspaceUser = {
   merchantId: string;
@@ -22,6 +23,8 @@ export type PlaygroundWorkspaceUser = {
   markets: string[];
   onboardingStatus: string;
 };
+
+export type PlaygroundInvoiceRecord = InvoiceRecord;
 
 export function createPlaygroundCheckoutClient() {
   return createRenewCheckoutClient({
@@ -49,6 +52,35 @@ export async function listPlaygroundPlans(environment: WorkspaceMode) {
   });
 
   return payload.data;
+}
+
+export async function listPlaygroundInvoices(input: {
+  environment: WorkspaceMode;
+  merchantId: string;
+  permissions?: readonly string[];
+}) {
+  const permissions = new Set(input.permissions ?? []);
+  const canAccessInvoices =
+    permissions.size === 0 ||
+    permissions.has("invoices") ||
+    permissions.has("team_admin");
+
+  if (!canAccessInvoices) {
+    return [] as readonly PlaygroundInvoiceRecord[];
+  }
+
+  const payload = await loadInvoicesPage({
+    token: getRequiredPlaygroundToken(),
+    merchantId: input.merchantId,
+    environment: input.environment,
+    status: "all",
+    page: 1,
+    limit: 100,
+  });
+
+  return payload.invoices.filter(
+    (invoice) => invoice.status !== "draft" && invoice.status !== "void"
+  );
 }
 
 export async function loadPlaygroundWorkspaceUser() {

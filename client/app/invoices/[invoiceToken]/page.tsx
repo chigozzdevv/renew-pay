@@ -44,6 +44,7 @@ export default function PublicInvoicePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [verificationDraft, setVerificationDraft] = useState({
     bvn: "",
+    phone: "",
     otp: "",
   });
 
@@ -272,7 +273,19 @@ export default function PublicInvoicePage() {
 
             {invoice.nextAction === "complete_verification" ? (
               <div className="mt-5 space-y-3">
-                {invoice.verification?.requiredFields.includes("otp") ? (
+                {invoice.verification?.requiredFields.includes("phone") ? (
+                  <input
+                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+                    placeholder="Phone number"
+                    value={verificationDraft.phone}
+                    onChange={(event) =>
+                      setVerificationDraft((current) => ({
+                        ...current,
+                        phone: event.target.value,
+                      }))
+                    }
+                  />
+                ) : invoice.verification?.requiredFields.includes("otp") ? (
                   <input
                     className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
                     placeholder="Verification code"
@@ -306,9 +319,15 @@ export default function PublicInvoicePage() {
                       () =>
                         submitPublicInvoiceVerification({
                           invoiceToken,
-                          payload: verificationDraft,
+                          payload: invoice.verification?.requiredFields.includes("phone")
+                            ? { phone: verificationDraft.phone }
+                            : invoice.verification?.requiredFields.includes("otp")
+                              ? { otp: verificationDraft.otp }
+                              : { bvn: verificationDraft.bvn },
                         }),
-                      invoice.verification?.requiredFields.includes("otp")
+                      invoice.verification?.requiredFields.includes("phone")
+                        ? "Verification code sent."
+                        : invoice.verification?.requiredFields.includes("otp")
                         ? "Verification completed. Payment instructions are ready."
                         : "Verification code sent."
                     )
@@ -316,12 +335,16 @@ export default function PublicInvoicePage() {
                   className="mt-2 inline-flex items-center justify-center rounded-2xl border border-[#d9f6bc]/18 bg-[#d9f6bc] px-5 py-3 text-sm font-semibold text-[#0c4a27]"
                 >
                   {isBusy === "verify"
-                    ? invoice.verification?.requiredFields.includes("otp")
-                      ? "Verifying..."
-                      : "Sending code..."
-                    : invoice.verification?.requiredFields.includes("otp")
-                      ? "Verify and continue"
-                      : "Get payment details"}
+                    ? invoice.verification?.requiredFields.includes("phone")
+                      ? "Confirming..."
+                      : invoice.verification?.requiredFields.includes("otp")
+                        ? "Verifying..."
+                        : "Sending code..."
+                    : invoice.verification?.requiredFields.includes("phone")
+                      ? "Continue"
+                      : invoice.verification?.requiredFields.includes("otp")
+                        ? "Verify and continue"
+                        : "Get payment details"}
                 </button>
               </div>
             ) : null}

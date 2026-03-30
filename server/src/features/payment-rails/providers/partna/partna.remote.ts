@@ -8,6 +8,7 @@ import type {
   PartnaAccountKycDetails,
   PartnaBvnVerificationMethod,
   PartnaConfirmBvnOtpInput,
+  PartnaConfirmPhoneInput,
   PartnaCreateAccountInput,
   PartnaCreateBankAccountInput,
   PartnaHandleBvnOtpMethodInput,
@@ -433,6 +434,20 @@ export class PartnaRemoteProvider implements PartnaProvider {
         verificationMethod: input.verificationMethod,
         accountNumber: input.accountNumber ?? undefined,
         bankCode: input.bankCode ?? undefined,
+      }
+    );
+
+    return extractPayloadData(payload);
+  }
+
+  async confirmPhone(input: PartnaConfirmPhoneInput) {
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/kyc/confirm-phone",
+      "PUT",
+      {
+        accountName: input.accountName,
+        phone: input.phone.trim(),
       }
     );
 
