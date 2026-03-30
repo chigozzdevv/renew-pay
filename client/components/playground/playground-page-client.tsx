@@ -306,8 +306,8 @@ export function PlaygroundPageClient() {
     <>
       <section className="relative overflow-hidden pb-24 pt-14 sm:pb-28 sm:pt-20">
         <Container className="space-y-6">
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#111111] px-6 py-6 text-white shadow-[0_28px_100px_rgba(8,12,10,0.18)] md:h-[42rem]">
+          <div className="grid gap-5 md:items-start md:grid-cols-2">
+            <div className="flex min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#111111] px-6 py-6 text-white shadow-[0_28px_100px_rgba(8,12,10,0.18)]">
               <div className="mb-5">
                 <p className="text-sm leading-6 text-white/72">
                   Here's how to use the playground to test your invoice and plans:
@@ -326,7 +326,7 @@ export function PlaygroundPageClient() {
               </div>
             </div>
 
-            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/78 px-6 py-6 shadow-[0_20px_60px_rgba(10,20,12,0.06)] md:h-[42rem]">
+            <div className="flex min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/78 px-6 py-6 shadow-[0_20px_60px_rgba(10,20,12,0.06)] md:max-h-[31rem]">
               {requiresSignIn ? (
                 <>
                   <div className="mb-5">
@@ -364,7 +364,7 @@ export function PlaygroundPageClient() {
                     </div>
                   ) : null}
 
-                  <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+                  <div className="mt-5 flex min-h-0 flex-col gap-4 overflow-y-auto pr-1 md:flex-1">
                     {(hasPlans || canAccessInvoices) ? (
                       <div className="flex flex-wrap gap-2">
                         <button
