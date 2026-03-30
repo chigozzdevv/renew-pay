@@ -167,6 +167,13 @@ function responseRequiresPartnaPhoneConfirmation(payload: Record<string, unknown
   return message.includes("confirm phone");
 }
 
+function isPartnaAccountAlreadyExistsError(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    error.message.trim().toLowerCase() === "account already exists"
+  );
+}
+
 export function buildPartnaVerificationSnapshot(currency: string) {
   return {
     provider: "partna" as const,
@@ -265,16 +272,21 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
   const accountName =
     sanitizePartnaAccountName(customer.paymentProfile?.partna?.accountName ?? "") ||
     buildPartnaCustomerAccountName(customer);
-  const methods = await provider
-    .createAccount({
+
+  try {
+    await provider.createAccount({
       accountName,
-    })
-    .then(() =>
-      provider.initiateBvnKyc({
-        accountName,
-        bvn: input.verification.bvn,
-      })
-    );
+    });
+  } catch (error) {
+    if (!isPartnaAccountAlreadyExistsError(error)) {
+      throw error;
+    }
+  }
+
+  const methods = await provider.initiateBvnKyc({
+    accountName,
+    bvn: input.verification.bvn,
+  });
   const selectedMethod = pickPreferredPartnaVerificationMethod(methods);
 
   if (!selectedMethod) {
