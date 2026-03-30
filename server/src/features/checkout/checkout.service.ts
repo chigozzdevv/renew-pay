@@ -15,6 +15,9 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueSubscriptionCreatedNotifications } from "@/features/notifications/notification.service";
 import {
   acceptCollectionRequest,
+  createCollectionRequest,
+  getPreferredCollectionChannel,
+  getPreferredCollectionNetwork,
   processYellowCardWebhook,
   quoteUsdAmountInBillingCurrency,
 } from "@/features/payment-rails/payment-rails.service";
@@ -33,11 +36,15 @@ import {
 import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import { PlanModel } from "@/features/plans/plan.model";
 import {
+  createSettlement,
+} from "@/features/settlements/settlement.service";
+import {
   SettlementModel,
   type SettlementDocument,
 } from "@/features/settlements/settlement.model";
 import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
 import {
+  getTreasuryByMerchantId,
   ensureMerchantSubscriptionOperatorReady,
   queueSubscriptionProtocolCreate,
 } from "@/features/treasury/treasury.service";
@@ -651,6 +658,200 @@ async function activateCheckoutSubscription(input: {
   return getCheckoutSession(input.sessionId);
 }
 
+async function createYellowCardCheckoutPaymentAttempt(input: {
+  sessionId: string;
+  session: Awaited<ReturnType<typeof ensureCheckoutSession>>;
+  merchant: Awaited<ReturnType<typeof ensureMerchantForCheckout>>;
+  plan: Awaited<ReturnType<typeof ensurePlanForCheckout>>;
+  customer: Awaited<ReturnType<typeof upsertCheckoutCustomer>>;
+  runtimeEnvironment: RuntimeMode;
+}) {
+  const initialQuote = await quoteUsdAmountInBillingCurrency({
+    environment: input.runtimeEnvironment,
+    currency: input.customer.market,
+    usdAmount: input.plan.usdAmount,
+  });
+  const nextChargeAt =
+    input.plan.trialDays > 0 ? addDays(new Date(), input.plan.trialDays) : new Date();
+  const subscription = await SubscriptionModel.create({
+    merchantId: input.merchant._id,
+    environment: input.runtimeEnvironment,
+    planId: input.plan._id,
+    customerRef: input.customer.customerRef,
+    customerName: input.customer.name,
+    billingCurrency: input.customer.market,
+    localAmount: initialQuote.localAmount,
+    paymentProvider: "yellow_card",
+    paymentAccountType: "bank",
+    paymentAccountNumber: null,
+    paymentNetworkId: null,
+    paymentProfileSnapshot: null,
+    status: "pending_activation",
+    pendingStatus: "active",
+    protocolSyncStatus: "pending_activation",
+    nextChargeAt,
+  });
+  try {
+    const channel = await getPreferredCollectionChannel(
+      input.customer.market,
+      input.runtimeEnvironment
+    );
+    const network = await getPreferredCollectionNetwork(
+      channel.externalId,
+      channel.country,
+      input.runtimeEnvironment
+    ).catch(() => null);
+    const collection = (await createCollectionRequest({
+      merchantId: input.merchant._id.toString(),
+      environment: input.runtimeEnvironment,
+      channelId: channel.externalId,
+      customerRef: input.customer.customerRef,
+      customerName: input.customer.name,
+      localAmount: initialQuote.localAmount,
+      usdAmount: initialQuote.usdcAmount,
+      currency: input.customer.market,
+      country: channel.country,
+      networkId: network?.externalId ?? null,
+      accountType: channel.channelType === "momo" ? "momo" : "bank",
+    })) as Record<string, unknown>;
+
+    const collectionStatus = String(collection.status ?? "processing").toLowerCase();
+    const externalChargeId = String(
+      collection.sequenceId ?? collection.id ?? `renew-checkout-${Date.now()}`
+    );
+    const collectionSnapshot = {
+      provider: "yellow_card" as const,
+      kind: "bank_transfer" as const,
+      externalChargeId,
+      billingCurrency: input.customer.market,
+      localAmount: initialQuote.localAmount,
+      usdcAmount: initialQuote.usdcAmount,
+      feeAmount: initialQuote.feeAmount,
+      status: collectionStatus,
+      reference: toNullableString(collection.reference),
+      expiresAt:
+        typeof collection.expiresAt === "string" || collection.expiresAt instanceof Date
+          ? new Date(collection.expiresAt)
+          : null,
+      redirectUrl: null,
+      bankTransfer:
+        typeof collection.bankInfo === "object" && collection.bankInfo !== null
+          ? {
+              bankCode: toNullableString((collection.bankInfo as Record<string, unknown>).bankCode),
+              bankName: toNullableString((collection.bankInfo as Record<string, unknown>).name),
+              accountNumber: toNullableString(
+                (collection.bankInfo as Record<string, unknown>).accountNumber
+              ),
+              accountName: toNullableString(
+                (collection.bankInfo as Record<string, unknown>).accountName
+              ),
+              currency: input.customer.market,
+            }
+          : null,
+    };
+
+    const treasury = await getTreasuryByMerchantId(
+      input.merchant._id.toString(),
+      input.runtimeEnvironment
+    ).catch(() => ({
+      account: null,
+    }));
+    const destinationWallet = treasury.account?.payoutWallet ?? input.merchant.payoutWallet;
+
+    if (!destinationWallet) {
+      throw new HttpError(409, "Merchant payout wallet is not configured.");
+    }
+
+    const charge = await ChargeModel.create({
+      merchantId: input.merchant._id,
+      environment: input.runtimeEnvironment,
+      sourceKind: "subscription",
+      subscriptionId: subscription._id,
+      invoiceId: null,
+      externalChargeId,
+      settlementSource: input.merchant.payoutWallet,
+      paymentProvider: "yellow_card",
+      localAmount: initialQuote.localAmount,
+      fxRate: initialQuote.fxRate,
+      usdcAmount: initialQuote.usdcAmount,
+      feeAmount: initialQuote.feeAmount,
+      status: "pending",
+      failureCode: null,
+      protocolChargeId: null,
+      protocolSyncStatus: "pending_execution",
+      protocolTxHash: null,
+      providerMetadata: {
+        paymentInstructions: collectionSnapshot,
+        checkoutSessionId: input.session._id.toString(),
+      },
+      processedAt: new Date(),
+    });
+
+    const settlement = await createSettlement({
+      merchantId: input.merchant._id.toString(),
+      environment: input.runtimeEnvironment,
+      sourceChargeId: charge._id.toString(),
+      sourceKind: "subscription",
+      batchRef: externalChargeId,
+      commercialRef: subscription._id.toString(),
+      grossUsdc: Number(initialQuote.usdcAmount.toFixed(2)),
+      feeUsdc: initialQuote.feeAmount,
+      netUsdc: Number(
+        Math.max(0.01, initialQuote.usdcAmount - initialQuote.feeAmount).toFixed(2)
+      ),
+      destinationWallet,
+      localAmount: initialQuote.localAmount,
+      fxRate: initialQuote.fxRate,
+      status: "queued",
+      scheduledFor: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    const refreshedSession = await ensureCheckoutSession(input.sessionId);
+    refreshedSession.customerDraft = {
+      name: input.customer.name,
+      email: input.customer.email,
+      market: input.customer.market,
+    };
+    refreshedSession.customerId = input.customer._id;
+    refreshedSession.subscriptionId = subscription._id;
+    refreshedSession.chargeId = charge._id;
+    refreshedSession.settlementId = new Types.ObjectId(settlement.id);
+    refreshedSession.submittedAt = refreshedSession.submittedAt ?? new Date();
+    refreshedSession.status = "pending_payment";
+    refreshedSession.verificationSnapshot = {
+      provider: "yellow_card",
+      status: "verified",
+      country: channel.country,
+      currency: input.customer.market,
+      instructions: "Payment details are ready.",
+      verificationHint: null,
+      verificationMethods: [],
+      requiredFields: [],
+    };
+    refreshedSession.paymentSnapshot = {
+      provider: collectionSnapshot.provider,
+      kind: collectionSnapshot.kind,
+      externalChargeId: collectionSnapshot.externalChargeId,
+      billingCurrency: collectionSnapshot.billingCurrency,
+      localAmount: collectionSnapshot.localAmount,
+      usdcAmount: collectionSnapshot.usdcAmount,
+      feeAmount: collectionSnapshot.feeAmount,
+      status: collectionSnapshot.status,
+      reference: collectionSnapshot.reference,
+      expiresAt: collectionSnapshot.expiresAt,
+      redirectUrl: null,
+      bankTransfer: collectionSnapshot.bankTransfer,
+    };
+    refreshedSession.failureReason = null;
+    await refreshedSession.save();
+
+    return getCheckoutSession(input.sessionId);
+  } catch (error) {
+    await SubscriptionModel.findByIdAndDelete(subscription._id).exec().catch(() => null);
+    throw error;
+  }
+}
+
 export async function submitCheckoutCustomer(
   sessionId: string,
   input: SubmitCheckoutCustomerInput
@@ -723,6 +924,17 @@ export async function submitCheckoutCustomer(
   }
 
   await session.save();
+
+  if (paymentProvider === "yellow_card") {
+    return createYellowCardCheckoutPaymentAttempt({
+      sessionId,
+      session,
+      merchant,
+      plan,
+      customer,
+      runtimeEnvironment,
+    });
+  }
 
   return activateCheckoutSubscription({
     sessionId,
@@ -1005,6 +1217,17 @@ export async function completeCheckoutTestPayment(sessionId: string) {
       },
       "test"
     );
+
+    if (session.subscriptionId) {
+      await queueSubscriptionProtocolCreate({
+        merchantId: session.merchantId.toString(),
+        actor: session.customerDraft?.email ?? "checkout",
+        environment: "test",
+        subscriptionId: session.subscriptionId.toString(),
+        checkoutSessionId: session._id.toString(),
+        triggerInitialCharge: false,
+      }).catch(() => null);
+    }
 
     return getCheckoutSession(sessionId);
   }
