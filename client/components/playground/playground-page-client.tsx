@@ -307,9 +307,9 @@ export function PlaygroundPageClient() {
       <section className="relative overflow-hidden pb-24 pt-14 sm:pb-28 sm:pt-20">
         <Container className="space-y-6">
           <div className="grid gap-5 md:grid-cols-2">
-            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#111111] px-6 py-6 text-white shadow-[0_28px_100px_rgba(8,12,10,0.18)]">
+            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#111111] px-6 py-6 text-white shadow-[0_28px_100px_rgba(8,12,10,0.18)] md:h-[42rem]">
               <div className="mb-5">
-                <p className="text-2xl font-semibold tracking-[-0.05em] text-white">
+                <p className="text-sm leading-6 text-white/72">
                   Here's how to use the playground to test your invoice and plans:
                 </p>
               </div>
@@ -326,7 +326,7 @@ export function PlaygroundPageClient() {
               </div>
             </div>
 
-            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/78 px-6 py-6 shadow-[0_20px_60px_rgba(10,20,12,0.06)]">
+            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/78 px-6 py-6 shadow-[0_20px_60px_rgba(10,20,12,0.06)] md:h-[42rem]">
               {requiresSignIn ? (
                 <>
                   <div className="mb-5">
@@ -340,7 +340,7 @@ export function PlaygroundPageClient() {
                       {signInMessage ?? "Open your workspace session first, then test checkout from an active plan."}
                     </p>
                   </div>
-                  <div className="mt-auto min-w-0">
+                  <div className="mt-auto min-w-0 overflow-y-auto pr-1">
                     <PrivySessionCard nextPath="/playground" />
                   </div>
                 </>
@@ -364,7 +364,7 @@ export function PlaygroundPageClient() {
                     </div>
                   ) : null}
 
-                  <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4">
+                  <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
                     {(hasPlans || canAccessInvoices) ? (
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -397,7 +397,7 @@ export function PlaygroundPageClient() {
                     ) : null}
 
                     {isLoadingCatalog ? (
-                      <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.4rem] border border-[color:var(--line)] bg-white px-5 py-10 text-center text-sm text-[color:var(--muted)]">
+                      <div className="flex min-h-[14rem] items-center justify-center rounded-[1.4rem] border border-[color:var(--line)] bg-white px-5 py-10 text-center text-sm text-[color:var(--muted)]">
                         Loading playground catalog...
                       </div>
                     ) : null}
@@ -429,7 +429,7 @@ export function PlaygroundPageClient() {
                         </label>
 
                         {selectedPlan ? (
-                          <div className="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-[color:var(--line)] bg-white px-5 py-5">
+                          <div className="flex min-h-0 flex-col rounded-[1.75rem] border border-[color:var(--line)] bg-white px-5 py-5">
                             <div className="min-w-0 space-y-4">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="rounded-full bg-[color:var(--brand)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">
@@ -475,7 +475,7 @@ export function PlaygroundPageClient() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
+                          <div className="flex min-h-[14rem] items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
                             Choose a plan above to show its details and open checkout from this panel.
                           </div>
                         )}
@@ -483,7 +483,7 @@ export function PlaygroundPageClient() {
                     ) : null}
 
                     {!isLoadingCatalog && selectedSource === "plan" && !hasPlans ? (
-                      <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
+                      <div className="flex min-h-[14rem] items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
                         No active playground plans are available in {workspaceMode} mode yet.
                       </div>
                     ) : null}
@@ -495,12 +495,13 @@ export function PlaygroundPageClient() {
                             Select an invoice
                           </span>
                           <select
+                            disabled={!hasInvoices}
                             value={selectedInvoice?.id ?? ""}
                             onChange={(event) => {
                               const invoice = invoices.find((entry) => entry.id === event.target.value);
                               setSelectedInvoice(invoice ?? null);
                             }}
-                            className="h-11 w-full min-w-0 rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-semibold text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27]"
+                            className="h-11 w-full min-w-0 rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-semibold text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <option value="" disabled>
                               Choose an invoice...
@@ -518,112 +519,112 @@ export function PlaygroundPageClient() {
                           </select>
                         </label>
 
-                        {selectedInvoice ? (
-                          <div className="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-[color:var(--line)] bg-white px-5 py-5">
-                            <div className="min-w-0 space-y-4">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-[color:var(--brand)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">
-                                  {selectedInvoice.invoiceNumber}
-                                </span>
-                                <span className="rounded-full border border-[color:var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--muted)]">
-                                  {humanizeValue(selectedInvoice.status)}
-                                </span>
-                              </div>
+                        {hasInvoices ? (
+                          selectedInvoice ? (
+                            <div className="flex min-h-0 flex-col rounded-[1.75rem] border border-[color:var(--line)] bg-white px-5 py-5">
+                              <div className="min-w-0 space-y-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full bg-[color:var(--brand)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">
+                                    {selectedInvoice.invoiceNumber}
+                                  </span>
+                                  <span className="rounded-full border border-[color:var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--muted)]">
+                                    {humanizeValue(selectedInvoice.status)}
+                                  </span>
+                                </div>
 
-                              <div className="min-w-0">
-                                <h3 className="break-words text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                                  {selectedInvoice.title}
-                                </h3>
-                                <p className="mt-2 break-words text-sm leading-6 text-[color:var(--muted)]">
-                                  {selectedInvoice.customerName} · {selectedInvoice.customerEmail}
-                                </p>
-                              </div>
-
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                                    Amount
-                                  </p>
-                                  <p className="mt-2 text-sm font-semibold text-[color:var(--ink)]">
-                                    {formatCurrencyAmount(
-                                      selectedInvoice.billingCurrency,
-                                      selectedInvoice.totals.localAmount
-                                    )}
-                                  </p>
-                                  <p className="mt-1 text-sm text-[color:var(--muted)]">
-                                    {selectedInvoice.totals.usdcAmount.toFixed(2)} USDC settlement
+                                <div className="min-w-0">
+                                  <h3 className="break-words text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+                                    {selectedInvoice.title}
+                                  </h3>
+                                  <p className="mt-2 break-words text-sm leading-6 text-[color:var(--muted)]">
+                                    {selectedInvoice.customerName} · {selectedInvoice.customerEmail}
                                   </p>
                                 </div>
 
-                                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                                    Due date
-                                  </p>
-                                  <p className="mt-2 text-sm font-semibold text-[color:var(--ink)]">
-                                    {formatDate(selectedInvoice.dueDate)}
-                                  </p>
-                                  <p className="mt-1 text-sm text-[color:var(--muted)]">
-                                    {selectedInvoice.paymentInstructions?.status
-                                      ? `Payment ${humanizeValue(selectedInvoice.paymentInstructions.status)}`
-                                      : "Payment instructions pending"}
-                                  </p>
-                                </div>
-                              </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                                      Amount
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold text-[color:var(--ink)]">
+                                      {formatCurrencyAmount(
+                                        selectedInvoice.billingCurrency,
+                                        selectedInvoice.totals.localAmount
+                                      )}
+                                    </p>
+                                    <p className="mt-1 text-sm text-[color:var(--muted)]">
+                                      {selectedInvoice.totals.usdcAmount.toFixed(2)} USDC settlement
+                                    </p>
+                                  </div>
 
-                              {selectedInvoice.paymentInstructions?.bankTransfer ? (
-                                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                                    Payment instructions
-                                  </p>
-                                  <div className="mt-3 space-y-2 text-sm text-[color:var(--muted)]">
-                                    <p>
-                                      Bank:{" "}
-                                      <span className="font-semibold text-[color:var(--ink)]">
-                                        {selectedInvoice.paymentInstructions.bankTransfer.bankName ?? "Pending"}
-                                      </span>
+                                  <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                                      Due date
                                     </p>
-                                    <p>
-                                      Account name:{" "}
-                                      <span className="font-semibold text-[color:var(--ink)]">
-                                        {selectedInvoice.paymentInstructions.bankTransfer.accountName ?? "Pending"}
-                                      </span>
+                                    <p className="mt-2 text-sm font-semibold text-[color:var(--ink)]">
+                                      {formatDate(selectedInvoice.dueDate)}
                                     </p>
-                                    <p>
-                                      Account number:{" "}
-                                      <span className="font-semibold text-[color:var(--ink)]">
-                                        {selectedInvoice.paymentInstructions.bankTransfer.accountNumber ?? "Pending"}
-                                      </span>
+                                    <p className="mt-1 text-sm text-[color:var(--muted)]">
+                                      {selectedInvoice.paymentInstructions?.status
+                                        ? `Payment ${humanizeValue(selectedInvoice.paymentInstructions.status)}`
+                                        : "Payment instructions pending"}
                                     </p>
                                   </div>
                                 </div>
-                              ) : null}
 
-                              {selectedInvoice.note ? (
-                                <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4 text-sm leading-6 text-[color:var(--muted)]">
-                                  {selectedInvoice.note}
-                                </div>
-                              ) : null}
+                                {selectedInvoice.paymentInstructions?.bankTransfer ? (
+                                  <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                                      Payment instructions
+                                    </p>
+                                    <div className="mt-3 space-y-2 text-sm text-[color:var(--muted)]">
+                                      <p>
+                                        Bank:{" "}
+                                        <span className="font-semibold text-[color:var(--ink)]">
+                                          {selectedInvoice.paymentInstructions.bankTransfer.bankName ?? "Pending"}
+                                        </span>
+                                      </p>
+                                      <p>
+                                        Account name:{" "}
+                                        <span className="font-semibold text-[color:var(--ink)]">
+                                          {selectedInvoice.paymentInstructions.bankTransfer.accountName ?? "Pending"}
+                                        </span>
+                                      </p>
+                                      <p>
+                                        Account number:{" "}
+                                        <span className="font-semibold text-[color:var(--ink)]">
+                                          {selectedInvoice.paymentInstructions.bankTransfer.accountNumber ?? "Pending"}
+                                        </span>
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : null}
 
-                              <Link
-                                href={`/invoices/${selectedInvoice.publicToken}`}
-                                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#111111] px-6 text-sm font-semibold tracking-[-0.02em] text-white transition-colors hover:bg-[#222222] sm:w-auto"
-                              >
-                                Open invoice page
-                              </Link>
+                                {selectedInvoice.note ? (
+                                  <div className="rounded-2xl border border-[color:var(--line)] bg-[#f8fbf8] px-4 py-4 text-sm leading-6 text-[color:var(--muted)]">
+                                    {selectedInvoice.note}
+                                  </div>
+                                ) : null}
+
+                                <Link
+                                  href={`/invoices/${selectedInvoice.publicToken}`}
+                                  className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#111111] px-6 text-sm font-semibold tracking-[-0.02em] text-white transition-colors hover:bg-[#222222] sm:w-auto"
+                                >
+                                  Open invoice page
+                                </Link>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="flex min-h-[14rem] items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
+                              Choose an invoice above to show its details and open the payment page from this panel.
+                            </div>
+                          )
                         ) : (
-                          <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
-                            Choose an invoice above to show its details and open the payment page from this panel.
+                          <div className="flex min-h-[14rem] items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
+                            No issued playground invoices are available in {workspaceMode} mode yet.
                           </div>
                         )}
                       </>
-                    ) : null}
-
-                    {!isLoadingCatalog && selectedSource === "invoice" && canAccessInvoices && !hasInvoices ? (
-                      <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
-                        No issued playground invoices are available in {workspaceMode} mode yet.
-                      </div>
                     ) : null}
                   </div>
                 </>
