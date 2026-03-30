@@ -22,6 +22,7 @@ type FormState = {
 
 type VerificationFormState = {
   bvn: string;
+  verificationMethod: string;
   phone: string;
   otp: string;
 };
@@ -378,6 +379,7 @@ function createInitialFormState(session: RenewCheckoutSession | null): FormState
 function createInitialVerificationState(): VerificationFormState {
   return {
     bvn: "",
+    verificationMethod: "",
     phone: "",
     otp: "",
   };
@@ -555,6 +557,8 @@ export function RenewCheckoutModal({
         : [];
   const requiresPhone = currentSession.verification?.requiredFields.includes("phone") ?? false;
   const requiresOtp = currentSession.verification?.requiredFields.includes("otp") ?? false;
+  const requiresVerificationMethod =
+    currentSession.verification?.requiredFields.includes("verificationMethod") ?? false;
 
   const handleSubmitCustomer = async () => {
     const payload: SubmitCheckoutCustomerInput = {
@@ -571,7 +575,9 @@ export function RenewCheckoutModal({
 
   const handleSubmitVerification = async () => {
     await submitVerification({
-      ...(requiresPhone
+      ...(requiresVerificationMethod
+        ? { verificationMethod: verificationState.verificationMethod.trim() }
+        : requiresPhone
         ? { phone: verificationState.phone.trim() }
         : requiresOtp
         ? { otp: verificationState.otp.trim() }
@@ -759,7 +765,9 @@ export function RenewCheckoutModal({
               <div className="renew-modal__stack">
                 <div>
                   <h3 className="renew-modal__section-title">
-                    {requiresPhone
+                    {requiresVerificationMethod
+                      ? "Choose verification option"
+                      : requiresPhone
                       ? "Confirm phone number"
                       : requiresOtp
                         ? "Enter verification code"
@@ -767,7 +775,9 @@ export function RenewCheckoutModal({
                   </h3>
                   <p className="renew-modal__copy">
                     {currentSession.verification?.instructions ??
-                      (requiresPhone
+                      (requiresVerificationMethod
+                        ? "Choose a verification option to continue."
+                        : requiresPhone
                         ? "Enter the phone number linked to your BVN to continue."
                         : requiresOtp
                         ? "Enter the verification code Partna sent to you."
@@ -775,7 +785,7 @@ export function RenewCheckoutModal({
                   </p>
                 </div>
 
-                {!requiresPhone && !requiresOtp ? (
+                {!requiresVerificationMethod && !requiresPhone && !requiresOtp ? (
                   <label className="renew-modal__field">
                     <span className="renew-modal__label">BVN</span>
                     <input
@@ -789,6 +799,29 @@ export function RenewCheckoutModal({
                       className="renew-modal__input"
                       placeholder="Enter BVN"
                     />
+                  </label>
+                ) : requiresVerificationMethod ? (
+                  <label className="renew-modal__field">
+                    <span className="renew-modal__label">Verification option</span>
+                    <select
+                      value={verificationState.verificationMethod}
+                      onChange={(event) =>
+                        setVerificationState((current) => ({
+                          ...current,
+                          verificationMethod: event.target.value,
+                        }))
+                      }
+                      className="renew-modal__select"
+                    >
+                      <option value="">Choose an option</option>
+                      {(currentSession.verification?.verificationMethods ?? []).map((entry) => (
+                        <option key={entry.method} value={entry.method}>
+                          {entry.hint
+                            ? `${humanizeValue(entry.method)} (${entry.hint})`
+                            : humanizeValue(entry.method)}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 ) : requiresPhone ? (
                   <label className="renew-modal__field">
@@ -828,7 +861,9 @@ export function RenewCheckoutModal({
                   onClick={() => void handleSubmitVerification()}
                   disabled={
                     isSubmittingVerification ||
-                    (requiresPhone
+                    (requiresVerificationMethod
+                      ? !verificationState.verificationMethod.trim()
+                      : requiresPhone
                       ? !verificationState.phone.trim()
                       : requiresOtp
                       ? !verificationState.otp.trim()
@@ -838,12 +873,16 @@ export function RenewCheckoutModal({
                   style={hiddenButtonStyle}
                 >
                   {isSubmittingVerification
-                    ? (requiresPhone
+                    ? (requiresVerificationMethod
+                        ? "Continuing..."
+                        : requiresPhone
                         ? "Confirming phone..."
                         : requiresOtp
                           ? "Verifying code..."
                           : "Sending code...")
-                    : (requiresPhone
+                    : (requiresVerificationMethod
+                        ? "Continue"
+                        : requiresPhone
                         ? "Continue"
                         : requiresOtp
                           ? "Verify and get payment details"

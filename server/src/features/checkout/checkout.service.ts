@@ -15,10 +15,12 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueSubscriptionCreatedNotifications } from "@/features/notifications/notification.service";
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
+  buildPartnaMethodVerificationSnapshot,
   buildPartnaPhoneVerificationSnapshot,
   buildPartnaOtpVerificationSnapshot,
   buildPartnaVerificationSnapshot,
   completePartnaCustomerPaymentProfileVerification,
+  continuePartnaCustomerPaymentProfileVerificationAfterMethod,
   continuePartnaCustomerPaymentProfileVerificationAfterPhone,
   hasActivePartnaPaymentProfile,
   processPartnaWebhook,
@@ -367,6 +369,12 @@ function toCheckoutSessionResponse(input: {
         country: session.verificationSnapshot.country ?? null,
         currency: session.verificationSnapshot.currency ?? null,
         instructions: session.verificationSnapshot.instructions ?? null,
+        verificationMethods: Array.isArray(session.verificationSnapshot.verificationMethods)
+          ? session.verificationSnapshot.verificationMethods.map((entry) => ({
+              method: entry?.method ?? "",
+              hint: entry?.hint ?? null,
+            }))
+          : [],
         requiredFields: Array.isArray(session.verificationSnapshot.requiredFields)
           ? session.verificationSnapshot.requiredFields
           : [],
@@ -608,6 +616,7 @@ async function activateCheckoutSubscription(input: {
         country: "NG",
         currency: input.customer.market,
         instructions: "Permanent bank instructions are ready for this customer.",
+        verificationMethods: [],
         requiredFields: [],
       }
       : null;
@@ -754,6 +763,7 @@ export async function submitCheckoutVerification(
       instructions: "Starting verification for this customer.",
       accountName: null,
       verificationMethod: null,
+      verificationMethods: [],
       requiredFields: [],
     };
     await session.save();
@@ -767,18 +777,59 @@ export async function submitCheckoutVerification(
     });
 
     session.status = "pending_verification";
-    session.verificationSnapshot = pendingVerification.phoneConfirmationRequired
+    session.verificationSnapshot = buildPartnaMethodVerificationSnapshot({
+      currency: customer.market,
+      accountName: pendingVerification.accountName ?? "",
+      verificationMethods: pendingVerification.verificationMethods,
+    });
+    await session.save();
+
+    return getCheckoutSession(sessionId);
+  }
+
+  if (input.verificationMethod?.trim()) {
+    const accountName = session.verificationSnapshot?.accountName ?? null;
+
+    session.verificationSnapshot = {
+      provider: "partna",
+      status: "processing",
+      country: "NG",
+      currency: customer.market,
+      instructions: "Sending verification code.",
+      accountName,
+      verificationMethod: null,
+      verificationMethods: Array.isArray(session.verificationSnapshot?.verificationMethods)
+        ? session.verificationSnapshot?.verificationMethods
+        : [],
+      requiredFields: [],
+    };
+    await session.save();
+
+    const methodVerification =
+      await continuePartnaCustomerPaymentProfileVerificationAfterMethod({
+        customerId: customer._id.toString(),
+        environment: runtimeEnvironment,
+        verification: {
+          verificationMethod: input.verificationMethod,
+        },
+        accountName,
+      });
+
+    session.status = "pending_verification";
+    session.verificationSnapshot = methodVerification.phoneConfirmationRequired
       ? buildPartnaPhoneVerificationSnapshot({
           currency: customer.market,
-          accountName: pendingVerification.accountName ?? "",
-          verificationMethod: pendingVerification.verificationMethod ?? "email",
-          instructions: pendingVerification.phoneConfirmationMessage,
+          accountName: accountName ?? "",
+          verificationMethod:
+            methodVerification.verificationMethod ?? input.verificationMethod,
+          instructions: methodVerification.phoneConfirmationMessage,
         })
       : buildPartnaOtpVerificationSnapshot({
           currency: customer.market,
-          accountName: pendingVerification.accountName ?? "",
-          verificationMethod: pendingVerification.verificationMethod ?? "email",
-          verificationHint: pendingVerification.verificationHint,
+          accountName: accountName ?? "",
+          verificationMethod:
+            methodVerification.verificationMethod ?? input.verificationMethod,
+          verificationHint: methodVerification.verificationHint,
         });
     await session.save();
 
@@ -797,6 +848,7 @@ export async function submitCheckoutVerification(
       instructions: "Confirming phone number and sending verification code.",
       accountName,
       verificationMethod,
+      verificationMethods: [],
       requiredFields: [],
     };
     await session.save();
@@ -835,6 +887,7 @@ export async function submitCheckoutVerification(
     instructions: "Finishing verification and preparing payment details.",
     accountName: session.verificationSnapshot?.accountName ?? null,
     verificationMethod: session.verificationSnapshot?.verificationMethod ?? null,
+    verificationMethods: [],
     requiredFields: [],
   };
   await session.save();

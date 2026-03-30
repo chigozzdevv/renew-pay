@@ -20,11 +20,13 @@ import {
 } from "@/features/notifications/notification.service";
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
+  buildPartnaMethodVerificationSnapshot,
   buildPartnaPhoneVerificationSnapshot,
   buildPartnaOtpVerificationSnapshot,
   buildPartnaVerificationSnapshot,
   createPartnaChargeInstruction,
   completePartnaCustomerPaymentProfileVerification,
+  continuePartnaCustomerPaymentProfileVerificationAfterMethod,
   continuePartnaCustomerPaymentProfileVerificationAfterPhone,
   derivePartnaFeeAmountUsdc,
   hasActivePartnaPaymentProfile,
@@ -780,6 +782,7 @@ async function createInvoicePaymentAttempt(
     country: "NG",
     currency: invoice.billingCurrency,
     instructions: "Permanent bank instructions are ready for this invoice.",
+    verificationMethods: [],
     requiredFields: [],
   };
   invoice.chargeId = charge._id;
@@ -1244,6 +1247,7 @@ export async function submitPublicInvoiceVerification(
       instructions: "Starting verification for this invoice.",
       accountName: null,
       verificationMethod: null,
+      verificationMethods: [],
       requiredFields: [],
     };
     await invoice.save();
@@ -1256,18 +1260,58 @@ export async function submitPublicInvoiceVerification(
       },
     });
 
-    invoice.verificationSnapshot = pendingVerification.phoneConfirmationRequired
+    invoice.verificationSnapshot = buildPartnaMethodVerificationSnapshot({
+      currency: invoice.billingCurrency,
+      accountName: pendingVerification.accountName ?? "",
+      verificationMethods: pendingVerification.verificationMethods,
+    });
+    await invoice.save();
+
+    return getPublicInvoiceByToken(publicToken);
+  }
+
+  if (input.verificationMethod?.trim()) {
+    const accountName = invoice.verificationSnapshot?.accountName ?? null;
+
+    invoice.verificationSnapshot = {
+      provider: "partna",
+      status: "processing",
+      country: "NG",
+      currency: invoice.billingCurrency,
+      instructions: "Sending verification code.",
+      accountName,
+      verificationMethod: null,
+      verificationMethods: Array.isArray(invoice.verificationSnapshot?.verificationMethods)
+        ? invoice.verificationSnapshot?.verificationMethods
+        : [],
+      requiredFields: [],
+    };
+    await invoice.save();
+
+    const methodVerification =
+      await continuePartnaCustomerPaymentProfileVerificationAfterMethod({
+        customerId: invoice.customerId.toString(),
+        environment: toStoredRuntimeMode(invoice.environment),
+        verification: {
+          verificationMethod: input.verificationMethod,
+        },
+        accountName,
+      });
+
+    invoice.verificationSnapshot = methodVerification.phoneConfirmationRequired
       ? buildPartnaPhoneVerificationSnapshot({
           currency: invoice.billingCurrency,
-          accountName: pendingVerification.accountName ?? "",
-          verificationMethod: pendingVerification.verificationMethod ?? "email",
-          instructions: pendingVerification.phoneConfirmationMessage,
+          accountName: accountName ?? "",
+          verificationMethod:
+            methodVerification.verificationMethod ?? input.verificationMethod,
+          instructions: methodVerification.phoneConfirmationMessage,
         })
       : buildPartnaOtpVerificationSnapshot({
           currency: invoice.billingCurrency,
-          accountName: pendingVerification.accountName ?? "",
-          verificationMethod: pendingVerification.verificationMethod ?? "email",
-          verificationHint: pendingVerification.verificationHint,
+          accountName: accountName ?? "",
+          verificationMethod:
+            methodVerification.verificationMethod ?? input.verificationMethod,
+          verificationHint: methodVerification.verificationHint,
         });
     await invoice.save();
 
@@ -1286,6 +1330,7 @@ export async function submitPublicInvoiceVerification(
       instructions: "Confirming phone number and sending verification code.",
       accountName,
       verificationMethod,
+      verificationMethods: [],
       requiredFields: [],
     };
     await invoice.save();
@@ -1323,6 +1368,7 @@ export async function submitPublicInvoiceVerification(
     instructions: "Finishing verification and preparing payment details.",
     accountName: invoice.verificationSnapshot?.accountName ?? null,
     verificationMethod: invoice.verificationSnapshot?.verificationMethod ?? null,
+    verificationMethods: [],
     requiredFields: [],
   };
   await invoice.save();

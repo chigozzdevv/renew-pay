@@ -44,6 +44,7 @@ export default function PublicInvoicePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [verificationDraft, setVerificationDraft] = useState({
     bvn: "",
+    verificationMethod: "",
     phone: "",
     otp: "",
   });
@@ -273,7 +274,27 @@ export default function PublicInvoicePage() {
 
             {invoice.nextAction === "complete_verification" ? (
               <div className="mt-5 space-y-3">
-                {invoice.verification?.requiredFields.includes("phone") ? (
+                {invoice.verification?.requiredFields.includes("verificationMethod") ? (
+                  <select
+                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+                    value={verificationDraft.verificationMethod}
+                    onChange={(event) =>
+                      setVerificationDraft((current) => ({
+                        ...current,
+                        verificationMethod: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Choose a verification option</option>
+                    {(invoice.verification?.verificationMethods ?? []).map((entry) => (
+                      <option key={entry.method} value={entry.method}>
+                        {entry.hint
+                          ? `${entry.method.replace(/_/g, " ")} (${entry.hint})`
+                          : entry.method.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                ) : invoice.verification?.requiredFields.includes("phone") ? (
                   <input
                     className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
                     placeholder="Phone number"
@@ -312,20 +333,33 @@ export default function PublicInvoicePage() {
                 )}
                 <button
                   type="button"
-                  disabled={isBusy === "verify"}
+                  disabled={
+                    isBusy === "verify" ||
+                    (invoice.verification?.requiredFields.includes("verificationMethod")
+                      ? !verificationDraft.verificationMethod.trim()
+                      : invoice.verification?.requiredFields.includes("phone")
+                        ? !verificationDraft.phone.trim()
+                        : invoice.verification?.requiredFields.includes("otp")
+                          ? !verificationDraft.otp.trim()
+                          : !verificationDraft.bvn.trim())
+                  }
                   onClick={() =>
                     void runAction(
                       "verify",
                       () =>
                         submitPublicInvoiceVerification({
                           invoiceToken,
-                          payload: invoice.verification?.requiredFields.includes("phone")
+                          payload: invoice.verification?.requiredFields.includes("verificationMethod")
+                            ? { verificationMethod: verificationDraft.verificationMethod }
+                            : invoice.verification?.requiredFields.includes("phone")
                             ? { phone: verificationDraft.phone }
                             : invoice.verification?.requiredFields.includes("otp")
                               ? { otp: verificationDraft.otp }
                               : { bvn: verificationDraft.bvn },
                         }),
-                      invoice.verification?.requiredFields.includes("phone")
+                      invoice.verification?.requiredFields.includes("verificationMethod")
+                        ? "Verification code sent."
+                        : invoice.verification?.requiredFields.includes("phone")
                         ? "Verification code sent."
                         : invoice.verification?.requiredFields.includes("otp")
                         ? "Verification completed. Payment instructions are ready."
@@ -335,12 +369,16 @@ export default function PublicInvoicePage() {
                   className="mt-2 inline-flex items-center justify-center rounded-2xl border border-[#d9f6bc]/18 bg-[#d9f6bc] px-5 py-3 text-sm font-semibold text-[#0c4a27]"
                 >
                   {isBusy === "verify"
-                    ? invoice.verification?.requiredFields.includes("phone")
+                    ? invoice.verification?.requiredFields.includes("verificationMethod")
+                      ? "Continuing..."
+                      : invoice.verification?.requiredFields.includes("phone")
                       ? "Confirming..."
                       : invoice.verification?.requiredFields.includes("otp")
                         ? "Verifying..."
                         : "Sending code..."
-                    : invoice.verification?.requiredFields.includes("phone")
+                    : invoice.verification?.requiredFields.includes("verificationMethod")
+                      ? "Continue"
+                      : invoice.verification?.requiredFields.includes("phone")
                       ? "Continue"
                       : invoice.verification?.requiredFields.includes("otp")
                         ? "Verify and continue"

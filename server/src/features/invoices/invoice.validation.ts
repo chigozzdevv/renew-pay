@@ -89,12 +89,14 @@ export const publicInvoiceParamSchema = z.object({
 export const submitInvoiceVerificationSchema = z
   .object({
     bvn: z.string().trim().min(8).max(32).optional(),
+    verificationMethod: z.string().trim().min(2).max(40).optional(),
     phone: z.string().trim().min(7).max(24).optional(),
     otp: z.string().trim().min(4).max(12).optional(),
   })
   .refine(
     (value) =>
-      [value.bvn, value.phone, value.otp].filter((entry) => Boolean(entry?.trim())).length === 1,
+      [value.bvn, value.verificationMethod, value.phone, value.otp]
+        .filter((entry) => Boolean(entry?.trim())).length === 1,
     {
       message: "Provide exactly one verification input.",
       path: [],

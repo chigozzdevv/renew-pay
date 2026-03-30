@@ -168,6 +168,7 @@ const invoiceSchema = new Schema(
         instructions: { type: String, trim: true, default: null },
         accountName: { type: String, trim: true, default: null },
         verificationMethod: { type: String, trim: true, default: null },
+        verificationMethods: { type: Schema.Types.Mixed, default: [] },
         requiredFields: { type: [String], default: [] },
       },
       default: null,

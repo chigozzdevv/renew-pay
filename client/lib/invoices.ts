@@ -119,6 +119,10 @@ export type PublicInvoiceRecord = {
     country: string;
     currency: string;
     instructions: string;
+    verificationMethods: Array<{
+      method: string;
+      hint: string | null;
+    }>;
     requiredFields: string[];
   } | null;
   charge: {
@@ -331,6 +335,7 @@ export async function submitPublicInvoiceVerification(input: {
   invoiceToken: string;
   payload: {
     bvn?: string;
+    verificationMethod?: string;
     phone?: string;
     otp?: string;
   };

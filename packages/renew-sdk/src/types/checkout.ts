@@ -44,6 +44,10 @@ export type RenewCheckoutVerification = {
   readonly country: string | null;
   readonly currency: string | null;
   readonly instructions: string | null;
+  readonly verificationMethods: readonly {
+    method: string;
+    hint: string | null;
+  }[];
   readonly requiredFields: readonly string[];
 };
 
@@ -169,6 +173,7 @@ export type SubmitCheckoutCustomerInput = {
 
 export type SubmitCheckoutVerificationInput = {
   readonly bvn?: string;
+  readonly verificationMethod?: string;
   readonly phone?: string;
   readonly otp?: string;
 };

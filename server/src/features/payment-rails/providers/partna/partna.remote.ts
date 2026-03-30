@@ -69,6 +69,24 @@ function asRecord(value: unknown) {
     : null;
 }
 
+function normalizePartnaPhoneNumber(value: string) {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D+/g, "");
+
+  if (digits.length === 13 && digits.startsWith("234")) {
+    return `0${digits.slice(3)}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits;
+  }
+
+  throw new HttpError(
+    400,
+    "Phone number must be the 11-digit local number linked to the BVN."
+  );
+}
+
 function extractPayloadData(payload: unknown) {
   const record = asRecord(payload);
 
@@ -441,13 +459,14 @@ export class PartnaRemoteProvider implements PartnaProvider {
   }
 
   async confirmPhone(input: PartnaConfirmPhoneInput) {
+    const phone = normalizePartnaPhoneNumber(input.phone);
     const payload = await this.requestJson(
       this.config.v4BaseUrl,
       "/kyc/confirm-phone",
       "PUT",
       {
         accountName: input.accountName,
-        phone: input.phone.trim(),
+        phone,
       }
     );
 
