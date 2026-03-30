@@ -138,17 +138,22 @@ function pickPreferredPartnaVerificationMethod(methods: PartnaBvnVerificationMet
   return methods[0] ?? null;
 }
 
+function sanitizePartnaAccountName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 40);
+}
+
 function buildPartnaCustomerAccountName(customer: {
   customerRef: string;
   _id: { toString(): string };
 }) {
-  const ref = customer.customerRef
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const ref = sanitizePartnaAccountName(customer.customerRef);
   const suffix = customer._id.toString().slice(-6).toLowerCase();
-  return `${ref || "renew-customer"}-${suffix}`.slice(0, 40);
+  const accountName = sanitizePartnaAccountName(`${ref || "renew"}${suffix}`);
+  return accountName || `renew${suffix}`;
 }
 
 export function buildPartnaVerificationSnapshot(currency: string) {
@@ -228,7 +233,7 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
 
   const provider = getPartnaProvider(input.environment);
   const accountName =
-    customer.paymentProfile?.partna?.accountName?.trim() ||
+    sanitizePartnaAccountName(customer.paymentProfile?.partna?.accountName ?? "") ||
     buildPartnaCustomerAccountName(customer);
   const methods = await provider
     .createAccount({
@@ -310,8 +315,8 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
 
   const provider = getPartnaProvider(input.environment);
   const accountName =
-    input.accountName?.trim() ||
-    customer.paymentProfile?.partna?.accountName?.trim() ||
+    sanitizePartnaAccountName(input.accountName ?? "") ||
+    sanitizePartnaAccountName(customer.paymentProfile?.partna?.accountName ?? "") ||
     buildPartnaCustomerAccountName(customer);
   const existingRaw =
     customer.paymentProfile?.partna?.raw &&

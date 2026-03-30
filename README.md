@@ -10,14 +10,15 @@ Renew uses Partna for local collection, Privy for authentication and wallet mana
 
 Renew currently runs in test mode on Solana devnet with Partna test rails and Sumsub test KYC during onboarding.
 
-Live mode is not active yet. It will follow the Solana mainnet deployment and the production compliance rollout. That live stack will include KYC, KYB, AML, KYT, and Travel Rule controls for real-money activity.
+Live mode is not active yet. It will follow the Solana mainnet deployment and the production compliance rollout. The live stack will include KYC, KYB, AML, KYT, and Travel Rule controls for real-money activity, through our existing Sumsub integration.
 
 Current compliance config:
 
 - Test KYC: `SUMSUB_LEVEL_NAME_KYC_TEST`
 - Live KYC: `SUMSUB_LEVEL_NAME_KYC_LIVE`
 - Live KYB: `SUMSUB_LEVEL_NAME_KYB_LIVE`
-- Live AML / KYT / Travel Rule: added with the production compliance stack
+
+- Live AML / KYT / Travel Rule: added with the Sumsub production compliance stack
 
 ## Quick Links
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -9,6 +8,7 @@ import {
 } from "@renew.sh/sdk/core";
 import { RenewCheckoutModal } from "@renew.sh/sdk/react";
 
+import { PrivySessionCard } from "@/components/auth/privy-session-card";
 import { Container } from "@/components/ui/container";
 import {
   type PlaygroundCheckoutClient,
@@ -17,7 +17,21 @@ import {
   listPlaygroundPlans,
   type PlaygroundSessionState,
 } from "@/lib/playground";
-import { ApiError, clearAccessToken, readWorkspaceMode, type WorkspaceMode } from "@/lib/api";
+import {
+  ApiError,
+  clearAccessToken,
+  readAccessToken,
+  readWorkspaceMode,
+  type WorkspaceMode,
+} from "@/lib/api";
+
+const PLAYGROUND_STEPS = [
+  "Sign in to your Renew workspace.",
+  "Open Playground and choose an active plan or invoice.",
+  "Start the checkout. If invoice, the payment page opens automatically.",
+  "Complete the customer flow and payment steps in test mode.",
+  "Watch the payment and settlement status update in Renew.",
+] as const;
 
 function formatInterval(days: number) {
   if (days % 30 === 0) {
@@ -34,6 +48,7 @@ function formatInterval(days: number) {
 export function PlaygroundPageClient() {
   const [plans, setPlans] = useState<readonly RenewCheckoutPlan[]>([]);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("test");
+  const [hasWorkspaceSession, setHasWorkspaceSession] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<RenewCheckoutPlan | null>(null);
   const [checkoutClient, setCheckoutClient] = useState<PlaygroundCheckoutClient | null>(null);
   const [session, setSession] = useState<PlaygroundSessionState | null>(null);
@@ -50,6 +65,12 @@ export function PlaygroundPageClient() {
       error.status === 401
     ) {
       clearAccessToken();
+      setHasWorkspaceSession(false);
+      setPlans([]);
+      setSelectedPlan(null);
+      setSession(null);
+      setClientSecret(null);
+      setIsModalOpen(false);
       setSignInMessage(
         error.message === "Authentication token expired."
           ? "Your session expired. Sign in again to use Playground."
@@ -63,6 +84,12 @@ export function PlaygroundPageClient() {
       error instanceof Error &&
       error.message === "Sign in to your workspace to use Playground."
     ) {
+      setHasWorkspaceSession(false);
+      setPlans([]);
+      setSelectedPlan(null);
+      setSession(null);
+      setClientSecret(null);
+      setIsModalOpen(false);
       setSignInMessage(error.message);
       setErrorMessage(null);
       return;
@@ -85,6 +112,22 @@ export function PlaygroundPageClient() {
     let isMounted = true;
 
     const loadPlans = async () => {
+      const token = readAccessToken();
+
+      if (!token) {
+        setHasWorkspaceSession(false);
+        setPlans([]);
+        setSelectedPlan(null);
+        setSession(null);
+        setClientSecret(null);
+        setIsModalOpen(false);
+        setErrorMessage(null);
+        setSignInMessage("Sign in to your workspace to use Playground.");
+        setIsLoadingPlans(false);
+        return;
+      }
+
+      setHasWorkspaceSession(true);
       setIsLoadingPlans(true);
       setErrorMessage(null);
       setSignInMessage(null);
@@ -148,154 +191,179 @@ export function PlaygroundPageClient() {
     setIsModalOpen(false);
     setSession(null);
     setClientSecret(null);
-    setSelectedPlan(null);
   };
 
   const handleSessionChange = (nextSession: RenewCheckoutSession) => {
     setSession(nextSession);
   };
 
-  const requiresSignIn = signInMessage !== null;
+  const requiresSignIn = !hasWorkspaceSession || signInMessage !== null;
 
   return (
     <>
       <section className="relative overflow-hidden pb-24 pt-14 sm:pb-28 sm:pt-20">
         <Container className="space-y-6">
-          {requiresSignIn ? (
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="flex min-h-[22rem] h-full flex-col justify-center rounded-[2rem] border border-white/10 bg-[#111111] px-6 py-6 text-white shadow-[0_28px_100px_rgba(8,12,10,0.18)]">
-                <div className="space-y-5">
-                  {[
-                    "Sign in to your Renew workspace.",
-                    "Open Playground and choose an active plan or invoice.",
-                    "Start the checkout. If invoice, the payment page opens automatically.",
-                    "Complete the customer flow and payment steps in test mode.",
-                    "Watch the payment and settlement status update in Renew.",
-                  ].map((step, index) => (
-                    <div key={step} className="flex gap-4">
-                      <div className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#d9f6bc] text-sm font-semibold text-[#0c4a27]">
-                        {index + 1}
-                      </div>
-                      <p className="text-sm leading-6 text-white/78">{step}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex min-h-[22rem] h-full flex-col justify-center rounded-[2rem] border border-white/80 bg-white/78 px-6 py-6 shadow-[0_20px_60px_rgba(10,20,12,0.06)]">
-                <div>
-                  <p className="text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                    Sign in to use Playground
-                  </p>
-                  <p className="mt-3 text-sm leading-6 text-[color:var(--muted)]">
-                    {signInMessage ?? "Open your workspace session first, then test checkout from an active plan."}
-                  </p>
-                </div>
-                <div className="mt-6">
-                  <Link
-                    href="/login?next=/playground"
-                    className="inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#222222]"
-                  >
-                    Sign in
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {errorMessage && !requiresSignIn ? (
-            <div className="max-w-3xl rounded-[1.2rem] border border-[#e7c3bc] bg-[#fff7f5] px-4 py-3 text-sm text-[#9b3b2d]">
-              {errorMessage}
-            </div>
-          ) : null}
-
-          {isLoadingPlans || hasPlans ? (
-            <div className="rounded-[1.75rem] border border-white/80 bg-white/72 p-4 shadow-[0_28px_90px_rgba(10,20,12,0.08)] backdrop-blur-xl">
-              <div className="grid gap-4">
-                {isLoadingPlans ? (
-                  <div className="rounded-[1.4rem] border border-[color:var(--line)] bg-white px-5 py-10 text-center text-sm text-[color:var(--muted)]">
-                    Loading active plans...
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/78 px-6 py-6 shadow-[0_20px_60px_rgba(10,20,12,0.06)]">
+              {requiresSignIn ? (
+                <>
+                  <div className="mb-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--muted)]">
+                      Workspace Session
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+                      Sign in to use Playground
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-[color:var(--muted)]">
+                      {signInMessage ?? "Open your workspace session first, then test checkout from an active plan."}
+                    </p>
                   </div>
-                ) : null}
+                  <div className="mt-auto min-w-0">
+                    <PrivySessionCard nextPath="/playground" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--muted)]">
+                      Playground
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+                      Choose a plan
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-[color:var(--muted)]">
+                      Select an active plan to preview its checkout details and launch the flow from this card.
+                    </p>
+                  </div>
 
-                {!isLoadingPlans && hasPlans ? (
-                  <>
-                    <label className="flex flex-col gap-3 rounded-[1.4rem] border border-[color:var(--line)] bg-white px-4 py-4 md:flex-row md:items-center">
-                      <span className="shrink-0 text-sm font-semibold text-[color:var(--ink)] md:min-w-[7rem]">
-                        Select a plan
-                      </span>
-                      <select
-                        value={selectedPlan?.id ?? ""}
-                        onChange={(event) => {
-                          const plan = plans.find((p) => p.id === event.target.value);
-                          setSelectedPlan(plan ?? null);
-                        }}
-                        className="h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-semibold text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27] md:flex-1"
-                      >
-                        <option value="" disabled>
-                          Choose a plan...
-                        </option>
-                        {plans.map((plan) => (
-                          <option key={plan.id} value={plan.id}>
-                            {plan.name} — ${plan.usdAmount.toFixed(2)} /{" "}
-                            {formatInterval(plan.billingIntervalDays)} ({plan.planCode})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  {errorMessage ? (
+                    <div className="mt-5 rounded-[1.2rem] border border-[#e7c3bc] bg-[#fff7f5] px-4 py-3 text-sm text-[#9b3b2d]">
+                      {errorMessage}
+                    </div>
+                  ) : null}
 
-                    {selectedPlan ? (
-                      <div className="rounded-[1.75rem] border border-[color:var(--line)] bg-white px-5 py-5">
-                        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[color:var(--brand)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">
-                                {selectedPlan.planCode}
-                              </span>
-                              <span className="rounded-full border border-[color:var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--muted)]">
-                                {selectedPlan.billingMode}
-                              </span>
-                            </div>
-                            <div>
-                              <h3 className="text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
-                                {selectedPlan.name}
-                              </h3>
-                              <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">
-                                ${selectedPlan.usdAmount.toFixed(2)} every{" "}
-                                {formatInterval(selectedPlan.billingIntervalDays)}
-                                {selectedPlan.trialDays > 0
-                                  ? ` with ${selectedPlan.trialDays} trial days`
-                                  : ""}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedPlan.supportedMarkets.map((market: string) => (
-                                <span
-                                  key={market}
-                                  className="rounded-full border border-[color:var(--line)] bg-[#f8fbf8] px-3 py-1 text-xs font-semibold tracking-[0.18em] text-[color:var(--muted)]"
-                                >
-                                  {market}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => void openCheckout(selectedPlan)}
-                            disabled={isCreatingSession}
-                            className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-[#0c4a27] px-6 text-sm font-semibold tracking-[-0.02em] text-[#d9f6bc] transition-colors hover:bg-[#093a1e] disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {isCreatingSession ? "Opening..." : "Open checkout"}
-                          </button>
-                        </div>
+                  <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4">
+                    {isLoadingPlans ? (
+                      <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.4rem] border border-[color:var(--line)] bg-white px-5 py-10 text-center text-sm text-[color:var(--muted)]">
+                        Loading active plans...
                       </div>
                     ) : null}
-                  </>
-                ) : null}
+
+                    {!isLoadingPlans && hasPlans ? (
+                      <>
+                        <label className="flex flex-col gap-3 rounded-[1.4rem] border border-[color:var(--line)] bg-white px-4 py-4">
+                          <span className="text-sm font-semibold text-[color:var(--ink)]">
+                            Select a plan
+                          </span>
+                          <select
+                            value={selectedPlan?.id ?? ""}
+                            onChange={(event) => {
+                              const plan = plans.find((p) => p.id === event.target.value);
+                              setSelectedPlan(plan ?? null);
+                            }}
+                            className="h-11 w-full min-w-0 rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-semibold text-[color:var(--ink)] outline-none transition-colors focus:border-[#0c4a27]"
+                          >
+                            <option value="" disabled>
+                              Choose a plan...
+                            </option>
+                            {plans.map((plan) => (
+                              <option key={plan.id} value={plan.id}>
+                                {plan.name} — ${plan.usdAmount.toFixed(2)} /{" "}
+                                {formatInterval(plan.billingIntervalDays)} ({plan.planCode})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        {selectedPlan ? (
+                          <div className="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-[color:var(--line)] bg-white px-5 py-5">
+                            <div className="min-w-0 space-y-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full bg-[color:var(--brand)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--brand)]">
+                                  {selectedPlan.planCode}
+                                </span>
+                                <span className="rounded-full border border-[color:var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[color:var(--muted)]">
+                                  {selectedPlan.billingMode}
+                                </span>
+                              </div>
+
+                              <div className="min-w-0">
+                                <h3 className="break-words text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+                                  {selectedPlan.name}
+                                </h3>
+                                <p className="mt-2 break-words text-sm leading-6 text-[color:var(--muted)]">
+                                  ${selectedPlan.usdAmount.toFixed(2)} every{" "}
+                                  {formatInterval(selectedPlan.billingIntervalDays)}
+                                  {selectedPlan.trialDays > 0
+                                    ? ` with ${selectedPlan.trialDays} trial days`
+                                    : ""}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                {selectedPlan.supportedMarkets.map((market: string) => (
+                                  <span
+                                    key={market}
+                                    className="rounded-full border border-[color:var(--line)] bg-[#f8fbf8] px-3 py-1 text-xs font-semibold tracking-[0.18em] text-[color:var(--muted)]"
+                                  >
+                                    {market}
+                                  </span>
+                                ))}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => void openCheckout(selectedPlan)}
+                                disabled={isCreatingSession}
+                                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#0c4a27] px-6 text-sm font-semibold tracking-[-0.02em] text-[#d9f6bc] transition-colors hover:bg-[#093a1e] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                              >
+                                {isCreatingSession ? "Opening..." : "Open checkout"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
+                            Choose a plan above to show its details and open checkout from this panel.
+                          </div>
+                        )}
+                      </>
+                    ) : null}
+
+                    {!isLoadingPlans && !hasPlans ? (
+                      <div className="flex min-h-[14rem] flex-1 items-center justify-center rounded-[1.75rem] border border-dashed border-[color:var(--line)] bg-white/70 px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted)]">
+                        No active playground plans are available in {workspaceMode} mode yet.
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#111111] px-6 py-6 text-white shadow-[0_28px_100px_rgba(8,12,10,0.18)]">
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">
+                  Playground Steps
+                </p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">
+                  How it works
+                </p>
+                <p className="mt-3 text-sm leading-6 text-white/72">
+                  This stays visible before and after sign-in, and the content is kept inside the card.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                {PLAYGROUND_STEPS.map((step, index) => (
+                  <div key={step} className="flex min-w-0 gap-4">
+                    <div className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#d9f6bc] text-sm font-semibold text-[#0c4a27]">
+                      {index + 1}
+                    </div>
+                    <p className="min-w-0 text-sm leading-6 text-white/78">{step}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          ) : null}
+          </div>
         </Container>
       </section>
 

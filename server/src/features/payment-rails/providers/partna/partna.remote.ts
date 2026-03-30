@@ -79,6 +79,22 @@ function extractPayloadData(payload: unknown) {
   return data ?? record;
 }
 
+function extractPartnaErrorDetail(payload: unknown) {
+  const data = extractPayloadData(payload);
+
+  if (Array.isArray(data)) {
+    const firstMessage = data.find(
+      (entry): entry is string => typeof entry === "string" && entry.trim().length > 0
+    );
+
+    if (firstMessage) {
+      return firstMessage.trim();
+    }
+  }
+
+  return null;
+}
+
 function extractManagedBankAccount(record: Record<string, unknown>): PartnaManagedBankAccount {
   return {
     provider: "partna",
@@ -367,8 +383,12 @@ export class PartnaRemoteProvider implements PartnaProvider {
         readString(asRecord(payload)?.message) ??
         readString(asRecord(payload)?.error) ??
         `Partna request failed with ${response.status}.`;
+      const detail = extractPartnaErrorDetail(payload);
 
-      throw new HttpError(response.status, message ?? "Partna request failed.");
+      throw new HttpError(
+        response.status,
+        detail && detail !== message ? `${message}: ${detail}` : message ?? "Partna request failed."
+      );
     }
 
     return payload;
