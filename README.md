@@ -4,11 +4,11 @@
 
 Renew lets merchants charge customers in local fiat, reconcile billing off-chain, and settle completed payments in USDC on Solana. It is built to solve the friction, low success rates, and poor reliability of card-based billing across many African markets by letting customers pay with the methods and currencies they already use and trust.
 
-Renew uses Partna for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
+Renew uses Partna and Yellow Card for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
 
 ## Runtime Status
 
-Renew currently runs in test mode on Solana devnet with Partna test rails and Sumsub test KYC during onboarding.
+Renew currently runs in test mode on Solana devnet with Partna and Yellow Card test rails and Sumsub test KYC during onboarding.
 
 Live mode is not active yet. It will follow the Solana mainnet deployment and the production compliance rollout. The live stack will include KYC, KYB, AML, KYT, and Travel Rule controls for real-money activity, through our existing Sumsub integration.
 
@@ -35,7 +35,7 @@ Current compliance config:
 |---------|-------|
 | Auth | Privy |
 | Onboarding | Owner, business, market, payout wallet, verification |
-| Payment rail | Partna |
+| Payment rail | Partna (default) + Yellow Card (sandbox checkout / invoice) |
 | Local billing markets | `NGN`, `GHS`, `KES` |
 | Settlement asset | `USDC` |
 | Settlement network | Solana |
@@ -55,9 +55,9 @@ Server defaults come from [server/.env.example](./server/.env.example):
 1. The merchant signs in with Privy.
 2. Onboarding completes the actual workspace setup: owner details, business details, supported billing markets, payout wallet, and verification.
 3. The merchant creates a subscription plan or invoice from the dashboard or API.
-4. Renew creates a checkout or invoice payment flow and provisions the customer’s local collection instructions through Partna.
+4. Renew creates a checkout or invoice payment flow and provisions the customer’s local collection instructions through the active payment rail.
 5. The customer pays in local fiat.
-6. Renew reconciles the payment from Partna webhooks and voucher events, normalizes the value into USDC, and records settlement state.
+6. Renew reconciles the payment rail event, normalizes the value into USDC, and records settlement state.
 7. The protocol records the billing and settlement state on Solana.
 8. Treasury actions and payout controls are managed through Squads-backed governance and approved payout wallets.
 
@@ -68,7 +68,7 @@ Server defaults come from [server/.env.example](./server/.env.example):
 - Privy authentication and session exchange
 - Onboarding state and merchant workspace management
 - Hosted checkout, customer records, invoices, and subscriptions
-- Partna customer payment profiles, voucher creation, webhooks, and FX quotes
+- Partna and Yellow Card payment-rail orchestration, webhooks, and FX quotes
 - Notification delivery, job queues, and dashboard aggregation
 - Sumsub KYC / KYB orchestration
 
@@ -112,7 +112,7 @@ The server is an Express + TypeScript API used for:
 - auth and workspace session management
 - onboarding and verification orchestration
 - customers, plans, subscriptions, charges, and invoices
-- Partna payment-rail integration and webhooks
+- Partna and Yellow Card payment-rail integration and webhooks
 - Solana protocol execution and settlement tracking
 - Squads treasury coordination
 - developer keys and webhook delivery
@@ -144,14 +144,14 @@ The `contracts/` workspace contains the `renew_protocol` Solana program.
 | Backend | Node.js, Express, MongoDB, Mongoose, BullMQ, Zod |
 | Auth | Privy |
 | Verification | Sumsub |
-| Payments | Partna |
+| Payments | Partna + Yellow Card |
 | Protocol | Solana, Anchor, SPL Token |
 | Treasury | Squads multisig |
 | SDK | TypeScript, npm |
 
 ## Payment Rails And Markets
 
-Renew uses Partna for the payment rail.
+Renew defaults to Partna for the main test runtime and also supports Yellow Card for sandbox checkout and invoice payment flows.
 
 Supported local billing markets:
 
@@ -159,7 +159,7 @@ Supported local billing markets:
 - `GHS`
 - `KES`
 
-These are the markets exposed by the Partna-backed market catalog.
+These are the current local billing markets exposed in the active test catalog.
 
 ## Getting Started
 
@@ -259,6 +259,15 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 - `PARTNA_API_USER_LIVE`
 - `PARTNA_WEBHOOK_PUBLIC_KEY_TEST`
 - `PARTNA_WEBHOOK_PUBLIC_KEY_LIVE`
+
+### Yellow Card
+
+- `YELLOW_CARD_BASE_URL_TEST`
+- `YELLOW_CARD_BASE_URL_LIVE`
+- `YELLOW_CARD_API_KEY_TEST`
+- `YELLOW_CARD_API_KEY_LIVE`
+- `YELLOW_CARD_WEBHOOK_SECRET_TEST`
+- `YELLOW_CARD_WEBHOOK_SECRET_LIVE`
 
 ### Auth and verification
 
