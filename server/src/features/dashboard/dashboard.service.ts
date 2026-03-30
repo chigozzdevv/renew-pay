@@ -98,7 +98,9 @@ export async function getDashboardOverview(query: DashboardOverviewQuery) {
         $match: {
           merchantId: merchantObjectId,
           ...environmentMatch,
-          status: { $in: ["queued", "confirming", "pending"] },
+          payoutBatchId: null,
+          creditTxHash: { $type: "string" },
+          status: { $in: ["confirming", "settled"] },
         },
       },
       {
