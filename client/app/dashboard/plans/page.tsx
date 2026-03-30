@@ -882,7 +882,7 @@ export default function PlansPage() {
                     href={getSolanaTxUrl(mode, detailPlan.onchain.txHash)}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[color:var(--ink)] underline decoration-[color:var(--line)] underline-offset-4 transition-colors hover:text-[color:var(--muted)]"
+                    className="inline-block max-w-full break-all text-[color:var(--ink)] underline decoration-[color:var(--line)] underline-offset-4 transition-colors hover:text-[color:var(--muted)] [overflow-wrap:anywhere]"
                   >
                     {formatTxHash(detailPlan.onchain.txHash)}
                   </a>

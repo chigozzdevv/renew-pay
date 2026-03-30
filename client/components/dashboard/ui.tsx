@@ -276,7 +276,10 @@ export function Field({
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
         {label}
       </p>
-      <div className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+      <div
+        className="mt-2 min-w-0 break-all text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)] [overflow-wrap:anywhere]"
+        title={typeof value === "string" ? value : undefined}
+      >
         {value}
       </div>
     </div>
