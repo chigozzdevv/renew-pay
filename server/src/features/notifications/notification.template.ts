@@ -1178,23 +1178,27 @@ function renderHtml(input: {
             </tr>
             <tr>
               <td style="border:1px solid #dbe6d7;border-radius:28px;background:#ffffff;padding:28px 28px 24px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
-                  <div>
-                    <div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${accent};">
-                      ${escapeHtml(input.branding.merchantName)}
-                    </div>
-                    <div style="margin-top:8px;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.03em;color:#122017;">
-                      ${escapeHtml(input.document.heading)}
-                    </div>
-                  </div>
-                  ${
-                    input.branding.emailLogoUrl
-                      ? `<img src="${escapeHtml(input.branding.emailLogoUrl)}" alt="${escapeHtml(
-                          input.branding.merchantName
-                        )}" style="display:block;max-height:44px;max-width:160px;border:0;" />`
-                      : ""
-                  }
-                </div>
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                  <tr>
+                    <td valign="top" style="padding:0;">
+                      <div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${accent};">
+                        ${escapeHtml(input.branding.merchantName)}
+                      </div>
+                      <div style="margin-top:8px;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.03em;color:#122017;">
+                        ${escapeHtml(input.document.heading)}
+                      </div>
+                    </td>
+                    ${
+                      input.branding.emailLogoUrl
+                        ? `<td valign="top" align="right" style="padding:0 0 0 16px;width:1%;">
+                            <img src="${escapeHtml(input.branding.emailLogoUrl)}" alt="${escapeHtml(
+                              input.branding.merchantName
+                            )}" style="display:block;max-height:44px;max-width:160px;border:0;" />
+                          </td>`
+                        : ""
+                    }
+                  </tr>
+                </table>
                 <div style="margin-top:20px;font-size:15px;line-height:25px;color:#314339;">
                   ${input.document.body
                     .map(

@@ -1184,9 +1184,7 @@ export async function queueChargeStatusNotifications(input: {
   const portalUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
 
   const sendReceipt =
-    (input.nextStatus === "awaiting_settlement" || input.nextStatus === "settled") &&
-    input.previousStatus !== "awaiting_settlement" &&
-    input.previousStatus !== "settled";
+    input.nextStatus === "settled" && input.previousStatus !== "settled";
 
   if (sendReceipt && customer?.email && setting.notifications.customerReceiptEmails) {
     const notification = await createNotificationRecord({
