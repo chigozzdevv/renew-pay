@@ -174,6 +174,13 @@ function isPartnaAccountAlreadyExistsError(error: unknown) {
   );
 }
 
+function isPartnaPhoneConfirmationRequiredError(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    error.message.trim().toLowerCase().includes("confirm phone")
+  );
+}
+
 export function buildPartnaVerificationSnapshot(currency: string) {
   return {
     provider: "partna" as const,
@@ -296,11 +303,26 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
     );
   }
 
-  const otpDispatchResult = await provider.handleBvnOtpMethod({
-    accountName,
-    verificationMethod: selectedMethod.method,
-  });
-  const phoneConfirmationRequired = responseRequiresPartnaPhoneConfirmation(otpDispatchResult);
+  let otpDispatchResult: Record<string, unknown> | null = null;
+  let phoneConfirmationRequired = false;
+  let phoneConfirmationMessage: string | null = null;
+
+  try {
+    otpDispatchResult = await provider.handleBvnOtpMethod({
+      accountName,
+      verificationMethod: selectedMethod.method,
+    });
+    phoneConfirmationRequired = responseRequiresPartnaPhoneConfirmation(otpDispatchResult);
+    phoneConfirmationMessage = readPartnaResponseMessage(otpDispatchResult);
+  } catch (error) {
+    if (!isPartnaPhoneConfirmationRequiredError(error)) {
+      throw error;
+    }
+
+    phoneConfirmationRequired = true;
+    phoneConfirmationMessage =
+      error instanceof HttpError ? error.message : "Confirm phone number to continue";
+  }
 
   const existingRaw =
     customer.paymentProfile?.partna?.raw &&
@@ -326,7 +348,7 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
         verificationMethods: methods,
         selectedVerificationMethod: selectedMethod.method,
         selectedVerificationHint: selectedMethod.hint,
-        otpDispatchMessage: readPartnaResponseMessage(otpDispatchResult),
+        otpDispatchMessage: phoneConfirmationMessage,
       },
     },
   };
@@ -337,7 +359,7 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
     verificationMethod: selectedMethod.method,
     verificationHint: selectedMethod.hint,
     phoneConfirmationRequired,
-    phoneConfirmationMessage: readPartnaResponseMessage(otpDispatchResult),
+    phoneConfirmationMessage,
   };
 }
 
