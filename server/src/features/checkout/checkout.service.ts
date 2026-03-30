@@ -369,6 +369,7 @@ function toCheckoutSessionResponse(input: {
         country: session.verificationSnapshot.country ?? null,
         currency: session.verificationSnapshot.currency ?? null,
         instructions: session.verificationSnapshot.instructions ?? null,
+        verificationHint: session.verificationSnapshot.verificationHint ?? null,
         verificationMethods: Array.isArray(session.verificationSnapshot.verificationMethods)
           ? session.verificationSnapshot.verificationMethods.map((entry) => ({
               method: entry?.method ?? "",
@@ -616,6 +617,7 @@ async function activateCheckoutSubscription(input: {
         country: "NG",
         currency: input.customer.market,
         instructions: "Permanent bank instructions are ready for this customer.",
+        verificationHint: null,
         verificationMethods: [],
         requiredFields: [],
       }
@@ -763,6 +765,7 @@ export async function submitCheckoutVerification(
       instructions: "Starting verification for this customer.",
       accountName: null,
       verificationMethod: null,
+      verificationHint: null,
       verificationMethods: [],
       requiredFields: [],
     };
@@ -798,6 +801,7 @@ export async function submitCheckoutVerification(
       instructions: "Sending verification code.",
       accountName,
       verificationMethod: null,
+      verificationHint: null,
       verificationMethods: Array.isArray(session.verificationSnapshot?.verificationMethods)
         ? session.verificationSnapshot?.verificationMethods
         : [],
@@ -822,6 +826,7 @@ export async function submitCheckoutVerification(
           accountName: accountName ?? "",
           verificationMethod:
             methodVerification.verificationMethod ?? input.verificationMethod,
+          verificationHint: methodVerification.verificationHint,
           instructions: methodVerification.phoneConfirmationMessage,
         })
       : buildPartnaOtpVerificationSnapshot({
@@ -848,6 +853,7 @@ export async function submitCheckoutVerification(
       instructions: "Confirming phone number and sending verification code.",
       accountName,
       verificationMethod,
+      verificationHint: session.verificationSnapshot?.verificationHint ?? null,
       verificationMethods: [],
       requiredFields: [],
     };
@@ -887,6 +893,7 @@ export async function submitCheckoutVerification(
     instructions: "Finishing verification and preparing payment details.",
     accountName: session.verificationSnapshot?.accountName ?? null,
     verificationMethod: session.verificationSnapshot?.verificationMethod ?? null,
+    verificationHint: session.verificationSnapshot?.verificationHint ?? null,
     verificationMethods: [],
     requiredFields: [],
   };

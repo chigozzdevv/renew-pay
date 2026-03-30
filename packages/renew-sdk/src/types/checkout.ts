@@ -44,6 +44,7 @@ export type RenewCheckoutVerification = {
   readonly country: string | null;
   readonly currency: string | null;
   readonly instructions: string | null;
+  readonly verificationHint: string | null;
   readonly verificationMethods: readonly {
     method: string;
     hint: string | null;

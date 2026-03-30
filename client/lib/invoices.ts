@@ -119,6 +119,7 @@ export type PublicInvoiceRecord = {
     country: string;
     currency: string;
     instructions: string;
+    verificationHint: string | null;
     verificationMethods: Array<{
       method: string;
       hint: string | null;

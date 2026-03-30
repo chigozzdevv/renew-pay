@@ -782,6 +782,7 @@ async function createInvoicePaymentAttempt(
     country: "NG",
     currency: invoice.billingCurrency,
     instructions: "Permanent bank instructions are ready for this invoice.",
+    verificationHint: null,
     verificationMethods: [],
     requiredFields: [],
   };
@@ -1247,6 +1248,7 @@ export async function submitPublicInvoiceVerification(
       instructions: "Starting verification for this invoice.",
       accountName: null,
       verificationMethod: null,
+      verificationHint: null,
       verificationMethods: [],
       requiredFields: [],
     };
@@ -1281,6 +1283,7 @@ export async function submitPublicInvoiceVerification(
       instructions: "Sending verification code.",
       accountName,
       verificationMethod: null,
+      verificationHint: null,
       verificationMethods: Array.isArray(invoice.verificationSnapshot?.verificationMethods)
         ? invoice.verificationSnapshot?.verificationMethods
         : [],
@@ -1304,6 +1307,7 @@ export async function submitPublicInvoiceVerification(
           accountName: accountName ?? "",
           verificationMethod:
             methodVerification.verificationMethod ?? input.verificationMethod,
+          verificationHint: methodVerification.verificationHint,
           instructions: methodVerification.phoneConfirmationMessage,
         })
       : buildPartnaOtpVerificationSnapshot({
@@ -1330,6 +1334,7 @@ export async function submitPublicInvoiceVerification(
       instructions: "Confirming phone number and sending verification code.",
       accountName,
       verificationMethod,
+      verificationHint: invoice.verificationSnapshot?.verificationHint ?? null,
       verificationMethods: [],
       requiredFields: [],
     };
@@ -1368,6 +1373,7 @@ export async function submitPublicInvoiceVerification(
     instructions: "Finishing verification and preparing payment details.",
     accountName: invoice.verificationSnapshot?.accountName ?? null,
     verificationMethod: invoice.verificationSnapshot?.verificationMethod ?? null,
+    verificationHint: invoice.verificationSnapshot?.verificationHint ?? null,
     verificationMethods: [],
     requiredFields: [],
   };

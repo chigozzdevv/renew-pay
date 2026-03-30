@@ -150,6 +150,48 @@ const modalStyles = `
   gap: 8px;
 }
 
+.renew-modal__choice-list {
+  display: grid;
+  gap: 10px;
+}
+
+.renew-modal__choice {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid #dce4dc;
+  background: #ffffff;
+  padding: 14px 16px;
+  text-align: left;
+  color: #102114;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.renew-modal__choice:hover {
+  border-color: #0c4a27;
+  background: #f7faf5;
+}
+
+.renew-modal__choice--selected {
+  border-color: #0c4a27;
+  background: #eef7eb;
+}
+
+.renew-modal__choice-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.renew-modal__choice-copy {
+  display: block;
+  margin-top: 4px;
+  color: #5b6f5f;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .renew-modal__label {
   font-size: 14px;
   font-weight: 700;
@@ -801,31 +843,46 @@ export function RenewCheckoutModal({
                     />
                   </label>
                 ) : requiresVerificationMethod ? (
-                  <label className="renew-modal__field">
+                  <div className="renew-modal__field">
                     <span className="renew-modal__label">Verification option</span>
-                    <select
-                      value={verificationState.verificationMethod}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          verificationMethod: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__select"
-                    >
-                      <option value="">Choose an option</option>
-                      {(currentSession.verification?.verificationMethods ?? []).map((entry) => (
-                        <option key={entry.method} value={entry.method}>
-                          {entry.hint
-                            ? `${humanizeValue(entry.method)} (${entry.hint})`
-                            : humanizeValue(entry.method)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <div className="renew-modal__choice-list">
+                      {(currentSession.verification?.verificationMethods ?? []).map((entry) => {
+                        const isSelected =
+                          verificationState.verificationMethod === entry.method;
+
+                        return (
+                          <button
+                            key={entry.method}
+                            type="button"
+                            onClick={() =>
+                              setVerificationState((current) => ({
+                                ...current,
+                                verificationMethod: entry.method,
+                              }))
+                            }
+                            className={`renew-modal__choice${
+                              isSelected ? " renew-modal__choice--selected" : ""
+                            }`}
+                          >
+                            <span className="renew-modal__choice-title">
+                              {humanizeValue(entry.method)}
+                            </span>
+                            {entry.hint ? (
+                              <span className="renew-modal__choice-copy">{entry.hint}</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : requiresPhone ? (
                   <label className="renew-modal__field">
                     <span className="renew-modal__label">Phone number</span>
+                    {currentSession.verification?.verificationHint ? (
+                      <span className="renew-modal__field-copy">
+                        Use the number matching {currentSession.verification.verificationHint}.
+                      </span>
+                    ) : null}
                     <input
                       type="tel"
                       value={verificationState.phone}

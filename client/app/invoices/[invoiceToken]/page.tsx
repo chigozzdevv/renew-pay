@@ -275,37 +275,55 @@ export default function PublicInvoicePage() {
             {invoice.nextAction === "complete_verification" ? (
               <div className="mt-5 space-y-3">
                 {invoice.verification?.requiredFields.includes("verificationMethod") ? (
-                  <select
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    value={verificationDraft.verificationMethod}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        verificationMethod: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Choose a verification option</option>
-                    {(invoice.verification?.verificationMethods ?? []).map((entry) => (
-                      <option key={entry.method} value={entry.method}>
-                        {entry.hint
-                          ? `${entry.method.replace(/_/g, " ")} (${entry.hint})`
-                          : entry.method.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    {(invoice.verification?.verificationMethods ?? []).map((entry) => {
+                      const isSelected = verificationDraft.verificationMethod === entry.method;
+
+                      return (
+                        <button
+                          key={entry.method}
+                          type="button"
+                          onClick={() =>
+                            setVerificationDraft((current) => ({
+                              ...current,
+                              verificationMethod: entry.method,
+                            }))
+                          }
+                          className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                            isSelected
+                              ? "border-[#d9f6bc] bg-[#d9f6bc]/12 text-white"
+                              : "border-white/12 bg-white/6 text-white"
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold capitalize">
+                            {entry.method.replace(/_/g, " ")}
+                          </span>
+                          {entry.hint ? (
+                            <span className="mt-1 block text-sm text-white/72">{entry.hint}</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : invoice.verification?.requiredFields.includes("phone") ? (
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="Phone number"
-                    value={verificationDraft.phone}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        phone: event.target.value,
-                      }))
-                    }
-                  />
+                  <div className="space-y-2">
+                    {invoice.verification?.verificationHint ? (
+                      <p className="text-sm text-white/72">
+                        Use the number matching {invoice.verification.verificationHint}.
+                      </p>
+                    ) : null}
+                    <input
+                      className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+                      placeholder="Phone number"
+                      value={verificationDraft.phone}
+                      onChange={(event) =>
+                        setVerificationDraft((current) => ({
+                          ...current,
+                          phone: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                 ) : invoice.verification?.requiredFields.includes("otp") ? (
                   <input
                     className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"

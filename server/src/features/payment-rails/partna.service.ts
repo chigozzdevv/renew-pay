@@ -178,6 +178,7 @@ export function buildPartnaVerificationSnapshot(currency: string) {
     country: "NG",
     currency,
     instructions: "Enter your BVN to verify and unlock payment details.",
+    verificationHint: null,
     requiredFields: [...PARTNA_CHECKOUT_VERIFICATION_FIELDS],
     verificationMethods: [],
   };
@@ -197,6 +198,7 @@ export function buildPartnaOtpVerificationSnapshot(input: {
     instructions:
       input.verificationHint?.trim() ||
       "Enter the verification code Partna sent to you.",
+    verificationHint: input.verificationHint ?? null,
     requiredFields: [...PARTNA_CHECKOUT_OTP_FIELDS],
     accountName: input.accountName,
     verificationMethod: input.verificationMethod,
@@ -208,6 +210,7 @@ export function buildPartnaPhoneVerificationSnapshot(input: {
   currency: string;
   accountName: string;
   verificationMethod: string;
+  verificationHint?: string | null;
   instructions?: string | null;
 }) {
   return {
@@ -218,6 +221,7 @@ export function buildPartnaPhoneVerificationSnapshot(input: {
     instructions:
       input.instructions?.trim() ||
       "Enter the 11-digit phone number linked to your BVN to continue.",
+    verificationHint: input.verificationHint ?? null,
     requiredFields: [...PARTNA_CHECKOUT_PHONE_FIELDS],
     accountName: input.accountName,
     verificationMethod: input.verificationMethod,
@@ -238,6 +242,7 @@ export function buildPartnaMethodVerificationSnapshot(input: {
     currency: input.currency,
     instructions:
       input.instructions?.trim() || "Choose a verification option to continue.",
+    verificationHint: null,
     requiredFields: [...PARTNA_CHECKOUT_VERIFICATION_METHOD_FIELDS],
     accountName: input.accountName,
     verificationMethod: null,
