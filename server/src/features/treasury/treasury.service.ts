@@ -2171,20 +2171,26 @@ export async function bootstrapTreasuryAccount(input: {
   }
 
   const conflictingTreasury = await TreasuryAccountModel.findOne({
-    $or: [
+    $and: [
       {
-        governanceMultisigAddress: normalizeAddress(
-          governance.governanceMultisigAddress
-        ),
+        $or: [
+          {
+            governanceMultisigAddress: normalizeAddress(
+              governance.governanceMultisigAddress
+            ),
+          },
+          {
+            governanceVaultAddress: normalizeAddress(
+              governance.governanceVaultAddress
+            ),
+          },
+        ],
       },
+      createRuntimeModeCondition("environment", input.payload.environment),
       {
-        governanceVaultAddress: normalizeAddress(
-          governance.governanceVaultAddress
-        ),
+        merchantId: { $ne: merchant._id },
       },
     ],
-    ...createRuntimeModeCondition("environment", input.payload.environment),
-    merchantId: { $ne: merchant._id },
   })
     .select({ _id: 1 })
     .lean()
