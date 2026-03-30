@@ -35,8 +35,8 @@ Current compliance config:
 |---------|-------|
 | Auth | Privy |
 | Onboarding | Owner, business, market, payout wallet, verification |
-| Payment rail | Partna (default) + Yellow Card (sandbox checkout / invoice) |
-| Local billing markets | `NGN`, `GHS`, `KES` |
+| Payment rails | Partna + Yellow Card |
+| Local billing markets | `BWP`, `CDF`, `GHS`, `KES`, `MWK`, `NGN`, `RWF`, `TZS`, `UGX`, `XAF`, `XOF`, `ZAR`, `ZMW` |
 | Settlement asset | `USDC` |
 | Settlement network | Solana |
 | Treasury / approvals | Squads multisig |
@@ -122,7 +122,7 @@ The server is an Express + TypeScript API used for:
 The `contracts/` workspace contains the `renew_protocol` Solana program.
 
 - Program: `renew_protocol`
-- Devnet program address: `fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh`
+- Test program address: `fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh`
 - Language: Rust
 - Framework: Anchor
 - Test config: Solana devnet
@@ -151,15 +151,23 @@ The `contracts/` workspace contains the `renew_protocol` Solana program.
 
 ## Payment Rails And Markets
 
-Renew defaults to Partna for the main test runtime and also supports Yellow Card for sandbox checkout and invoice payment flows.
+Renew uses Partna and Yellow Card for sandbox and live checkout and invoice payment flows.
 
-Supported local billing markets:
+The current test billing catalog includes:
 
-- `NGN`
+- `BWP`
+- `CDF`
 - `GHS`
 - `KES`
-
-These are the current local billing markets exposed in the active test catalog.
+- `MWK`
+- `NGN`
+- `RWF`
+- `TZS`
+- `UGX`
+- `XAF`
+- `XOF`
+- `ZAR`
+- `ZMW`
 
 ## Getting Started
 
@@ -266,8 +274,10 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 - `YELLOW_CARD_BASE_URL_LIVE`
 - `YELLOW_CARD_API_KEY_TEST`
 - `YELLOW_CARD_API_KEY_LIVE`
+- `YELLOW_CARD_TIMESTAMP_HEADER`
 - `YELLOW_CARD_WEBHOOK_SECRET_TEST`
 - `YELLOW_CARD_WEBHOOK_SECRET_LIVE`
+- `YELLOW_CARD_TIMEOUT_MS`
 
 ### Auth and verification
 
