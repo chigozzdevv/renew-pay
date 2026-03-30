@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -31,6 +30,45 @@ function toErrorMessage(error: unknown) {
   }
 
   return "Something went wrong.";
+}
+
+function getActionTitle(invoice: PublicInvoiceRecord) {
+  if (invoice.nextAction === "wait_for_settlement") {
+    return "Settlement in progress";
+  }
+
+  if (invoice.status === "paid") {
+    return "Invoice paid";
+  }
+
+  return "Clear invoice";
+}
+
+function getActionCopy(invoice: PublicInvoiceRecord) {
+  if (invoice.nextAction === "complete_verification") {
+    return invoice.verification?.instructions ?? "Complete verification to unlock payment details.";
+  }
+
+  if (invoice.nextAction === "create_payment") {
+    return "Generate payment details for this invoice.";
+  }
+
+  if (
+    invoice.nextAction === "show_payment_instructions" ||
+    invoice.nextAction === "complete_test_payment"
+  ) {
+    return "Use the payment details below to clear this invoice.";
+  }
+
+  if (invoice.nextAction === "wait_for_settlement") {
+    return "We are confirming this payment now.";
+  }
+
+  if (invoice.status === "paid") {
+    return "This invoice has already been cleared.";
+  }
+
+  return "Review the current invoice state.";
 }
 
 export default function PublicInvoicePage() {
@@ -113,7 +151,7 @@ export default function PublicInvoicePage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-[#f4f7fb] px-6 py-10">
+      <main className="min-h-screen bg-[#e8f5e9] px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-black/6 bg-white px-6 py-10 shadow-[0_24px_90px_rgba(16,32,20,0.08)]">
           <h1 className="text-3xl font-semibold tracking-[-0.05em] text-[#1b1f1c]">
             Loading invoice
@@ -128,7 +166,7 @@ export default function PublicInvoicePage() {
 
   if (!invoice) {
     return (
-      <main className="min-h-screen bg-[#f4f7fb] px-6 py-10">
+      <main className="min-h-screen bg-[#e8f5e9] px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-[#d6b2ad] bg-[#fff6f5] px-6 py-10">
           <h1 className="text-3xl font-semibold tracking-[-0.05em] text-[#1b1f1c]">
             Invoice unavailable
@@ -149,15 +187,23 @@ export default function PublicInvoicePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(217,246,188,0.35),transparent_42%),linear-gradient(180deg,#f4f7fb,#eef3f5)] px-6 py-10">
+    <main className="min-h-screen bg-[#e8f5e9] px-6 py-10">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="inline-flex items-center rounded-2xl border border-black/8 bg-white/88 px-4 py-3 text-sm font-semibold text-[#1b1f1c]"
-          >
-            Renew
-          </Link>
+          <div className="inline-flex items-center gap-3 rounded-2xl border border-black/8 bg-white/88 px-4 py-3 text-sm font-semibold text-[#1b1f1c]">
+            {invoice.brand.logoUrl ? (
+              <img
+                src={invoice.brand.logoUrl}
+                alt={invoice.brand.name}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#111111] text-xs font-semibold text-white">
+                {invoice.brand.name.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <span>{invoice.brand.name}</span>
+          </div>
           <button
             type="button"
             onClick={() => void refreshInvoice()}
@@ -242,32 +288,29 @@ export default function PublicInvoicePage() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(27,28,27,0.98),rgba(10,11,10,0.98))] px-6 py-6 text-white shadow-[0_24px_90px_rgba(5,12,8,0.22)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/48">
-              Payment
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em]">
+          <div className="rounded-[2rem] border border-black/6 bg-white px-6 py-6 shadow-[0_24px_90px_rgba(16,32,20,0.08)] xl:sticky xl:top-10 xl:self-start">
+            <div className="inline-flex rounded-full border border-black/8 bg-[#f7faf5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5b665f]">
               {invoice.nextAction === "complete_verification"
-                ? "Verify once"
+                ? "Verification"
                 : invoice.nextAction === "create_payment"
-                  ? "Generate instructions"
-                  : invoice.nextAction === "show_payment_instructions" ||
-                      invoice.nextAction === "complete_test_payment"
-                    ? "Send payment"
-                    : invoice.nextAction === "wait_for_settlement"
-                      ? "Settlement in progress"
-                      : invoice.status === "paid"
-                        ? "Invoice paid"
-                        : "Invoice state"}
+                  ? "Payment setup"
+                  : invoice.nextAction === "wait_for_settlement"
+                    ? "Settlement"
+                    : invoice.status === "paid"
+                      ? "Paid"
+                      : "Payment"}
+            </div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#171b18]">
+              {getActionTitle(invoice)}
             </h2>
 
-            <div className="mt-4 space-y-3 text-sm leading-7 text-white/74">
-              {message ? <p className="text-[#d9f6bc]">{message}</p> : null}
-              {errorMessage ? <p className="text-[#ffb6aa]">{errorMessage}</p> : null}
-              {invoice.verification?.instructions ? <p>{invoice.verification.instructions}</p> : null}
+            <div className="mt-3 space-y-3 text-sm leading-7 text-[#58635d]">
+              <p>{getActionCopy(invoice)}</p>
+              {message ? <p className="text-[#0c4a27]">{message}</p> : null}
+              {errorMessage ? <p className="text-[#a74736]">{errorMessage}</p> : null}
               {paymentReference ? (
                 <p>
-                  Reference: <span className="font-semibold text-white">{paymentReference}</span>
+                  Reference: <span className="font-semibold text-[#171b18]">{paymentReference}</span>
                 </p>
               ) : null}
             </div>
@@ -291,15 +334,15 @@ export default function PublicInvoicePage() {
                           }
                           className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                             isSelected
-                              ? "border-[#d9f6bc] bg-[#d9f6bc]/12 text-white"
-                              : "border-white/12 bg-white/6 text-white"
+                              ? "border-[#0c4a27] bg-[#eef7eb] text-[#171b18]"
+                              : "border-black/8 bg-[#f7faf5] text-[#171b18]"
                           }`}
                         >
                           <span className="block text-sm font-semibold capitalize">
                             {entry.method.replace(/_/g, " ")}
                           </span>
                           {entry.hint ? (
-                            <span className="mt-1 block text-sm text-white/72">{entry.hint}</span>
+                            <span className="mt-1 block text-sm text-[#58635d]">{entry.hint}</span>
                           ) : null}
                         </button>
                       );
@@ -308,12 +351,12 @@ export default function PublicInvoicePage() {
                 ) : invoice.verification?.requiredFields.includes("phone") ? (
                   <div className="space-y-2">
                     {invoice.verification?.verificationHint ? (
-                      <p className="text-sm text-white/72">
+                      <p className="text-sm text-[#58635d]">
                         Use the number matching {invoice.verification.verificationHint}.
                       </p>
                     ) : null}
                     <input
-                      className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+                      className="w-full rounded-2xl border border-black/8 bg-[#f7faf5] px-4 py-3 text-sm text-[#171b18] outline-none"
                       placeholder="Phone number"
                       value={verificationDraft.phone}
                       onChange={(event) =>
@@ -326,7 +369,7 @@ export default function PublicInvoicePage() {
                   </div>
                 ) : invoice.verification?.requiredFields.includes("otp") ? (
                   <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+                    className="w-full rounded-2xl border border-black/8 bg-[#f7faf5] px-4 py-3 text-sm text-[#171b18] outline-none"
                     placeholder="Verification code"
                     value={verificationDraft.otp}
                     onChange={(event) =>
@@ -338,7 +381,7 @@ export default function PublicInvoicePage() {
                   />
                 ) : (
                   <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
+                    className="w-full rounded-2xl border border-black/8 bg-[#f7faf5] px-4 py-3 text-sm text-[#171b18] outline-none"
                     placeholder="BVN"
                     value={verificationDraft.bvn}
                     onChange={(event) =>
@@ -384,7 +427,7 @@ export default function PublicInvoicePage() {
                         : "Verification code sent."
                     )
                   }
-                  className="mt-2 inline-flex items-center justify-center rounded-2xl border border-[#d9f6bc]/18 bg-[#d9f6bc] px-5 py-3 text-sm font-semibold text-[#0c4a27]"
+                  className="mt-2 inline-flex items-center justify-center rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
                 >
                   {isBusy === "verify"
                     ? invoice.verification?.requiredFields.includes("verificationMethod")
@@ -416,7 +459,7 @@ export default function PublicInvoicePage() {
                     "Payment instructions are ready."
                   )
                 }
-                className="mt-5 inline-flex items-center justify-center rounded-2xl border border-[#d9f6bc]/18 bg-[#d9f6bc] px-5 py-3 text-sm font-semibold text-[#0c4a27]"
+                className="mt-5 inline-flex items-center justify-center rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
               >
                 {isBusy === "create-payment" ? "Preparing..." : "Get payment instructions"}
               </button>
@@ -427,32 +470,32 @@ export default function PublicInvoicePage() {
               invoice.nextAction === "wait_for_settlement" ||
               invoice.status === "paid") && (
               <div className="mt-5 space-y-3">
-                <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/46">
+                <div className="rounded-2xl border border-black/6 bg-[#f7faf5] px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#627066]">
                     Bank transfer details
                   </p>
-                  <div className="mt-3 space-y-2 text-sm text-white/76">
+                  <div className="mt-3 space-y-2 text-sm text-[#58635d]">
                     <p>
                       Bank:{" "}
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-[#171b18]">
                         {invoice.paymentInstructions?.bankTransfer?.bankName ?? "Pending"}
                       </span>
                     </p>
                     <p>
                       Account name:{" "}
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-[#171b18]">
                         {invoice.paymentInstructions?.bankTransfer?.accountName ?? "Pending"}
                       </span>
                     </p>
                     <p>
                       Account number:{" "}
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-[#171b18]">
                         {invoice.paymentInstructions?.bankTransfer?.accountNumber ?? "Pending"}
                       </span>
                     </p>
                     <p>
                       Amount:{" "}
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-[#171b18]">
                         {formatCurrencyAmount(
                           invoice.paymentInstructions?.billingCurrency ?? invoice.billingCurrency,
                           invoice.paymentInstructions?.localAmount ?? invoice.totals.localAmount
@@ -463,7 +506,7 @@ export default function PublicInvoicePage() {
                 </div>
 
                 {invoice.charge?.failureCode ? (
-                  <div className="rounded-2xl border border-[#603029] bg-[#2d1613] px-4 py-4 text-sm leading-7 text-[#ffb6aa]">
+                  <div className="rounded-2xl border border-[#e8c0b8] bg-[#fff5f2] px-4 py-4 text-sm leading-7 text-[#a74736]">
                     {invoice.charge.failureCode}
                   </div>
                 ) : null}
@@ -479,7 +522,7 @@ export default function PublicInvoicePage() {
                         "Sandbox payment completed."
                       )
                     }
-                    className="inline-flex items-center justify-center rounded-2xl border border-white/12 bg-white/6 px-5 py-3 text-sm font-semibold text-white"
+                    className="inline-flex items-center justify-center rounded-2xl border border-black/8 bg-[#f7faf5] px-5 py-3 text-sm font-semibold text-[#171b18]"
                   >
                     {isBusy === "complete-test-payment"
                       ? "Completing..."

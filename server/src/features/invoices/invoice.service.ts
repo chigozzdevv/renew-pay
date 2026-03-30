@@ -504,6 +504,7 @@ async function toPublicInvoiceResponse(input: {
         .lean()
         .exec()
     : null;
+  const setting = await getOrCreateMerchantSetting(input.invoice.merchantId.toString());
   const runtimeEnvironment = toStoredRuntimeMode(input.invoice.environment);
   const hasPaymentProfile = hasActivePartnaPaymentProfile(
     customer ?? null,
@@ -517,6 +518,10 @@ async function toPublicInvoiceResponse(input: {
   });
 
   return {
+    brand: {
+      name: setting.business.name || "Renew",
+      logoUrl: setting.business.logoUrl ?? null,
+    },
     invoiceNumber: input.invoice.invoiceNumber,
     publicToken: input.invoice.publicToken,
     title: input.invoice.title,

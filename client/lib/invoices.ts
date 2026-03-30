@@ -87,6 +87,10 @@ export type InvoiceRecord = {
 };
 
 export type PublicInvoiceRecord = {
+  brand: {
+    name: string;
+    logoUrl: string | null;
+  };
   invoiceNumber: string;
   publicToken: string;
   title: string;
