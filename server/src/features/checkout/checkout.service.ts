@@ -13,7 +13,11 @@ import type {
 import { CustomerModel } from "@/features/customers/customer.model";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueSubscriptionCreatedNotifications } from "@/features/notifications/notification.service";
-import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
+import {
+  acceptCollectionRequest,
+  processYellowCardWebhook,
+  quoteUsdAmountInBillingCurrency,
+} from "@/features/payment-rails/payment-rails.service";
 import {
   buildPartnaMethodVerificationSnapshot,
   buildPartnaPhoneVerificationSnapshot,
@@ -621,7 +625,16 @@ async function activateCheckoutSubscription(input: {
         verificationMethods: [],
         requiredFields: [],
       }
-      : null;
+      : {
+        provider: "yellow_card",
+        status: "verified",
+        country: null,
+        currency: input.customer.market,
+        instructions: "Payment details are ready.",
+        verificationHint: null,
+        verificationMethods: [],
+        requiredFields: [],
+      };
 
   if (!refreshedSession.chargeId) {
     refreshedSession.status = "scheduled";
@@ -690,6 +703,7 @@ export async function submitCheckoutCustomer(
     runtimeEnvironment,
     input
   );
+  const paymentProvider = getDefaultPaymentRailProvider(runtimeEnvironment);
   session.customerDraft = {
     name: customer.name,
     email: customer.email,
@@ -698,7 +712,10 @@ export async function submitCheckoutCustomer(
   session.customerId = customer._id;
   session.submittedAt = session.submittedAt ?? new Date();
 
-  if (!hasActivePartnaPaymentProfile(customer, input.market)) {
+  if (
+    paymentProvider === "partna" &&
+    !hasActivePartnaPaymentProfile(customer, input.market)
+  ) {
     session.status = "pending_verification";
     session.verificationSnapshot = buildPartnaVerificationSnapshot(input.market);
     await session.save();
@@ -966,10 +983,36 @@ export async function completeCheckoutTestPayment(sessionId: string) {
     throw new HttpError(409, "Checkout session has no pending payment to complete.");
   }
 
+  if (session.paymentSnapshot.provider === "yellow_card") {
+    const acceptedCollection = await acceptCollectionRequest(
+      session.paymentSnapshot.externalChargeId,
+      "test"
+    );
+
+    await processYellowCardWebhook(
+      {
+        event: "collection.updated",
+        status: "success",
+        sequenceId: session.paymentSnapshot.externalChargeId,
+        id:
+          typeof (acceptedCollection as Record<string, unknown>).id === "string"
+            ? ((acceptedCollection as Record<string, unknown>).id as string)
+            : session.paymentSnapshot.externalChargeId,
+        data: {
+          ...(acceptedCollection as Record<string, unknown>),
+          status: "success",
+        },
+      },
+      "test"
+    );
+
+    return getCheckoutSession(sessionId);
+  }
+
   if (session.paymentSnapshot.provider !== "partna") {
     throw new HttpError(
       409,
-      "Sandbox payment completion is only implemented for Partna checkout sessions."
+      "Sandbox payment completion is not implemented for this checkout provider."
     );
   }
 
