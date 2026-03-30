@@ -219,7 +219,7 @@ export class YellowCardSimulatedProvider implements YellowCardProvider {
     const bankInfo =
       input.source.accountType === "bank"
         ? {
-            name: `Mock ${input.country ?? "NG"} Collection Bank`,
+            name: "First Test Bank",
             accountNumber: generateDigits(`${seed}:bank-account`, 10),
             accountName:
               input.recipient.businessName ??

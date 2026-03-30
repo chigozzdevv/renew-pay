@@ -41,7 +41,7 @@ function getActionTitle(invoice: PublicInvoiceRecord) {
     return "Invoice paid";
   }
 
-  return "Clear invoice";
+  return "Make payment";
 }
 
 function getActionCopy(invoice: PublicInvoiceRecord) {
@@ -57,7 +57,7 @@ function getActionCopy(invoice: PublicInvoiceRecord) {
     invoice.nextAction === "show_payment_instructions" ||
     invoice.nextAction === "complete_test_payment"
   ) {
-    return "Use the payment details below to clear this invoice.";
+    return "Use the payment details below to make payment.";
   }
 
   if (invoice.nextAction === "wait_for_settlement") {
@@ -65,7 +65,7 @@ function getActionCopy(invoice: PublicInvoiceRecord) {
   }
 
   if (invoice.status === "paid") {
-    return "This invoice has already been cleared.";
+    return "This invoice has already been paid.";
   }
 
   return "Review the current invoice state.";
@@ -221,9 +221,6 @@ export default function PublicInvoicePage() {
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em] text-[#171b18]">
               {invoice.title}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#58635d]">
-              Pay this invoice in local fiat. Renew handles verification, collection, and settlement.
-            </p>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               <div className="rounded-2xl border border-black/6 bg-[#f7faf5] px-4 py-4">

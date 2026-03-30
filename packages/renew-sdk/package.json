@@ -1,6 +1,6 @@
 {
   "name": "@renew.sh/sdk",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Renew SDK for checkout sessions, server integrations, and React checkout flows.",
   "license": "MIT",
   "type": "module",

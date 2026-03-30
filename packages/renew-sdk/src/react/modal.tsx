@@ -445,6 +445,18 @@ function humanizeValue(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function getProviderLabel(provider: "partna" | "yellow_card" | null) {
+  if (provider === "yellow_card") {
+    return "Yellow Card";
+  }
+
+  if (provider === "partna") {
+    return "Partna";
+  }
+
+  return "Renew";
+}
+
 function getPrimarySectionContent(session: RenewCheckoutSession) {
   if (session.nextAction === "wait_for_charge") {
     return {
@@ -601,6 +613,15 @@ export function RenewCheckoutModal({
   const requiresOtp = currentSession.verification?.requiredFields.includes("otp") ?? false;
   const requiresVerificationMethod =
     currentSession.verification?.requiredFields.includes("verificationMethod") ?? false;
+  const paymentProviderLabel = getProviderLabel(paymentInstructions?.provider ?? null);
+  const paymentDetailsLabel =
+    paymentInstructions?.provider === "yellow_card"
+      ? "Yellow Card payment details"
+      : paymentInstructions?.provider === "partna"
+        ? "Partna payment details"
+        : "Payment details";
+  const bankLabel =
+    paymentInstructions?.provider === "yellow_card" ? "Collection bank" : "Bank";
 
   const handleSubmitCustomer = async () => {
     const payload: SubmitCheckoutCustomerInput = {
@@ -820,9 +841,9 @@ export function RenewCheckoutModal({
                       (requiresVerificationMethod
                         ? "Choose a verification option to continue."
                         : requiresPhone
-                        ? "Enter the phone number linked to your BVN to continue."
+                        ? "Enter the phone number for the selected verification option."
                         : requiresOtp
-                        ? "Enter the verification code Partna sent to you."
+                        ? "Enter the verification code sent to you."
                         : "Enter your BVN to verify and unlock payment details.")}
                   </p>
                 </div>
@@ -975,7 +996,7 @@ export function RenewCheckoutModal({
                   <>
                     <div className="renew-modal__meta-grid renew-modal__meta-grid--two">
                       <div className="renew-modal__card">
-                        <p className="renew-modal__card-label">Charge amount</p>
+                        <p className="renew-modal__card-label">Amount</p>
                         <p className="renew-modal__card-value renew-modal__card-value--lg">
                           {paymentInstructions?.localAmount?.toFixed(2) ?? "--"}{" "}
                           {paymentInstructions?.billingCurrency ?? ""}
@@ -993,6 +1014,7 @@ export function RenewCheckoutModal({
                     </div>
 
                     <div className="renew-modal__instruction-card">
+                      <p className="renew-modal__card-label">{paymentDetailsLabel}</p>
                       <div className="renew-modal__grid renew-modal__grid--two">
                         <div>
                           <p className="renew-modal__card-label">Account name</p>
@@ -1002,7 +1024,7 @@ export function RenewCheckoutModal({
                         </div>
 
                         <div>
-                          <p className="renew-modal__card-label">Bank</p>
+                          <p className="renew-modal__card-label">{bankLabel}</p>
                           <p className="renew-modal__card-value renew-modal__card-value--md">
                             {paymentInstructions?.bankTransfer?.bankName ?? "--"}
                           </p>
@@ -1015,6 +1037,12 @@ export function RenewCheckoutModal({
                             style={{ letterSpacing: "0.08em" }}
                           >
                             {paymentInstructions?.bankTransfer?.accountNumber ?? "--"}
+                          </p>
+                        </div>
+
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <p className="renew-modal__field-copy">
+                            {paymentProviderLabel}
                           </p>
                         </div>
                       </div>
