@@ -603,6 +603,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     settlement.protocolChargeId = bridgeResult.protocolChargeId ?? null;
     settlement.bridgeAttestedAt = bridgeResult.attestedAt;
     settlement.submittedAt = settlement.submittedAt ?? new Date();
+    settlement.settledAt = postExecutionStatus === "settled" ? new Date() : null;
     await settlement.save();
 
     if (sourceCharge) {
@@ -684,6 +685,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
   settlement.protocolChargeId = bridgeResult.protocolChargeId ?? null;
   settlement.bridgeAttestedAt = bridgeResult.attestedAt;
   settlement.submittedAt = settlement.submittedAt ?? new Date();
+  settlement.settledAt = postExecutionStatus === "settled" ? new Date() : null;
   await settlement.save();
 
   sourceCharge.protocolChargeId = bridgeResult.protocolChargeId ?? null;

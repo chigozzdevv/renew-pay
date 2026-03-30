@@ -496,7 +496,7 @@ async function listEligiblePayoutSettlements(merchantId: string, environment: Ru
     merchantId,
     payoutBatchId: null,
     creditTxHash: { $type: "string" },
-    status: "confirming",
+    status: { $in: ["confirming", "settled"] },
     ...createRuntimeModeCondition("environment", environment),
   })
     .sort({ createdAt: 1 })

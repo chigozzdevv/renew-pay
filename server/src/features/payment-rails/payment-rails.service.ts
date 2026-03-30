@@ -41,6 +41,10 @@ function toSafeNumber(value: unknown, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function addDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
 function resolveChargeStatusFromSettlement(settlementStatus: string) {
   switch (settlementStatus) {
     case "queued":
@@ -54,6 +58,56 @@ function resolveChargeStatusFromSettlement(settlementStatus: string) {
     default:
       return "failed" as const;
   }
+}
+
+async function syncCustomerSubscriptionSummary(input: {
+  merchantId: string;
+  customerRef: string;
+  environment: RuntimeMode;
+}) {
+  const activeSubscriptions = await SubscriptionModel.find({
+    merchantId: input.merchantId,
+    customerRef: input.customerRef,
+    status: "active",
+    ...createRuntimeModeCondition("environment", input.environment),
+  })
+    .select({ nextChargeAt: 1, lastChargeAt: 1 })
+    .lean()
+    .exec();
+
+  let nextRenewalAt: Date | null = null;
+  let lastChargeAt: Date | null = null;
+
+  for (const subscription of activeSubscriptions) {
+    if (
+      subscription.nextChargeAt instanceof Date &&
+      (!nextRenewalAt || subscription.nextChargeAt.getTime() < nextRenewalAt.getTime())
+    ) {
+      nextRenewalAt = subscription.nextChargeAt;
+    }
+
+    if (
+      subscription.lastChargeAt instanceof Date &&
+      (!lastChargeAt || subscription.lastChargeAt.getTime() > lastChargeAt.getTime())
+    ) {
+      lastChargeAt = subscription.lastChargeAt;
+    }
+  }
+
+  await CustomerModel.findOneAndUpdate(
+    {
+      merchantId: input.merchantId,
+      customerRef: input.customerRef,
+      ...createRuntimeModeCondition("environment", input.environment),
+    },
+    {
+      $set: {
+        subscriptionCount: activeSubscriptions.length,
+        nextRenewalAt,
+        lastChargeAt,
+      },
+    }
+  ).exec();
 }
 
 const PARTNA_CRYPTO_NETWORKS = new Set([
@@ -1301,10 +1355,43 @@ export async function processYellowCardWebhook(
 
     if (previousChargeStatus !== "settled" && previousChargeStatus !== "awaiting_settlement") {
       const chargeSubscription = await SubscriptionModel.findById(charge.subscriptionId)
-        .select({ customerRef: 1, merchantId: 1 })
+        .select({
+          customerRef: 1,
+          merchantId: 1,
+          planId: 1,
+          status: 1,
+          pendingStatus: 1,
+          protocolSyncStatus: 1,
+          nextChargeAt: 1,
+          lastChargeAt: 1,
+          retryAvailableAt: 1,
+        })
         .exec();
 
       if (chargeSubscription) {
+        const metadata = (charge.providerMetadata ?? {}) as Record<string, unknown>;
+        const checkoutSessionId =
+          typeof metadata.checkoutSessionId === "string"
+            ? metadata.checkoutSessionId.trim()
+            : "";
+
+        if (checkoutSessionId) {
+          const plan = await PlanModel.findById(chargeSubscription.planId)
+            .select({ billingIntervalDays: 1 })
+            .lean()
+            .exec();
+
+          chargeSubscription.status = "active";
+          chargeSubscription.pendingStatus = null;
+          chargeSubscription.retryAvailableAt = null;
+          chargeSubscription.lastChargeAt = now;
+          chargeSubscription.nextChargeAt = addDays(
+            now,
+            Math.max(1, plan?.billingIntervalDays ?? 1)
+          );
+          await chargeSubscription.save();
+        }
+
         await CustomerModel.findOneAndUpdate(
           {
             merchantId: chargeSubscription.merchantId,
@@ -1314,6 +1401,12 @@ export async function processYellowCardWebhook(
             $inc: { monthlyVolumeUsdc: charge.usdcAmount },
           }
         ).exec();
+
+        await syncCustomerSubscriptionSummary({
+          merchantId: chargeSubscription.merchantId.toString(),
+          customerRef: chargeSubscription.customerRef,
+          environment,
+        });
       }
     }
   } else if (
