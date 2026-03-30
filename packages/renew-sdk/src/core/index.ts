@@ -15,6 +15,10 @@ export {
   type RenewCheckoutClient,
 } from "../clients/checkout-client.js";
 export {
+  createRenewInvoiceClient,
+  type RenewInvoiceClient,
+} from "../clients/invoice-client.js";
+export {
   getRenewApiOrigin,
   inferRenewEnvironmentFromSecretKey,
   inferRenewEnvironmentFromApiOrigin,
@@ -62,3 +66,12 @@ export type {
   SubmitCheckoutCustomerInput,
   SubmitCheckoutVerificationInput,
 } from "../types/checkout.js";
+export type {
+  RenewInvoiceLineItem,
+  RenewInvoicePaymentInstructions,
+  RenewInvoiceStatus,
+  RenewInvoiceVerification,
+  RenewPublicInvoiceNextAction,
+  RenewPublicInvoiceRecord,
+  SubmitPublicInvoiceVerificationInput,
+} from "../types/invoice.js";

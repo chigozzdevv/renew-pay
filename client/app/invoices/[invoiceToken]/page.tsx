@@ -1,15 +1,8 @@
 "use client";
 
+import { createRenewInvoiceClient, type RenewPublicInvoiceRecord } from "@renew.sh/sdk/core";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-
-import {
-  completePublicInvoiceTestPayment,
-  loadPublicInvoice,
-  startPublicInvoicePayment,
-  submitPublicInvoiceVerification,
-  type PublicInvoiceRecord,
-} from "@/lib/invoices";
 
 function formatCurrencyAmount(currency: string, amount: number) {
   return `${currency} ${amount.toLocaleString()}`;
@@ -32,50 +25,65 @@ function toErrorMessage(error: unknown) {
   return "Something went wrong.";
 }
 
-function getActionTitle(invoice: PublicInvoiceRecord) {
+function getActionTitle(invoice: RenewPublicInvoiceRecord) {
   if (invoice.nextAction === "wait_for_settlement") {
     return "Settlement in progress";
   }
 
   if (invoice.status === "paid") {
-    return "Invoice paid";
+    return "Payment complete";
   }
 
   return "Make payment";
 }
 
-function getActionCopy(invoice: PublicInvoiceRecord) {
-  if (invoice.nextAction === "complete_verification") {
-    return invoice.verification?.instructions ?? "Complete verification to unlock payment details.";
+function getVerificationButtonLabel(invoice: RenewPublicInvoiceRecord, isBusy: boolean) {
+  const requiredFields = invoice.verification?.requiredFields ?? [];
+
+  if (isBusy) {
+    if (requiredFields.includes("verificationMethod")) {
+      return "Continuing...";
+    }
+
+    if (requiredFields.includes("phone")) {
+      return "Confirming...";
+    }
+
+    if (requiredFields.includes("otp")) {
+      return "Verifying...";
+    }
+
+    return "Submitting...";
   }
 
-  if (invoice.nextAction === "create_payment") {
-    return "Generate payment details for this invoice.";
+  if (requiredFields.includes("verificationMethod")) {
+    return "Continue";
   }
 
-  if (
-    invoice.nextAction === "show_payment_instructions" ||
-    invoice.nextAction === "complete_test_payment"
-  ) {
-    return "Use the payment details below to make payment.";
+  if (requiredFields.includes("phone")) {
+    return "Continue";
   }
 
-  if (invoice.nextAction === "wait_for_settlement") {
-    return "We are confirming this payment now.";
+  if (requiredFields.includes("otp")) {
+    return "Verify";
   }
 
-  if (invoice.status === "paid") {
-    return "This invoice has already been paid.";
-  }
-
-  return "Review the current invoice state.";
+  return "Get payment details";
 }
 
 export default function PublicInvoicePage() {
   const params = useParams<{ invoiceToken: string }>();
   const invoiceToken =
     typeof params?.invoiceToken === "string" ? params.invoiceToken : "";
-  const [invoice, setInvoice] = useState<PublicInvoiceRecord | null>(null);
+  const invoiceClient = useMemo(
+    () =>
+      createRenewInvoiceClient({
+        apiOrigin: process.env.NEXT_PUBLIC_API_BASE_URL,
+      }),
+    []
+  );
+
+  const [invoice, setInvoice] = useState<RenewPublicInvoiceRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -95,7 +103,7 @@ export default function PublicInvoicePage() {
     setIsLoading(true);
 
     try {
-      const payload = await loadPublicInvoice(invoiceToken);
+      const payload = await invoiceClient.getInvoice(invoiceToken);
       setInvoice(payload);
       setErrorMessage(null);
     } catch (error) {
@@ -107,7 +115,7 @@ export default function PublicInvoicePage() {
 
   useEffect(() => {
     void refreshInvoice();
-  }, [invoiceToken]);
+  }, [invoiceClient, invoiceToken]);
 
   useEffect(() => {
     if (!message && !errorMessage) {
@@ -129,7 +137,7 @@ export default function PublicInvoicePage() {
 
   async function runAction(
     key: string,
-    runner: () => Promise<PublicInvoiceRecord>,
+    runner: () => Promise<RenewPublicInvoiceRecord>,
     successMessage?: string
   ) {
     setIsBusy(key);
@@ -152,13 +160,10 @@ export default function PublicInvoicePage() {
   if (isLoading) {
     return (
       <main className="min-h-screen bg-[#e8f5e9] px-6 py-10">
-        <div className="mx-auto max-w-5xl rounded-[2rem] border border-black/6 bg-white px-6 py-10 shadow-[0_24px_90px_rgba(16,32,20,0.08)]">
+        <div className="mx-auto max-w-4xl rounded-[2rem] border border-black/6 bg-white px-6 py-10 shadow-[0_24px_90px_rgba(16,32,20,0.08)]">
           <h1 className="text-3xl font-semibold tracking-[-0.05em] text-[#1b1f1c]">
             Loading invoice
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-7 text-[#5c655d]">
-            Fetching invoice details and payment instructions.
-          </p>
         </div>
       </main>
     );
@@ -167,17 +172,17 @@ export default function PublicInvoicePage() {
   if (!invoice) {
     return (
       <main className="min-h-screen bg-[#e8f5e9] px-6 py-10">
-        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[#d6b2ad] bg-[#fff6f5] px-6 py-10">
+        <div className="mx-auto max-w-4xl rounded-[2rem] border border-[#d6b2ad] bg-[#fff6f5] px-6 py-10">
           <h1 className="text-3xl font-semibold tracking-[-0.05em] text-[#1b1f1c]">
             Invoice unavailable
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-7 text-[#6d4d47]">
+          <p className="mt-3 text-sm leading-7 text-[#6d4d47]">
             {errorMessage ?? "This invoice could not be loaded."}
           </p>
           <button
             type="button"
             onClick={() => void refreshInvoice()}
-            className="mt-6 rounded-2xl bg-[#1b1f1c] px-5 py-3 text-sm font-semibold text-white"
+            className="mt-6 rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
           >
             Retry
           </button>
@@ -186,10 +191,24 @@ export default function PublicInvoicePage() {
     );
   }
 
+  const requiredFields = invoice.verification?.requiredFields ?? [];
+  const requiresVerificationMethod = requiredFields.includes("verificationMethod");
+  const requiresPhone = requiredFields.includes("phone");
+  const requiresOtp = requiredFields.includes("otp");
+  const isVerificationActionDisabled =
+    isBusy === "verify" ||
+    (requiresVerificationMethod
+      ? !verificationDraft.verificationMethod.trim()
+      : requiresPhone
+        ? !verificationDraft.phone.trim()
+        : requiresOtp
+          ? !verificationDraft.otp.trim()
+          : !verificationDraft.bvn.trim());
+
   return (
     <main className="min-h-screen bg-[#e8f5e9] px-6 py-10">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-4">
           <div className="inline-flex items-center gap-3 rounded-2xl border border-black/8 bg-white/88 px-4 py-3 text-sm font-semibold text-[#1b1f1c]">
             {invoice.brand.logoUrl ? (
               <img
@@ -204,6 +223,7 @@ export default function PublicInvoicePage() {
             )}
             <span>{invoice.brand.name}</span>
           </div>
+
           <button
             type="button"
             onClick={() => void refreshInvoice()}
@@ -213,7 +233,7 @@ export default function PublicInvoicePage() {
           </button>
         </div>
 
-        <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <section className="mx-auto flex max-w-4xl flex-col gap-5">
           <div className="rounded-[2rem] border border-black/6 bg-white px-6 py-6 shadow-[0_24px_90px_rgba(16,32,20,0.08)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5b665f]">
               Invoice {invoice.invoiceNumber}
@@ -285,24 +305,12 @@ export default function PublicInvoicePage() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-black/6 bg-white px-6 py-6 shadow-[0_24px_90px_rgba(16,32,20,0.08)] xl:sticky xl:top-10 xl:self-start">
-            <div className="inline-flex rounded-full border border-black/8 bg-[#f7faf5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5b665f]">
-              {invoice.nextAction === "complete_verification"
-                ? "Verification"
-                : invoice.nextAction === "create_payment"
-                  ? "Payment setup"
-                  : invoice.nextAction === "wait_for_settlement"
-                    ? "Settlement"
-                    : invoice.status === "paid"
-                      ? "Paid"
-                      : "Payment"}
-            </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#171b18]">
+          <div className="mx-auto w-full max-w-xl rounded-[2rem] border border-black/6 bg-white px-6 py-6 text-center shadow-[0_24px_90px_rgba(16,32,20,0.08)]">
+            <h2 className="text-3xl font-semibold tracking-[-0.05em] text-[#171b18]">
               {getActionTitle(invoice)}
             </h2>
 
-            <div className="mt-3 space-y-3 text-sm leading-7 text-[#58635d]">
-              <p>{getActionCopy(invoice)}</p>
+            <div className="mt-4 space-y-3 text-sm leading-7 text-[#58635d]">
               {message ? <p className="text-[#0c4a27]">{message}</p> : null}
               {errorMessage ? <p className="text-[#a74736]">{errorMessage}</p> : null}
               {paymentReference ? (
@@ -313,8 +321,8 @@ export default function PublicInvoicePage() {
             </div>
 
             {invoice.nextAction === "complete_verification" ? (
-              <div className="mt-5 space-y-3">
-                {invoice.verification?.requiredFields.includes("verificationMethod") ? (
+              <div className="mt-5 space-y-3 text-left">
+                {requiresVerificationMethod ? (
                   <div className="space-y-2">
                     {(invoice.verification?.verificationMethods ?? []).map((entry) => {
                       const isSelected = verificationDraft.verificationMethod === entry.method;
@@ -345,102 +353,68 @@ export default function PublicInvoicePage() {
                       );
                     })}
                   </div>
-                ) : invoice.verification?.requiredFields.includes("phone") ? (
-                  <div className="space-y-2">
-                    {invoice.verification?.verificationHint ? (
-                      <p className="text-sm text-[#58635d]">
-                        Use the number matching {invoice.verification.verificationHint}.
-                      </p>
-                    ) : null}
+                ) : (
+                  <label className="block space-y-2">
+                    <span className="text-sm font-semibold text-[#171b18]">
+                      {requiresPhone
+                        ? "Phone number"
+                        : requiresOtp
+                          ? "Verification code"
+                          : "BVN"}
+                    </span>
                     <input
                       className="w-full rounded-2xl border border-black/8 bg-[#f7faf5] px-4 py-3 text-sm text-[#171b18] outline-none"
-                      placeholder="Phone number"
-                      value={verificationDraft.phone}
+                      placeholder={
+                        requiresPhone
+                          ? "Phone number"
+                          : requiresOtp
+                            ? "Verification code"
+                            : "BVN"
+                      }
+                      value={
+                        requiresPhone
+                          ? verificationDraft.phone
+                          : requiresOtp
+                            ? verificationDraft.otp
+                            : verificationDraft.bvn
+                      }
                       onChange={(event) =>
                         setVerificationDraft((current) => ({
                           ...current,
-                          phone: event.target.value,
+                          ...(requiresPhone
+                            ? { phone: event.target.value }
+                            : requiresOtp
+                              ? { otp: event.target.value }
+                              : { bvn: event.target.value }),
                         }))
                       }
                     />
-                  </div>
-                ) : invoice.verification?.requiredFields.includes("otp") ? (
-                  <input
-                    className="w-full rounded-2xl border border-black/8 bg-[#f7faf5] px-4 py-3 text-sm text-[#171b18] outline-none"
-                    placeholder="Verification code"
-                    value={verificationDraft.otp}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        otp: event.target.value,
-                      }))
-                    }
-                  />
-                ) : (
-                  <input
-                    className="w-full rounded-2xl border border-black/8 bg-[#f7faf5] px-4 py-3 text-sm text-[#171b18] outline-none"
-                    placeholder="BVN"
-                    value={verificationDraft.bvn}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        bvn: event.target.value,
-                      }))
-                    }
-                  />
+                  </label>
                 )}
+
                 <button
                   type="button"
-                  disabled={
-                    isBusy === "verify" ||
-                    (invoice.verification?.requiredFields.includes("verificationMethod")
-                      ? !verificationDraft.verificationMethod.trim()
-                      : invoice.verification?.requiredFields.includes("phone")
-                        ? !verificationDraft.phone.trim()
-                        : invoice.verification?.requiredFields.includes("otp")
-                          ? !verificationDraft.otp.trim()
-                          : !verificationDraft.bvn.trim())
-                  }
+                  disabled={isVerificationActionDisabled}
                   onClick={() =>
                     void runAction(
                       "verify",
                       () =>
-                        submitPublicInvoiceVerification({
+                        invoiceClient.submitVerification(
                           invoiceToken,
-                          payload: invoice.verification?.requiredFields.includes("verificationMethod")
+                          requiresVerificationMethod
                             ? { verificationMethod: verificationDraft.verificationMethod }
-                            : invoice.verification?.requiredFields.includes("phone")
-                            ? { phone: verificationDraft.phone }
-                            : invoice.verification?.requiredFields.includes("otp")
-                              ? { otp: verificationDraft.otp }
-                              : { bvn: verificationDraft.bvn },
-                        }),
-                      invoice.verification?.requiredFields.includes("verificationMethod")
-                        ? "Verification code sent."
-                        : invoice.verification?.requiredFields.includes("phone")
-                        ? "Verification code sent."
-                        : invoice.verification?.requiredFields.includes("otp")
-                        ? "Verification completed. Payment instructions are ready."
-                        : "Verification code sent."
+                            : requiresPhone
+                              ? { phone: verificationDraft.phone }
+                              : requiresOtp
+                                ? { otp: verificationDraft.otp }
+                                : { bvn: verificationDraft.bvn }
+                        ),
+                      requiresOtp ? "Payment details are ready." : undefined
                     )
                   }
-                  className="mt-2 inline-flex items-center justify-center rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
+                  className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
                 >
-                  {isBusy === "verify"
-                    ? invoice.verification?.requiredFields.includes("verificationMethod")
-                      ? "Continuing..."
-                      : invoice.verification?.requiredFields.includes("phone")
-                      ? "Confirming..."
-                      : invoice.verification?.requiredFields.includes("otp")
-                        ? "Verifying..."
-                        : "Sending code..."
-                    : invoice.verification?.requiredFields.includes("verificationMethod")
-                      ? "Continue"
-                      : invoice.verification?.requiredFields.includes("phone")
-                      ? "Continue"
-                      : invoice.verification?.requiredFields.includes("otp")
-                        ? "Verify and continue"
-                        : "Get payment details"}
+                  {getVerificationButtonLabel(invoice, isBusy === "verify")}
                 </button>
               </div>
             ) : null}
@@ -452,13 +426,13 @@ export default function PublicInvoicePage() {
                 onClick={() =>
                   void runAction(
                     "create-payment",
-                    () => startPublicInvoicePayment(invoiceToken),
-                    "Payment instructions are ready."
+                    () => invoiceClient.startPayment(invoiceToken),
+                    "Payment details are ready."
                   )
                 }
                 className="mt-5 inline-flex items-center justify-center rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
               >
-                {isBusy === "create-payment" ? "Preparing..." : "Get payment instructions"}
+                {isBusy === "create-payment" ? "Preparing..." : "Make payment"}
               </button>
             ) : null}
 
@@ -466,12 +440,9 @@ export default function PublicInvoicePage() {
               invoice.nextAction === "complete_test_payment" ||
               invoice.nextAction === "wait_for_settlement" ||
               invoice.status === "paid") && (
-              <div className="mt-5 space-y-3">
+              <div className="mt-5 space-y-3 text-left">
                 <div className="rounded-2xl border border-black/6 bg-[#f7faf5] px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#627066]">
-                    Bank transfer details
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-[#58635d]">
+                  <div className="space-y-2 text-sm text-[#58635d]">
                     <p>
                       Bank:{" "}
                       <span className="font-semibold text-[#171b18]">
@@ -515,15 +486,13 @@ export default function PublicInvoicePage() {
                     onClick={() =>
                       void runAction(
                         "complete-test-payment",
-                        () => completePublicInvoiceTestPayment(invoiceToken),
-                        "Sandbox payment completed."
+                        () => invoiceClient.completeTestPayment(invoiceToken),
+                        "Payment completed."
                       )
                     }
-                    className="inline-flex items-center justify-center rounded-2xl border border-black/8 bg-[#f7faf5] px-5 py-3 text-sm font-semibold text-[#171b18]"
+                    className="inline-flex w-full items-center justify-center rounded-2xl bg-[#111111] px-5 py-3 text-sm font-semibold text-white"
                   >
-                    {isBusy === "complete-test-payment"
-                      ? "Completing..."
-                      : "Complete sandbox payment"}
+                    {isBusy === "complete-test-payment" ? "Processing..." : "I have paid"}
                   </button>
                 ) : null}
               </div>
