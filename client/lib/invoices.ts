@@ -330,15 +330,8 @@ export async function startPublicInvoicePayment(invoiceToken: string) {
 export async function submitPublicInvoiceVerification(input: {
   invoiceToken: string;
   payload: {
-    phoneNumber: string;
-    dateOfBirth: string;
-    bvn: string;
-    stateOfOrigin: string;
-    stateOfResidence: string;
-    lgaOfOrigin: string;
-    lgaOfResidence: string;
-    addressLine1: string;
-    country?: string;
+    bvn?: string;
+    otp?: string;
   };
 }) {
   const response = await fetchApi<PublicInvoiceRecord>(

@@ -166,6 +166,8 @@ const invoiceSchema = new Schema(
         country: { type: String, trim: true, uppercase: true, default: null },
         currency: { type: String, trim: true, uppercase: true, default: null },
         instructions: { type: String, trim: true, default: null },
+        accountName: { type: String, trim: true, default: null },
+        verificationMethod: { type: String, trim: true, default: null },
         requiredFields: { type: [String], default: [] },
       },
       default: null,

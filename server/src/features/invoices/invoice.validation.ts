@@ -86,20 +86,15 @@ export const publicInvoiceParamSchema = z.object({
   publicToken: z.string().trim().min(12).max(160),
 });
 
-export const submitInvoiceVerificationSchema = z.object({
-  phoneNumber: z.string().trim().min(7).max(32),
-  dateOfBirth: z.string().trim().min(8).max(32),
-  bvn: z.string().trim().min(6).max(32),
-  stateOfOrigin: z.string().trim().min(2).max(80),
-  stateOfResidence: z.string().trim().min(2).max(80),
-  lgaOfOrigin: z.string().trim().min(2).max(80),
-  lgaOfResidence: z.string().trim().min(2).max(80),
-  addressLine1: z.string().trim().min(4).max(200),
-  addressLine2: z.string().trim().min(2).max(200).optional(),
-  addressLine3: z.string().trim().min(2).max(200).optional(),
-  middleName: z.string().trim().min(1).max(120).optional(),
-  country: z.string().trim().min(2).max(3).optional(),
-});
+export const submitInvoiceVerificationSchema = z
+  .object({
+    bvn: z.string().trim().min(8).max(32).optional(),
+    otp: z.string().trim().min(4).max(12).optional(),
+  })
+  .refine((value) => Boolean(value.bvn?.trim()) !== Boolean(value.otp?.trim()), {
+    message: "Provide either BVN or OTP.",
+    path: [],
+  });
 
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;

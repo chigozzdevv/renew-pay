@@ -7,9 +7,8 @@ import { getPartnaConfig } from "@/config/partna.config";
 import { PaymentRailEventModel } from "@/features/payment-rails/payment-rail-event.model";
 import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import type {
-  PartnaAccountDetailsRecord,
+  PartnaBvnVerificationMethod,
   PartnaManagedBankAccount,
-  PartnaManagedAccountInput,
   PartnaVoucherRecord,
 } from "@/features/payment-rails/providers/partna/partna.types";
 import { ChargeModel } from "@/features/charges/charge.model";
@@ -57,35 +56,6 @@ function buildPartnaCallbackUrl(mode: RuntimeMode) {
   const url = new URL("/v1/payment-rails/webhooks/partna", env.API_BASE_URL);
   url.searchParams.set("environment", mode);
   return url.toString();
-}
-
-function extractNames(fullName: string) {
-  const parts = fullName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (parts.length === 0) {
-    return {
-      firstName: "Renew",
-      lastName: "Customer",
-      middleName: null as string | null,
-    };
-  }
-
-  if (parts.length === 1) {
-    return {
-      firstName: parts[0],
-      lastName: "Customer",
-      middleName: null as string | null,
-    };
-  }
-
-  return {
-    firstName: parts[0],
-    lastName: parts[parts.length - 1],
-    middleName: parts.length > 2 ? parts.slice(1, -1).join(" ") : null,
-  };
 }
 
 function readPartnaFeeBearer(value: unknown) {
@@ -148,50 +118,38 @@ export function derivePartnaFeeAmountUsdc(input: {
   return null;
 }
 
-function buildFullNameFromPartnaKyc(
-  accountDetails: PartnaAccountDetailsRecord | null
-) {
-  const parts = [
-    accountDetails?.kycDetails?.firstName,
-    accountDetails?.kycDetails?.middleName,
-    accountDetails?.kycDetails?.lastName,
-  ]
-    .map((value) => value?.trim() ?? "")
-    .filter(Boolean);
-
-  return parts.length > 0 ? parts.join(" ") : null;
-}
-
-function findBestPartnaAccountDetailsMatch(input: {
-  accountDetails: PartnaAccountDetailsRecord[];
-  accountName: string;
-  email: string;
-}) {
-  const normalizedAccountName = input.accountName.trim().toLowerCase();
-  const normalizedEmail = input.email.trim().toLowerCase();
-
-  return (
-    input.accountDetails.find(
-      (entry) => entry.accountName?.trim().toLowerCase() === normalizedAccountName
-    ) ??
-    input.accountDetails.find(
-      (entry) => entry.email?.trim().toLowerCase() === normalizedEmail
-    ) ??
-    input.accountDetails[0] ??
-    null
-  );
-}
-
 export const PARTNA_CHECKOUT_VERIFICATION_FIELDS = [
-  "phoneNumber",
-  "dateOfBirth",
   "bvn",
-  "stateOfOrigin",
-  "stateOfResidence",
-  "lgaOfOrigin",
-  "lgaOfResidence",
-  "addressLine1",
 ] as const;
+
+export const PARTNA_CHECKOUT_OTP_FIELDS = ["otp"] as const;
+
+function pickPreferredPartnaVerificationMethod(methods: PartnaBvnVerificationMethod[]) {
+  const preferredOrder = ["email", "phone", "phone_1", "alternate_phone"];
+
+  for (const method of preferredOrder) {
+    const matched = methods.find((entry) => entry.method === method);
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return methods[0] ?? null;
+}
+
+function buildPartnaCustomerAccountName(customer: {
+  customerRef: string;
+  _id: { toString(): string };
+}) {
+  const ref = customer.customerRef
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const suffix = customer._id.toString().slice(-6).toLowerCase();
+  return `${ref || "renew-customer"}-${suffix}`.slice(0, 40);
+}
 
 export function buildPartnaVerificationSnapshot(currency: string) {
   return {
@@ -199,8 +157,28 @@ export function buildPartnaVerificationSnapshot(currency: string) {
     status: "required",
     country: "NG",
     currency,
-    instructions: "We need your details to create a billing account for you.",
+    instructions: "Enter your BVN to verify and unlock payment details.",
     requiredFields: [...PARTNA_CHECKOUT_VERIFICATION_FIELDS],
+  };
+}
+
+export function buildPartnaOtpVerificationSnapshot(input: {
+  currency: string;
+  accountName: string;
+  verificationMethod: string;
+  verificationHint?: string | null;
+}) {
+  return {
+    provider: "partna" as const,
+    status: "otp_required",
+    country: "NG",
+    currency: input.currency,
+    instructions:
+      input.verificationHint?.trim() ||
+      "Enter the verification code Partna sent to you.",
+    requiredFields: [...PARTNA_CHECKOUT_OTP_FIELDS],
+    accountName: input.accountName,
+    verificationMethod: input.verificationMethod,
   };
 }
 
@@ -227,23 +205,98 @@ export function hasActivePartnaPaymentProfile(customer: {
   );
 }
 
-export async function ensurePartnaCustomerPaymentProfile(input: {
+export async function startPartnaCustomerPaymentProfileVerification(input: {
   customerId: string;
   environment: RuntimeMode;
   verification: {
-    phoneNumber: string;
-    dateOfBirth: string;
     bvn: string;
-    stateOfOrigin: string;
-    stateOfResidence: string;
-    lgaOfOrigin: string;
-    lgaOfResidence: string;
-    addressLine1: string;
-    addressLine2?: string;
-    addressLine3?: string;
-    middleName?: string;
-    country?: string;
   };
+}) {
+  const customer = await CustomerModel.findById(input.customerId).exec();
+
+  if (!customer) {
+    throw new HttpError(404, "Customer was not found.");
+  }
+
+  if (hasActivePartnaPaymentProfile(customer, customer.market)) {
+    return {
+      accountName: customer.paymentProfile?.partna?.accountName ?? null,
+      verificationMethod: null,
+      verificationHint: null,
+    };
+  }
+
+  const provider = getPartnaProvider(input.environment);
+  const accountName =
+    customer.paymentProfile?.partna?.accountName?.trim() ||
+    buildPartnaCustomerAccountName(customer);
+  const methods = await provider
+    .createAccount({
+      accountName,
+    })
+    .then(() =>
+      provider.initiateBvnKyc({
+        accountName,
+        bvn: input.verification.bvn,
+      })
+    );
+  const selectedMethod = pickPreferredPartnaVerificationMethod(methods);
+
+  if (!selectedMethod) {
+    throw new HttpError(
+      502,
+      "Partna did not return a verification method for this account."
+    );
+  }
+
+  await provider.handleBvnOtpMethod({
+    accountName,
+    verificationMethod: selectedMethod.method,
+  });
+
+  const existingRaw =
+    customer.paymentProfile?.partna?.raw &&
+    typeof customer.paymentProfile.partna.raw === "object" &&
+    customer.paymentProfile.partna.raw !== null
+      ? (customer.paymentProfile.partna.raw as Record<string, unknown>)
+      : {};
+  customer.paymentProvider = "partna";
+  customer.paymentProfile = {
+    provider: "partna",
+    status: "pending",
+    verifiedAt: null,
+    bankTransfer: null,
+    partna: {
+      email: normalizeEmail(customer.email),
+      fullName: customer.name,
+      accountName,
+      bvnLast4: input.verification.bvn.slice(-4),
+      callbackUrl: buildPartnaCallbackUrl(input.environment),
+      raw: {
+        ...existingRaw,
+        kycStatus: "otp_pending",
+        verificationMethods: methods,
+        selectedVerificationMethod: selectedMethod.method,
+        selectedVerificationHint: selectedMethod.hint,
+      },
+    },
+  };
+  await customer.save();
+
+  return {
+    accountName,
+    verificationMethod: selectedMethod.method,
+    verificationHint: selectedMethod.hint,
+  };
+}
+
+export async function completePartnaCustomerPaymentProfileVerification(input: {
+  customerId: string;
+  environment: RuntimeMode;
+  verification: {
+    otp: string;
+  };
+  accountName?: string | null;
 }) {
   const customer = await CustomerModel.findById(input.customerId).exec();
 
@@ -256,51 +309,29 @@ export async function ensurePartnaCustomerPaymentProfile(input: {
   }
 
   const provider = getPartnaProvider(input.environment);
-  const nameParts = extractNames(customer.name);
-  const account = await provider.createManagedBankAccount({
-    email: normalizeEmail(customer.email),
-    fullName: customer.name,
-    firstName: nameParts.firstName,
-    lastName: nameParts.lastName,
-    middleName: input.verification.middleName ?? nameParts.middleName ?? undefined,
-    dateOfBirth: input.verification.dateOfBirth,
-    addressLine1: input.verification.addressLine1,
-    addressLine2: input.verification.addressLine2,
-    addressLine3: input.verification.addressLine3,
-    phoneNumber: input.verification.phoneNumber,
-    country: (input.verification.country ?? "NG").toUpperCase(),
-    currency: customer.market,
-    bvn: input.verification.bvn,
-    stateOfOrigin: input.verification.stateOfOrigin,
-    stateOfResidence: input.verification.stateOfResidence,
-    lgaOfOrigin: input.verification.lgaOfOrigin,
-    lgaOfResidence: input.verification.lgaOfResidence,
-    callbackUrl: buildPartnaCallbackUrl(input.environment),
-  } satisfies PartnaManagedAccountInput);
-  const accountDetails = await provider
-    .getAccountDetails({
-      accountName: account.accountName,
-      page: 1,
-      perPage: 10,
+  const accountName =
+    input.accountName?.trim() ||
+    customer.paymentProfile?.partna?.accountName?.trim() ||
+    buildPartnaCustomerAccountName(customer);
+  const existingRaw =
+    customer.paymentProfile?.partna?.raw &&
+    typeof customer.paymentProfile.partna.raw === "object" &&
+    customer.paymentProfile.partna.raw !== null
+      ? (customer.paymentProfile.partna.raw as Record<string, unknown>)
+      : {};
+  const verifiedBankAccount = await provider
+    .confirmBvnOtp({
+      accountName,
+      currency: customer.market,
+      otp: input.verification.otp,
     })
-    .catch(() => []);
-  const matchedAccountDetails = findBestPartnaAccountDetailsMatch({
-    accountDetails,
-    accountName: account.accountName,
-    email: normalizeEmail(customer.email),
-  });
-  const verifiedFullName =
-    buildFullNameFromPartnaKyc(matchedAccountDetails) ??
-    account.fullName ??
-    customer.name;
-  const verifiedAccountName = matchedAccountDetails?.accountName ?? account.accountName;
-  const verifiedBankCode = matchedAccountDetails?.bankCode ?? account.bankCode;
-  const verifiedBankName = matchedAccountDetails?.bankName ?? account.bankName;
-  const verifiedAccountNumber =
-    matchedAccountDetails?.accountNumber ?? account.accountNumber;
-  const verifiedCurrency = account.currency;
-
-  customer.name = verifiedFullName;
+    .then(() =>
+      provider.createBankAccount({
+        accountName,
+        currency: customer.market,
+        preferredAccountName: customer.name,
+      })
+    );
 
   customer.paymentProvider = "partna";
   customer.paymentProfile = {
@@ -308,21 +339,22 @@ export async function ensurePartnaCustomerPaymentProfile(input: {
     status: "active",
     verifiedAt: new Date(),
     bankTransfer: {
-      bankCode: verifiedBankCode,
-      bankName: verifiedBankName,
-      accountName: verifiedAccountName,
-      accountNumber: verifiedAccountNumber,
-      currency: verifiedCurrency,
+      bankCode: verifiedBankAccount.bankCode,
+      bankName: verifiedBankAccount.bankName,
+      accountName: verifiedBankAccount.accountName,
+      accountNumber: verifiedBankAccount.accountNumber,
+      currency: verifiedBankAccount.currency,
     },
     partna: {
       email: normalizeEmail(customer.email),
-      fullName: verifiedFullName,
-      accountName: verifiedAccountName,
-      bvnLast4: input.verification.bvn.slice(-4),
+      fullName: customer.name,
+      accountName,
+      bvnLast4: customer.paymentProfile?.partna?.bvnLast4 ?? null,
       callbackUrl: buildPartnaCallbackUrl(input.environment),
       raw: {
-        account: account.raw,
-        accountDetails: matchedAccountDetails?.raw ?? null,
+        ...existingRaw,
+        kycStatus: "verified",
+        bankAccount: verifiedBankAccount.raw,
       },
     },
   };

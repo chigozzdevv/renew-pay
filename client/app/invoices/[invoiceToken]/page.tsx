@@ -43,15 +43,8 @@ export default function PublicInvoicePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [verificationDraft, setVerificationDraft] = useState({
-    phoneNumber: "",
-    dateOfBirth: "",
     bvn: "",
-    stateOfOrigin: "",
-    stateOfResidence: "",
-    lgaOfOrigin: "",
-    lgaOfResidence: "",
-    addressLine1: "",
-    country: "NG",
+    otp: "",
   });
 
   async function refreshInvoice() {
@@ -279,29 +272,19 @@ export default function PublicInvoicePage() {
 
             {invoice.nextAction === "complete_verification" ? (
               <div className="mt-5 space-y-3">
-                <input
-                  className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                  placeholder="Phone number"
-                  value={verificationDraft.phoneNumber}
-                  onChange={(event) =>
-                    setVerificationDraft((current) => ({
-                      ...current,
-                      phoneNumber: event.target.value,
-                    }))
-                  }
-                />
-                <div className="grid gap-3 md:grid-cols-2">
+                {invoice.verification?.requiredFields.includes("otp") ? (
                   <input
                     className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="Date of birth (YYYY-MM-DD)"
-                    value={verificationDraft.dateOfBirth}
+                    placeholder="Verification code"
+                    value={verificationDraft.otp}
                     onChange={(event) =>
                       setVerificationDraft((current) => ({
                         ...current,
-                        dateOfBirth: event.target.value,
+                        otp: event.target.value,
                       }))
                     }
                   />
+                ) : (
                   <input
                     className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
                     placeholder="BVN"
@@ -313,64 +296,7 @@ export default function PublicInvoicePage() {
                       }))
                     }
                   />
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="State of origin"
-                    value={verificationDraft.stateOfOrigin}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        stateOfOrigin: event.target.value,
-                      }))
-                    }
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="LGA of origin"
-                    value={verificationDraft.lgaOfOrigin}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        lgaOfOrigin: event.target.value,
-                      }))
-                    }
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="State of residence"
-                    value={verificationDraft.stateOfResidence}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        stateOfResidence: event.target.value,
-                      }))
-                    }
-                  />
-                  <input
-                    className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                    placeholder="LGA of residence"
-                    value={verificationDraft.lgaOfResidence}
-                    onChange={(event) =>
-                      setVerificationDraft((current) => ({
-                        ...current,
-                        lgaOfResidence: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <input
-                  className="w-full rounded-2xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white outline-none"
-                  placeholder="Address line 1"
-                  value={verificationDraft.addressLine1}
-                  onChange={(event) =>
-                    setVerificationDraft((current) => ({
-                      ...current,
-                      addressLine1: event.target.value,
-                    }))
-                  }
-                />
+                )}
                 <button
                   type="button"
                   disabled={isBusy === "verify"}
@@ -382,12 +308,20 @@ export default function PublicInvoicePage() {
                           invoiceToken,
                           payload: verificationDraft,
                         }),
-                      "Verification completed. Payment instructions are ready."
+                      invoice.verification?.requiredFields.includes("otp")
+                        ? "Verification completed. Payment instructions are ready."
+                        : "Verification code sent."
                     )
                   }
                   className="mt-2 inline-flex items-center justify-center rounded-2xl border border-[#d9f6bc]/18 bg-[#d9f6bc] px-5 py-3 text-sm font-semibold text-[#0c4a27]"
                 >
-                  {isBusy === "verify" ? "Verifying..." : "Verify and continue"}
+                  {isBusy === "verify"
+                    ? invoice.verification?.requiredFields.includes("otp")
+                      ? "Verifying..."
+                      : "Sending code..."
+                    : invoice.verification?.requiredFields.includes("otp")
+                      ? "Verify and continue"
+                      : "Get payment details"}
                 </button>
               </div>
             ) : null}

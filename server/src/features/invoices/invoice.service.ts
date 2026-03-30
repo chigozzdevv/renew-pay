@@ -20,12 +20,14 @@ import {
 } from "@/features/notifications/notification.service";
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
+  buildPartnaOtpVerificationSnapshot,
   buildPartnaVerificationSnapshot,
   createPartnaChargeInstruction,
+  completePartnaCustomerPaymentProfileVerification,
   derivePartnaFeeAmountUsdc,
-  ensurePartnaCustomerPaymentProfile,
   hasActivePartnaPaymentProfile,
   processPartnaWebhook,
+  startPartnaCustomerPaymentProfileVerification,
 } from "@/features/payment-rails/partna.service";
 import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
@@ -1231,20 +1233,61 @@ export async function submitPublicInvoiceVerification(
     throw new HttpError(409, "Invoice customer is not ready.");
   }
 
+  if (input.bvn?.trim()) {
+    invoice.verificationSnapshot = {
+      provider: "partna",
+      status: "processing",
+      country: "NG",
+      currency: invoice.billingCurrency,
+      instructions: "Starting verification for this invoice.",
+      accountName: null,
+      verificationMethod: null,
+      requiredFields: [],
+    };
+    await invoice.save();
+
+    const pendingVerification = await startPartnaCustomerPaymentProfileVerification({
+      customerId: invoice.customerId.toString(),
+      environment: toStoredRuntimeMode(invoice.environment),
+      verification: {
+        bvn: input.bvn,
+      },
+    });
+
+    invoice.verificationSnapshot = buildPartnaOtpVerificationSnapshot({
+      currency: invoice.billingCurrency,
+      accountName: pendingVerification.accountName ?? "",
+      verificationMethod: pendingVerification.verificationMethod ?? "email",
+      verificationHint: pendingVerification.verificationHint,
+    });
+    await invoice.save();
+
+    return getPublicInvoiceByToken(publicToken);
+  }
+
+  if (!input.otp?.trim()) {
+    throw new HttpError(409, "Verification code is required.");
+  }
+
   invoice.verificationSnapshot = {
     provider: "partna",
     status: "processing",
-    country: (input.country ?? "NG").toUpperCase(),
+    country: "NG",
     currency: invoice.billingCurrency,
-    instructions: "Creating permanent bank instructions for this invoice.",
+    instructions: "Finishing verification and preparing payment details.",
+    accountName: invoice.verificationSnapshot?.accountName ?? null,
+    verificationMethod: invoice.verificationSnapshot?.verificationMethod ?? null,
     requiredFields: [],
   };
   await invoice.save();
 
-  await ensurePartnaCustomerPaymentProfile({
+  await completePartnaCustomerPaymentProfileVerification({
     customerId: invoice.customerId.toString(),
     environment: toStoredRuntimeMode(invoice.environment),
-    verification: input,
+    verification: {
+      otp: input.otp,
+    },
+    accountName: invoice.verificationSnapshot?.accountName ?? undefined,
   });
 
   return createInvoicePaymentAttempt(invoice);

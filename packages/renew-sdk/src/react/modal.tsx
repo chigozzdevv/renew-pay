@@ -21,14 +21,8 @@ type FormState = {
 };
 
 type VerificationFormState = {
-  phoneNumber: string;
-  dateOfBirth: string;
   bvn: string;
-  stateOfOrigin: string;
-  stateOfResidence: string;
-  lgaOfOrigin: string;
-  lgaOfResidence: string;
-  addressLine1: string;
+  otp: string;
 };
 
 const modalStyles = `
@@ -382,14 +376,8 @@ function createInitialFormState(session: RenewCheckoutSession | null): FormState
 
 function createInitialVerificationState(): VerificationFormState {
   return {
-    phoneNumber: "",
-    dateOfBirth: "",
     bvn: "",
-    stateOfOrigin: "",
-    stateOfResidence: "",
-    lgaOfOrigin: "",
-    lgaOfResidence: "",
-    addressLine1: "",
+    otp: "",
   };
 }
 
@@ -563,6 +551,7 @@ export function RenewCheckoutModal({
       : formState.market
         ? [formState.market]
         : [];
+  const requiresOtp = currentSession.verification?.requiredFields.includes("otp") ?? false;
 
   const handleSubmitCustomer = async () => {
     const payload: SubmitCheckoutCustomerInput = {
@@ -579,15 +568,9 @@ export function RenewCheckoutModal({
 
   const handleSubmitVerification = async () => {
     await submitVerification({
-      phoneNumber: verificationState.phoneNumber.trim(),
-      dateOfBirth: verificationState.dateOfBirth.trim(),
-      bvn: verificationState.bvn.trim(),
-      stateOfOrigin: verificationState.stateOfOrigin.trim(),
-      stateOfResidence: verificationState.stateOfResidence.trim(),
-      lgaOfOrigin: verificationState.lgaOfOrigin.trim(),
-      lgaOfResidence: verificationState.lgaOfResidence.trim(),
-      addressLine1: verificationState.addressLine1.trim(),
-      country: currentSession.verification?.country ?? "NG",
+      ...(requiresOtp
+        ? { otp: verificationState.otp.trim() }
+        : { bvn: verificationState.bvn.trim() }),
     });
   };
 
@@ -770,45 +753,18 @@ export function RenewCheckoutModal({
             ) : currentSession.nextAction === "complete_verification" ? (
               <div className="renew-modal__stack">
                 <div>
-                  <h3 className="renew-modal__section-title">Verify to get payment details</h3>
+                  <h3 className="renew-modal__section-title">
+                    {requiresOtp ? "Enter verification code" : "Verify to get payment details"}
+                  </h3>
                   <p className="renew-modal__copy">
-                    We need your details to create a billing account for you.
+                    {currentSession.verification?.instructions ??
+                      (requiresOtp
+                        ? "Enter the verification code Partna sent to you."
+                        : "Enter your BVN to verify and unlock payment details.")}
                   </p>
                 </div>
 
-                <div className="renew-modal__grid renew-modal__grid--two">
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">Phone number</span>
-                    <input
-                      value={verificationState.phoneNumber}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          phoneNumber: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="+2348012345678"
-                    />
-                  </label>
-
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">Date of birth</span>
-                    <input
-                      value={verificationState.dateOfBirth}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          dateOfBirth: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="1994-08-12"
-                    />
-                  </label>
-                </div>
-
-                <div className="renew-modal__grid renew-modal__grid--two">
+                {!requiresOtp ? (
                   <label className="renew-modal__field">
                     <span className="renew-modal__label">BVN</span>
                     <input
@@ -823,107 +779,38 @@ export function RenewCheckoutModal({
                       placeholder="Enter BVN"
                     />
                   </label>
-                </div>
-
-                <div className="renew-modal__grid renew-modal__grid--two">
+                ) : (
                   <label className="renew-modal__field">
-                    <span className="renew-modal__label">State of origin</span>
+                    <span className="renew-modal__label">Verification code</span>
                     <input
-                      value={verificationState.stateOfOrigin}
+                      value={verificationState.otp}
                       onChange={(event) =>
                         setVerificationState((current) => ({
                           ...current,
-                          stateOfOrigin: event.target.value,
+                          otp: event.target.value,
                         }))
                       }
                       className="renew-modal__input"
-                      placeholder="State of origin"
+                      placeholder="Enter code"
                     />
                   </label>
-
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">State of residence</span>
-                    <input
-                      value={verificationState.stateOfResidence}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          stateOfResidence: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="State of residence"
-                    />
-                  </label>
-                </div>
-
-                <div className="renew-modal__grid renew-modal__grid--two">
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">LGA of origin</span>
-                    <input
-                      value={verificationState.lgaOfOrigin}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          lgaOfOrigin: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="LGA of origin"
-                    />
-                  </label>
-
-                  <label className="renew-modal__field">
-                    <span className="renew-modal__label">LGA of residence</span>
-                    <input
-                      value={verificationState.lgaOfResidence}
-                      onChange={(event) =>
-                        setVerificationState((current) => ({
-                          ...current,
-                          lgaOfResidence: event.target.value,
-                        }))
-                      }
-                      className="renew-modal__input"
-                      placeholder="LGA of residence"
-                    />
-                  </label>
-                </div>
-
-                <label className="renew-modal__field">
-                  <span className="renew-modal__label">Address line 1</span>
-                  <input
-                    value={verificationState.addressLine1}
-                    onChange={(event) =>
-                      setVerificationState((current) => ({
-                        ...current,
-                        addressLine1: event.target.value,
-                      }))
-                    }
-                    className="renew-modal__input"
-                    placeholder="Street address"
-                  />
-                </label>
+                )}
 
                 <button
                   type="button"
                   onClick={() => void handleSubmitVerification()}
                   disabled={
                     isSubmittingVerification ||
-                    !verificationState.phoneNumber.trim() ||
-                    !verificationState.dateOfBirth.trim() ||
-                    !verificationState.bvn.trim() ||
-                    !verificationState.stateOfOrigin.trim() ||
-                    !verificationState.stateOfResidence.trim() ||
-                    !verificationState.lgaOfOrigin.trim() ||
-                    !verificationState.lgaOfResidence.trim() ||
-                    !verificationState.addressLine1.trim()
+                    (requiresOtp
+                      ? !verificationState.otp.trim()
+                      : !verificationState.bvn.trim())
                   }
                   className="renew-modal__button renew-modal__button--brand"
                   style={hiddenButtonStyle}
                 >
                   {isSubmittingVerification
-                    ? "Creating payment instructions..."
-                    : "Get payment details"}
+                    ? (requiresOtp ? "Verifying code..." : "Sending code...")
+                    : (requiresOtp ? "Verify and get payment details" : "Get payment details")}
                 </button>
               </div>
             ) : (

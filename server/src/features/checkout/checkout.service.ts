@@ -15,10 +15,12 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueSubscriptionCreatedNotifications } from "@/features/notifications/notification.service";
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import {
+  buildPartnaOtpVerificationSnapshot,
   buildPartnaVerificationSnapshot,
-  ensurePartnaCustomerPaymentProfile,
+  completePartnaCustomerPaymentProfileVerification,
   hasActivePartnaPaymentProfile,
   processPartnaWebhook,
+  startPartnaCustomerPaymentProfileVerification,
 } from "@/features/payment-rails/partna.service";
 import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import { PlanModel } from "@/features/plans/plan.model";
@@ -741,20 +743,62 @@ export async function submitCheckoutVerification(
     throw new HttpError(404, "Checkout customer was not found.");
   }
 
+  if (input.bvn?.trim()) {
+    session.verificationSnapshot = {
+      provider: "partna",
+      status: "processing",
+      country: "NG",
+      currency: customer.market,
+      instructions: "Starting verification for this customer.",
+      accountName: null,
+      verificationMethod: null,
+      requiredFields: [],
+    };
+    await session.save();
+
+    const pendingVerification = await startPartnaCustomerPaymentProfileVerification({
+      customerId: customer._id.toString(),
+      environment: runtimeEnvironment,
+      verification: {
+        bvn: input.bvn,
+      },
+    });
+
+    session.status = "pending_verification";
+    session.verificationSnapshot = buildPartnaOtpVerificationSnapshot({
+      currency: customer.market,
+      accountName: pendingVerification.accountName ?? "",
+      verificationMethod: pendingVerification.verificationMethod ?? "email",
+      verificationHint: pendingVerification.verificationHint,
+    });
+    await session.save();
+
+    return getCheckoutSession(sessionId);
+  }
+
+  if (!input.otp?.trim()) {
+    throw new HttpError(409, "Verification code is required.");
+  }
+
   session.verificationSnapshot = {
     provider: "partna",
     status: "processing",
-    country: (input.country ?? "NG").toUpperCase(),
+    country: "NG",
     currency: customer.market,
-    instructions: "Creating permanent bank instructions for this customer.",
+    instructions: "Finishing verification and preparing payment details.",
+    accountName: session.verificationSnapshot?.accountName ?? null,
+    verificationMethod: session.verificationSnapshot?.verificationMethod ?? null,
     requiredFields: [],
   };
   await session.save();
 
-  await ensurePartnaCustomerPaymentProfile({
+  await completePartnaCustomerPaymentProfileVerification({
     customerId: customer._id.toString(),
     environment: runtimeEnvironment,
-    verification: input,
+    verification: {
+      otp: input.otp,
+    },
+    accountName: session.verificationSnapshot?.accountName ?? undefined,
   });
 
   const refreshedCustomer = (await CustomerModel.findById(customer._id).exec()) ?? customer;

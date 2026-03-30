@@ -23,20 +23,15 @@ export const submitCheckoutCustomerSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const submitCheckoutVerificationSchema = z.object({
-  phoneNumber: z.string().trim().min(7).max(24),
-  dateOfBirth: z.string().trim().min(10).max(32),
-  bvn: z.string().trim().min(8).max(32),
-  stateOfOrigin: z.string().trim().min(2).max(120),
-  stateOfResidence: z.string().trim().min(2).max(120),
-  lgaOfOrigin: z.string().trim().min(2).max(120),
-  lgaOfResidence: z.string().trim().min(2).max(120),
-  addressLine1: z.string().trim().min(4).max(180),
-  addressLine2: z.string().trim().max(180).optional(),
-  addressLine3: z.string().trim().max(180).optional(),
-  middleName: z.string().trim().max(120).optional(),
-  country: z.string().trim().min(2).max(3).toUpperCase().default("NG"),
-});
+export const submitCheckoutVerificationSchema = z
+  .object({
+    bvn: z.string().trim().min(8).max(32).optional(),
+    otp: z.string().trim().min(4).max(12).optional(),
+  })
+  .refine((value) => Boolean(value.bvn?.trim()) !== Boolean(value.otp?.trim()), {
+    message: "Provide either BVN or OTP.",
+    path: [],
+  });
 
 export type CreateCheckoutSessionInput = z.infer<typeof createCheckoutSessionSchema>;
 export type CheckoutSessionParamInput = z.infer<typeof checkoutSessionParamSchema>;

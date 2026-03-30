@@ -17,7 +17,7 @@ import {
   listPlaygroundPlans,
   type PlaygroundSessionState,
 } from "@/lib/playground";
-import { readWorkspaceMode, type WorkspaceMode } from "@/lib/api";
+import { ApiError, clearAccessToken, readWorkspaceMode, type WorkspaceMode } from "@/lib/api";
 
 function formatInterval(days: number) {
   if (days % 30 === 0) {
@@ -42,15 +42,42 @@ export function PlaygroundPageClient() {
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [signInMessage, setSignInMessage] = useState<string | null>(null);
+
+  const handlePlaygroundError = (error: unknown, fallbackMessage: string) => {
+    if (
+      error instanceof ApiError &&
+      error.status === 401
+    ) {
+      clearAccessToken();
+      setSignInMessage(
+        error.message === "Authentication token expired."
+          ? "Your session expired. Sign in again to use Playground."
+          : "Sign in to your workspace to use Playground."
+      );
+      setErrorMessage(null);
+      return;
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "Sign in to your workspace to use Playground."
+    ) {
+      setSignInMessage(error.message);
+      setErrorMessage(null);
+      return;
+    }
+
+    setSignInMessage(null);
+    setErrorMessage(error instanceof Error ? error.message : fallbackMessage);
+  };
 
   useEffect(() => {
     try {
       setWorkspaceMode(readWorkspaceMode());
       setCheckoutClient(createPlaygroundCheckoutClient());
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Playground is not configured."
-      );
+      handlePlaygroundError(error, "Playground is not configured.");
     }
   }, []);
 
@@ -60,6 +87,7 @@ export function PlaygroundPageClient() {
     const loadPlans = async () => {
       setIsLoadingPlans(true);
       setErrorMessage(null);
+      setSignInMessage(null);
 
       try {
         const nextMode = readWorkspaceMode();
@@ -76,9 +104,7 @@ export function PlaygroundPageClient() {
           return;
         }
 
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load playground."
-        );
+        handlePlaygroundError(error, "Unable to load playground.");
       } finally {
         if (isMounted) {
           setIsLoadingPlans(false);
@@ -104,6 +130,7 @@ export function PlaygroundPageClient() {
     setSelectedPlan(plan);
     setIsCreatingSession(true);
     setErrorMessage(null);
+    setSignInMessage(null);
 
     try {
       const nextSession = await createPlaygroundSession(plan.id, workspaceMode);
@@ -111,9 +138,7 @@ export function PlaygroundPageClient() {
       setClientSecret(nextSession.clientSecret);
       setIsModalOpen(true);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to start playground checkout."
-      );
+      handlePlaygroundError(error, "Unable to start playground checkout.");
     } finally {
       setIsCreatingSession(false);
     }
@@ -130,7 +155,7 @@ export function PlaygroundPageClient() {
     setSession(nextSession);
   };
 
-  const requiresSignIn = errorMessage === "Sign in to your workspace to use Playground.";
+  const requiresSignIn = signInMessage !== null;
 
   return (
     <>
@@ -163,7 +188,7 @@ export function PlaygroundPageClient() {
                     Sign in to use Playground
                   </p>
                   <p className="mt-3 text-sm leading-6 text-[color:var(--muted)]">
-                    Open your workspace session first, then test checkout from an active plan.
+                    {signInMessage ?? "Open your workspace session first, then test checkout from an active plan."}
                   </p>
                 </div>
                 <div className="mt-6">
@@ -179,7 +204,7 @@ export function PlaygroundPageClient() {
           ) : null}
 
           {errorMessage && !requiresSignIn ? (
-            <div className="rounded-[1.2rem] border border-[#e7c3bc] bg-[#fff7f5] px-4 py-3 text-sm text-[#9b3b2d]">
+            <div className="max-w-3xl rounded-[1.2rem] border border-[#e7c3bc] bg-[#fff7f5] px-4 py-3 text-sm text-[#9b3b2d]">
               {errorMessage}
             </div>
           ) : null}

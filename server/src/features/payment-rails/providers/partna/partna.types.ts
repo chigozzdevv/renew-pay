@@ -1,22 +1,36 @@
-export type PartnaManagedAccountInput = {
-  email: string;
-  fullName: string;
-  firstName: string;
-  middleName?: string | null;
-  lastName: string;
-  dateOfBirth: string;
-  addressLine1: string;
-  addressLine2?: string | null;
-  addressLine3?: string | null;
-  phoneNumber: string;
-  country: string;
-  currency: string;
+export type PartnaCreateAccountInput = {
+  accountName: string;
+};
+
+export type PartnaInitiateBvnKycInput = {
+  accountName: string;
   bvn: string;
-  stateOfOrigin: string;
-  stateOfResidence: string;
-  lgaOfOrigin: string;
-  lgaOfResidence: string;
-  callbackUrl?: string | null;
+  kesMobileNetwork?: string | null;
+  kesShortcode?: string | null;
+};
+
+export type PartnaBvnVerificationMethod = {
+  method: string;
+  hint: string | null;
+};
+
+export type PartnaHandleBvnOtpMethodInput = {
+  accountName: string;
+  verificationMethod: string;
+  accountNumber?: string | null;
+  bankCode?: string | null;
+};
+
+export type PartnaConfirmBvnOtpInput = {
+  accountName: string;
+  currency: string;
+  otp: string;
+};
+
+export type PartnaCreateBankAccountInput = {
+  accountName: string;
+  currency: string;
+  preferredAccountName?: string | null;
 };
 
 export type PartnaManagedBankAccount = {
@@ -129,8 +143,14 @@ export type PartnaAccountDetailsInput = {
 };
 
 export interface PartnaProvider {
-  createManagedBankAccount(
-    input: PartnaManagedAccountInput
+  createAccount(input: PartnaCreateAccountInput): Promise<Record<string, unknown>>;
+  initiateBvnKyc(
+    input: PartnaInitiateBvnKycInput
+  ): Promise<PartnaBvnVerificationMethod[]>;
+  handleBvnOtpMethod(input: PartnaHandleBvnOtpMethodInput): Promise<Record<string, unknown>>;
+  confirmBvnOtp(input: PartnaConfirmBvnOtpInput): Promise<Record<string, unknown>>;
+  createBankAccount(
+    input: PartnaCreateBankAccountInput
   ): Promise<PartnaManagedBankAccount>;
   listStaticBankAccounts(email: string): Promise<PartnaManagedBankAccount[]>;
   listSupportedAssets(): Promise<PartnaSupportedAsset[]>;

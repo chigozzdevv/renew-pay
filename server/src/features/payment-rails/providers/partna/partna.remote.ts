@@ -6,7 +6,12 @@ import type {
   PartnaAccountDetailsInput,
   PartnaAccountDetailsRecord,
   PartnaAccountKycDetails,
-  PartnaManagedAccountInput,
+  PartnaBvnVerificationMethod,
+  PartnaConfirmBvnOtpInput,
+  PartnaCreateAccountInput,
+  PartnaCreateBankAccountInput,
+  PartnaHandleBvnOtpMethodInput,
+  PartnaInitiateBvnKycInput,
   PartnaManagedBankAccount,
   PartnaMockPaymentInput,
   PartnaProvider,
@@ -18,7 +23,7 @@ import type {
   PartnaVoucherRecord,
 } from "@/features/payment-rails/providers/partna/partna.types";
 
-type HttpMethod = "GET" | "POST" | "PATCH";
+type HttpMethod = "GET" | "POST" | "PATCH" | "PUT";
 
 function readString(value: unknown) {
   if (typeof value !== "string") {
@@ -97,6 +102,33 @@ function extractManagedBankAccount(record: Record<string, unknown>): PartnaManag
   };
 }
 
+function extractManagedBankAccountPayload(payload: unknown) {
+  const data = extractPayloadData(payload);
+  const record = Array.isArray(data) ? asRecord(data[0]) : asRecord(data);
+
+  if (!record) {
+    throw new HttpError(502, "Partna bank account response did not include an account.");
+  }
+
+  return extractManagedBankAccount(record);
+}
+
+function extractBvnVerificationMethods(payload: unknown) {
+  const data = extractPayloadData(payload);
+  const methods = Array.isArray(data.methods) ? data.methods : [];
+
+  return methods
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map(
+      (entry): PartnaBvnVerificationMethod => ({
+        method: readString(entry.method) ?? "",
+        hint: readString(entry.hint),
+      })
+    )
+    .filter((entry) => entry.method.length > 0);
+}
+
 function extractVoucherRecord(record: Record<string, unknown>): PartnaVoucherRecord {
   return {
     provider: "partna",
@@ -161,17 +193,6 @@ function extractSupportedAssets(payload: unknown) {
   }
 
   return assets;
-}
-
-function formatPartnaDob(value: string) {
-  const trimmed = value.trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    const [year, month, day] = trimmed.split("-");
-    return `${day}-${month}-${year}`;
-  }
-
-  return trimmed;
 }
 
 function extractRateQuote(
@@ -353,40 +374,85 @@ export class PartnaRemoteProvider implements PartnaProvider {
     return payload;
   }
 
-  async createManagedBankAccount(input: PartnaManagedAccountInput) {
+  async createAccount(input: PartnaCreateAccountInput) {
     const payload = await this.requestJson(
-      this.config.vouchersBaseUrl,
-      "/accounts/create-account",
+      this.config.v4BaseUrl,
+      "/account",
       "POST",
       {
-        email: input.email,
-        fullName: input.fullName,
-        firstName: input.firstName,
-        middleName: input.middleName ?? undefined,
-        lastName: input.lastName,
-        dob: formatPartnaDob(input.dateOfBirth),
-        addressLine1: input.addressLine1,
-        addressLine2: input.addressLine2 ?? undefined,
-        addressLine3: input.addressLine3 ?? undefined,
-        phone: input.phoneNumber,
-        country: input.country,
-        currency: input.currency,
-        bvn: input.bvn,
-        stateOfOrigin: input.stateOfOrigin,
-        stateOfResidence: input.stateOfResidence,
-        lgaOfOrigin: input.lgaOfOrigin,
-        lgaOfResidence: input.lgaOfResidence,
-        callbackurl: input.callbackUrl ?? undefined,
+        accountName: input.accountName,
       }
     );
 
-    return extractManagedBankAccount(extractPayloadData(payload));
+    return extractPayloadData(payload);
+  }
+
+  async initiateBvnKyc(input: PartnaInitiateBvnKycInput) {
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/kyc",
+      "POST",
+      {
+        accountName: input.accountName,
+        bvn: input.bvn,
+        kesMobileNetwork: input.kesMobileNetwork ?? undefined,
+        kesShortcode: input.kesShortcode ?? undefined,
+      }
+    );
+
+    return extractBvnVerificationMethods(payload);
+  }
+
+  async handleBvnOtpMethod(input: PartnaHandleBvnOtpMethodInput) {
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/kyc/handle-otp",
+      "PUT",
+      {
+        accountName: input.accountName,
+        verificationMethod: input.verificationMethod,
+        accountNumber: input.accountNumber ?? undefined,
+        bankCode: input.bankCode ?? undefined,
+      }
+    );
+
+    return extractPayloadData(payload);
+  }
+
+  async confirmBvnOtp(input: PartnaConfirmBvnOtpInput) {
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/kyc/confirm-otp",
+      "PUT",
+      {
+        accountName: input.accountName,
+        currency: input.currency.trim().toUpperCase(),
+        otp: input.otp.trim(),
+      }
+    );
+
+    return extractPayloadData(payload);
+  }
+
+  async createBankAccount(input: PartnaCreateBankAccountInput) {
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/account",
+      "PUT",
+      {
+        accountName: input.accountName,
+        currency: input.currency.trim().toUpperCase(),
+        preferredAccountName: input.preferredAccountName ?? undefined,
+      }
+    );
+
+    return extractManagedBankAccountPayload(payload);
   }
 
   async listStaticBankAccounts(email: string) {
     const payload = await this.requestJson(
       this.config.vouchersBaseUrl,
-      "/accounts",
+      "/get-accounts",
       "GET",
       undefined,
       new URLSearchParams({ email })

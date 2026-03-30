@@ -168,13 +168,6 @@ export type SubmitCheckoutCustomerInput = {
 };
 
 export type SubmitCheckoutVerificationInput = {
-  readonly phoneNumber: string;
-  readonly dateOfBirth: string;
-  readonly bvn: string;
-  readonly stateOfOrigin: string;
-  readonly stateOfResidence: string;
-  readonly lgaOfOrigin: string;
-  readonly lgaOfResidence: string;
-  readonly addressLine1: string;
-  readonly country?: string;
+  readonly bvn?: string;
+  readonly otp?: string;
 };
