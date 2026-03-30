@@ -456,6 +456,24 @@ export async function queueSettlementBridge(
     };
   }
 
+  if (toStoredRuntimeMode(settlement.environment) === "test") {
+    console.log(
+      `[settlement-bridge] inline-start ${JSON.stringify({
+        settlementId,
+        environment: "test",
+        merchantId: settlement.merchantId.toString(),
+      })}`
+    );
+    const inlineResult = await runSettlementBridgeJob({ settlementId });
+
+    return {
+      queued: false,
+      processedInline: true,
+      settlementId,
+      result: inlineResult,
+    };
+  }
+
   const queuedJob = await enqueueQueueJob(
     queueNames.settlementBridge,
     "settlement-bridge",
@@ -532,8 +550,11 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     throw new HttpError(404, "Merchant was not found.");
   }
 
+  const runtimeEnvironment = toStoredRuntimeMode(settlement.environment);
+  const postExecutionStatus = runtimeEnvironment === "test" ? "settled" : "confirming";
+
   const protocolMerchantAddress = deriveProtocolMerchantAddress({
-    environment: toStoredRuntimeMode(settlement.environment),
+    environment: runtimeEnvironment,
     merchantId: settlement.merchantId.toString(),
   });
 
@@ -562,7 +583,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     const localAmount = settlement.localAmount;
     const fxRate = settlement.fxRate;
     const bridgeResult = await executeProtocolSettlement({
-      environment: toStoredRuntimeMode(settlement.environment),
+      environment: runtimeEnvironment,
       mode: "invoice_settlement",
       providerRef: sourceCharge?.paymentProvider ?? "partna",
       merchantAddress: protocolMerchantAddress,
@@ -573,7 +594,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
       amountUsdc: settlement.grossUsdc,
     });
 
-    settlement.status = "confirming";
+    settlement.status = postExecutionStatus;
     settlement.bridgeSourceTxHash = bridgeResult.bridgeSourceTxHash;
     settlement.bridgeReceiveTxHash = bridgeResult.bridgeReceiveTxHash;
     settlement.creditTxHash = bridgeResult.creditTxHash;
@@ -642,7 +663,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
 
   const protocolAmountUsdc = sourceCharge.usdcAmount;
   const bridgeResult = await executeProtocolSettlement({
-    environment: toStoredRuntimeMode(settlement.environment),
+    environment: runtimeEnvironment,
     mode: "subscription_charge_success",
     providerRef: sourceCharge.paymentProvider ?? "yellow_card",
     externalChargeId: sourceCharge.externalChargeId,
@@ -654,7 +675,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     usdcAmount: sourceCharge.usdcAmount,
   });
 
-  settlement.status = "confirming";
+  settlement.status = postExecutionStatus;
   settlement.bridgeSourceTxHash = bridgeResult.bridgeSourceTxHash;
   settlement.bridgeReceiveTxHash = bridgeResult.bridgeReceiveTxHash;
   settlement.creditTxHash = bridgeResult.creditTxHash;
