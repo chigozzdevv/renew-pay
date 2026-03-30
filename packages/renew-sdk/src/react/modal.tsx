@@ -614,12 +614,7 @@ export function RenewCheckoutModal({
   const requiresVerificationMethod =
     currentSession.verification?.requiredFields.includes("verificationMethod") ?? false;
   const paymentProviderLabel = getProviderLabel(paymentInstructions?.provider ?? null);
-  const paymentDetailsLabel =
-    paymentInstructions?.provider === "yellow_card"
-      ? "Yellow Card payment details"
-      : paymentInstructions?.provider === "partna"
-        ? "Partna payment details"
-        : "Payment details";
+  const paymentDetailsLabel = "Payment details";
   const bankLabel =
     paymentInstructions?.provider === "yellow_card" ? "Collection bank" : "Bank";
 

@@ -1196,6 +1196,24 @@ export async function completeCheckoutTestPayment(sessionId: string) {
   }
 
   if (session.paymentSnapshot.provider === "yellow_card") {
+    if (session.subscriptionId) {
+      const activation = await queueSubscriptionProtocolCreate({
+        merchantId: session.merchantId.toString(),
+        actor: session.customerDraft?.email ?? "checkout",
+        environment: "test",
+        subscriptionId: session.subscriptionId.toString(),
+        checkoutSessionId: session._id.toString(),
+        triggerInitialCharge: false,
+      });
+
+      if (!activation) {
+        throw new HttpError(
+          409,
+          "Checkout subscription could not be activated on-chain for settlement."
+        );
+      }
+    }
+
     const acceptedCollection = await acceptCollectionRequest(
       session.paymentSnapshot.externalChargeId,
       "test"
@@ -1217,17 +1235,6 @@ export async function completeCheckoutTestPayment(sessionId: string) {
       },
       "test"
     );
-
-    if (session.subscriptionId) {
-      await queueSubscriptionProtocolCreate({
-        merchantId: session.merchantId.toString(),
-        actor: session.customerDraft?.email ?? "checkout",
-        environment: "test",
-        subscriptionId: session.subscriptionId.toString(),
-        checkoutSessionId: session._id.toString(),
-        triggerInitialCharge: false,
-      }).catch(() => null);
-    }
 
     return getCheckoutSession(sessionId);
   }
