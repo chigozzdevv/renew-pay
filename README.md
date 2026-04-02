@@ -64,6 +64,12 @@ Server defaults come from [server/.env.example](./server/.env.example):
 
 ## Architecture
 
+Renew uses a hybrid off-chain and on-chain architecture.
+
+Off-chain handles business logic, customer data, payment-rail orchestration, and operational workflows.
+
+On-chain records the protocol and settlement state that benefits from transparency, balances, and treasury-controlled execution.
+
 ### Off-chain
 
 - Privy authentication and session exchange
