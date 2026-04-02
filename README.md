@@ -129,12 +129,70 @@ The `contracts/` workspace contains the `renew_protocol` Solana program.
 
 ### SDK
 
-[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides:
+[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides headless checkout clients, server-side helpers, React checkout components, webhook verification helpers, and protocol clients.
 
-- checkout session clients
-- server-side checkout helpers
-- webhook verification helpers
-- React checkout components
+Install:
+
+```bash
+npm install @renew.sh/sdk
+```
+
+Environments:
+
+- `sandbox`
+- `live`
+
+Server usage:
+
+```ts
+import { createRenewServerClient } from "@renew.sh/sdk/server";
+
+const renew = createRenewServerClient({
+  environment: "sandbox",
+  secretKey: process.env.RENEW_SECRET_KEY!,
+});
+
+const plans = await renew.listCheckoutPlans();
+
+const { session, clientSecret } = await renew.createCheckoutSession({
+  planId: plans[0].id,
+});
+```
+
+React usage:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import {
+  RenewCheckoutModal,
+  createRenewCheckoutClient,
+} from "@renew.sh/sdk";
+
+const client = createRenewCheckoutClient({
+  environment: "sandbox",
+});
+
+export function CheckoutExample() {
+  const [session, setSession] = useState(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <RenewCheckoutModal
+      isOpen={isOpen}
+      client={client}
+      session={session}
+      clientSecret={clientSecret}
+      onClose={() => setIsOpen(false)}
+      onSettled={(nextSession) => {
+        console.log("Settled", nextSession.id);
+      }}
+    />
+  );
+}
+```
 
 ## Tech Stack
 
@@ -148,26 +206,6 @@ The `contracts/` workspace contains the `renew_protocol` Solana program.
 | Protocol | Solana, Anchor, SPL Token |
 | Treasury | Squads multisig |
 | SDK | TypeScript, npm |
-
-## Payment Rails And Markets
-
-Renew uses Partna and Yellow Card for sandbox and live checkout and invoice payment flows.
-
-The current test billing catalog includes:
-
-- `BWP`
-- `CDF`
-- `GHS`
-- `KES`
-- `MWK`
-- `NGN`
-- `RWF`
-- `TZS`
-- `UGX`
-- `XAF`
-- `XOF`
-- `ZAR`
-- `ZMW`
 
 ## Getting Started
 
@@ -295,8 +333,6 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 - `SUMSUB_LEVEL_NAME_KYC_LIVE`
 - `SUMSUB_LEVEL_NAME_KYB_LIVE`
 - `SUMSUB_WEBHOOK_SECRET_LIVE`
-
-Live AML / KYT / Travel Rule configuration should be added alongside this compliance block in `server/.env.example` once the production providers are selected.
 
 ### Platform auth
 
