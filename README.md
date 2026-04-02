@@ -15,6 +15,7 @@ Live mode is not active yet. It will follow the Solana mainnet deployment and th
 Current compliance config:
 
 - Test KYC: `SUMSUB_LEVEL_NAME_KYC_TEST`
+- Test KYB: `SUMSUB_LEVEL_NAME_KYB_TEST`
 - Live KYC: `SUMSUB_LEVEL_NAME_KYC_LIVE`
 - Live KYB: `SUMSUB_LEVEL_NAME_KYB_LIVE`
 
