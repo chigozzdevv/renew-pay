@@ -19,7 +19,7 @@ export function Hero() {
                   className="block text-[clamp(2.55rem,6vw,4.5rem)]"
                 />
                 <span className="block text-[clamp(2.35rem,5.4vw,4.1rem)]">
-                  Settle in USDC.
+                  Settle in stablecoins.
                 </span>
               </h1>
             </Reveal>

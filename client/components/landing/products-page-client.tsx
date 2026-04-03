@@ -32,7 +32,7 @@ const productConfigs: Record<ProductType, ProductConfig> = {
     title: "Recurring billing, made easy.",
     body: "",
     listIntro:
-      "Create plans faster, integrate Renew Checkout into your product, and collect local fiat while settlement lands in USDC.",
+      "Create plans faster, integrate Renew Checkout into your product, and collect local fiat while settlement stays in stablecoins.",
     pageClassName: "bg-[#e8f5e9]",
     headerTone: "hero",
     footerTone: "hero",
@@ -46,8 +46,8 @@ const productConfigs: Record<ProductType, ProductConfig> = {
         body: "Launch hosted checkout from your app with an active plan and customer context.",
       },
       {
-        title: "Collect and settle in USDC",
-        body: "Accept local payments and keep recurring billing tied back to USDC settlement.",
+        title: "Collect and settle",
+        body: "Accept local payments and keep recurring billing tied back to stablecoin settlement.",
       },
     ],
   },
@@ -55,7 +55,7 @@ const productConfigs: Record<ProductType, ProductConfig> = {
     title: "Send invoices, collect faster.",
     body: "",
     listIntro:
-      "Generate hosted invoices, route customers through Renew Checkout, and track collection through to USDC settlement.",
+      "Generate hosted invoices, route customers through Renew Checkout, and track collection through to stablecoin settlement.",
     pageClassName: "bg-[#f7f9fc]",
     headerTone: "default",
     footerTone: "default",
@@ -69,7 +69,7 @@ const productConfigs: Record<ProductType, ProductConfig> = {
         body: "Send customers through a hosted payment flow without rebuilding the collection layer.",
       },
       {
-        title: "Collect and settle in USDC",
+        title: "Collect and settle",
         body: "Track payment status through collection, settlement, and reconciliation.",
       },
     ],

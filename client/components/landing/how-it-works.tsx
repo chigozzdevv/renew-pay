@@ -106,8 +106,8 @@ const flowSteps: FlowStep[] = [
   {
     id: "settle",
     step: "03",
-    title: "Settle in USDC",
-    body: "Successful payments are reconciled and recorded on Solana in USDC.",
+    title: "Settle in stablecoins",
+    body: "Successful payments are reconciled and recorded as stablecoin settlement.",
     accentColor: "#7a5af5",
     inkColor: "#ffffff",
     bodyColor: "rgba(255,255,255,0.65)",
@@ -121,7 +121,7 @@ const flowSteps: FlowStep[] = [
     id: "withdraw",
     step: "04",
     title: "Withdraw to wallet",
-    body: "Move available USDC to your approved payout wallet on your schedule.",
+    body: "Move available stablecoin balance to your approved payout wallet on your schedule.",
     accentColor: "#eef4ff",
     inkColor: "#111111",
     bodyColor: "rgba(17,17,17,0.62)",
@@ -258,7 +258,7 @@ export function HowItWorksSection() {
                 style={{ opacity: introOpacity, y: introY }}
               >
                 <h2 className="text-balance font-display text-4xl leading-[1] tracking-[-0.03em] text-[#111111] sm:text-[3.2rem]">
-                  From local collection to USDC settlement.
+                  From local collection to stablecoin settlement.
                 </h2>
               </motion.div>
             </Reveal>

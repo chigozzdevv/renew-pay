@@ -11,9 +11,9 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Renew | Stablecoin Billing on Solana",
+  title: "Renew | Stablecoin Billing for Fiat-First Markets",
   description:
-    "Renew is a stablecoin billing and settlement platform for modern merchants building on Solana.",
+    "Renew is a stablecoin billing and settlement platform for modern merchants collecting local fiat across fiat-first markets.",
 };
 
 export default function RootLayout({

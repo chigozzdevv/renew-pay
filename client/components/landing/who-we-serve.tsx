@@ -111,13 +111,13 @@ const audiences: Audience[] = [
   },
   {
     title: "Fintech and infrastructure teams",
-    body: "Embed billing, local collection, and Solana settlement into your product with APIs and webhooks.",
+    body: "Embed billing, local collection, and stablecoin settlement into your product with APIs and webhooks.",
     accent: "#b1a1ff",
     art: <FintechTrace />,
   },
   {
     title: "Global merchants",
-    body: "Expand into fiat-first markets while keeping treasury and settlement in USDC.",
+    body: "Expand into fiat-first markets while keeping treasury and settlement in stablecoins.",
     accent: "#ffb387",
     art: <MerchantTrace />,
   },

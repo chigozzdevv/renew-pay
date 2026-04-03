@@ -91,23 +91,23 @@ const features: Feature[] = [
     icon: <BillingStackIcon />,
   },
   {
-    title: "Account abstraction",
-    body: "Smart accounts powered by Solana. No seed phrases, no wallet pop-ups — merchants interact with the protocol through a fully abstracted experience.",
+    title: "Abstracted wallet experience",
+    body: "No seed phrases, no wallet pop-ups. Merchants manage billing, approvals, and payouts through a fully abstracted treasury experience.",
     icon: <AccountAbstractionIcon />,
   },
   {
-    title: "Zero gas fees",
-    body: "Never worry about gas. Renew sponsors all on-chain transactions so merchants and their customers never need to hold SOL.",
+    title: "Abstracted network fees",
+    body: "Renew handles network fees and transaction execution in the background, so merchants and customers never deal with gas.",
     icon: <ZeroGasIcon />,
   },
   {
     title: "Treasury & payouts",
-    body: "Track settlement in USDC on Solana and withdraw available balance to your approved payout wallet.",
+    body: "Track stablecoin settlement and withdraw available balance to your approved payout wallet.",
     icon: <TreasuryIcon />,
   },
   {
     title: "Multisig governance",
-    body: "Squads-based multisig on Solana. Every treasury action requires team approval — no single point of failure for fund movements.",
+    body: "Team-based treasury approvals. Every payout action requires the right sign-off before funds move.",
     icon: <GovernanceIcon />,
   },
   {
