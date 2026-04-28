@@ -57,12 +57,6 @@ export type PlanRecord = {
   supportedMarkets: string[];
   status: string;
   pendingStatus: string | null;
-  onchain: {
-    id: string | null;
-    status: string;
-    operationId: string | null;
-    txHash: string | null;
-  };
 };
 
 export type SubscriptionRecord = {
@@ -81,12 +75,6 @@ export type SubscriptionRecord = {
   nextChargeAt: string;
   lastChargeAt: string | null;
   retryAvailableAt: string | null;
-  onchain: {
-    id: string | null;
-    status: string;
-    operationId: string | null;
-    txHash: string | null;
-  };
 };
 
 export type ChargeRecord = {
@@ -262,71 +250,6 @@ export type AuditRecord = {
   createdAt: string;
 };
 
-export type TreasurySignerRecord = {
-  id: string;
-  merchantId: string;
-  teamMemberId: string;
-  walletAddress: string;
-  status: string;
-  verifiedAt: string | null;
-  lastApprovedAt: string | null;
-};
-
-export type TreasuryOperationRecord = {
-  id: string;
-  merchantId: string;
-  treasuryAccountId: string;
-  settlementId: string | null;
-  kind: string;
-  status: string;
-  governanceMultisigAddress: string;
-  governanceVaultAddress: string;
-  threshold: number;
-  approvedCount: number;
-  canExecute: boolean;
-  targetAddress: string;
-  origin: string;
-  createdBy: string;
-  signatures: Array<{
-    teamMemberId: string;
-    name: string;
-    email: string;
-    role: string;
-    walletAddress: string;
-    signedAt: string;
-  }>;
-  txHash: string | null;
-  rejectedBy: string | null;
-  rejectionReason: string | null;
-  rejectedAt: string | null;
-  executedAt: string | null;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-};
-
-export type TreasuryPayload = {
-  account: {
-    id: string;
-    merchantId: string;
-    custodyModel: string;
-    governanceMultisigAddress: string;
-    governanceVaultAddress: string;
-    payoutWallet: string;
-    reserveWallet: string | null;
-    ownerAddresses: string[];
-    threshold: number;
-    governanceVaultIndex: number;
-    network: string;
-    gasPolicy: string;
-    status: string;
-    pendingPayoutWallet: string | null;
-    payoutWalletChangeReadyAt: string | null;
-    lastSyncedAt: string | null;
-  } | null;
-  signers: TreasurySignerRecord[];
-  operations: TreasuryOperationRecord[];
-};
-
 export type SettingsPayload = {
   id: string;
   merchantId: string;
@@ -352,11 +275,7 @@ export type SettingsPayload = {
   };
   wallets: {
     primaryWallet: string;
-    reserveWallet: string | null;
     walletAlerts: boolean;
-    governanceVaultAddress: string | null;
-    pendingPayoutWallet: string | null;
-    payoutWalletChangeReadyAt: string | null;
   };
   notifications: {
     customerSubscriptionEmails: boolean;
@@ -366,8 +285,6 @@ export type SettingsPayload = {
     merchantPaymentDigestFrequency: "off" | "daily" | "weekly" | "monthly";
     merchantPaymentDigestMode: "counts" | "detailed";
     teamInviteEmails: boolean;
-    governanceAlerts: boolean;
-    treasuryAlerts: boolean;
     verificationAlerts: boolean;
     developerAlerts: boolean;
     securityAlerts: boolean;
@@ -377,13 +294,5 @@ export type SettingsPayload = {
     inviteDomainPolicy: string;
     enforceTwoFactor: boolean;
     restrictInviteDomains: boolean;
-  };
-  treasury: {
-    threshold: number;
-    pendingOperations: Array<{
-      id: string;
-      kind: string;
-      status: string;
-    }>;
   };
 };

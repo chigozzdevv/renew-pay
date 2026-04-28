@@ -11,7 +11,6 @@ export type PrivySessionResponse = {
     name: string;
     email: string;
     onboardingStatus: string;
-    governanceEnabled: boolean;
   };
 };
 

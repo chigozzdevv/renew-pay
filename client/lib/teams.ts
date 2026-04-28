@@ -16,7 +16,6 @@ export type TeamPermission =
   | "subscriptions"
   | "invoices"
   | "payments"
-  | "treasury"
   | "developers"
   | "team_admin";
 

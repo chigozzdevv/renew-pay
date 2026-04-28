@@ -51,7 +51,7 @@ const ZeroGasIcon = () => (
   </svg>
 );
 
-const TreasuryIcon = () => (
+const SettlementIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
     <rect x="3" y="9" width="18" height="11" rx="3" stroke="currentColor" strokeWidth="1.7" />
     <path d="M6 9V7.5C6 5.84 7.34 4.5 9 4.5H15C16.66 4.5 18 5.84 18 7.5V9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -60,15 +60,6 @@ const TreasuryIcon = () => (
     <rect x="15" y="12.5" width="4" height="3" rx="1" fill="currentColor" opacity="0.2" />
     <path d="M10 4.5V2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.25" />
     <path d="M14 4.5V3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.25" />
-  </svg>
-);
-
-const GovernanceIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-    <path d="M12 3L20 7V12C20 16.4 16.5 20.2 12 21C7.5 20.2 4 16.4 4 12V7L12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-    <path d="M12 3L20 7V12C20 16.4 16.5 20.2 12 21C7.5 20.2 4 16.4 4 12V7L12 3Z" fill="currentColor" opacity="0.06" />
-    <path d="M9 12L11 14L15 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="12" cy="7" r="1" fill="currentColor" opacity="0.25" />
   </svg>
 );
 
@@ -92,7 +83,7 @@ const features: Feature[] = [
   },
   {
     title: "Abstracted wallet experience",
-    body: "No seed phrases, no wallet pop-ups. Merchants manage billing, approvals, and payouts through a fully abstracted treasury experience.",
+    body: "No seed phrases, no wallet pop-ups. Merchants manage billing and payouts through a fully abstracted payment experience.",
     icon: <AccountAbstractionIcon />,
   },
   {
@@ -101,14 +92,9 @@ const features: Feature[] = [
     icon: <ZeroGasIcon />,
   },
   {
-    title: "Treasury & payouts",
+    title: "Stable settlement",
     body: "Track stablecoin settlement and withdraw available balance to your approved payout wallet.",
-    icon: <TreasuryIcon />,
-  },
-  {
-    title: "Multisig governance",
-    body: "Team-based treasury approvals. Every payout action requires the right sign-off before funds move.",
-    icon: <GovernanceIcon />,
+    icon: <SettlementIcon />,
   },
   {
     title: "Developer-first",

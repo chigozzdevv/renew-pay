@@ -40,7 +40,6 @@ function toAuthenticatedUser(
     authProvider?: string | null;
     operatorWalletAddress?: string | null;
     onboardingStatus?: string | null;
-    governanceEnabled?: boolean | null;
   }
 ) {
   const displayName = document.name?.trim() ? document.name.trim() : document.email;
@@ -59,7 +58,6 @@ function toAuthenticatedUser(
     authProvider: merchant?.authProvider ?? "privy",
     operatorWalletAddress: merchant?.operatorWalletAddress ?? null,
     onboardingStatus: merchant?.onboardingStatus ?? "business",
-    governanceEnabled: true,
   };
 }
 
@@ -242,7 +240,6 @@ async function resolveMerchantSessionMeta(merchantId: string) {
       authProvider: 1,
       operatorWalletAddress: 1,
       onboardingStatus: 1,
-      governanceEnabled: 1,
     })
     .lean()
     .exec();
@@ -317,7 +314,6 @@ export async function signupWithPassword(input: SignupInput) {
   const merchant = await MerchantModel.create({
     merchantAccount,
     payoutWallet,
-    reserveWallet: null,
     name: input.company,
     supportEmail: input.email,
     billingTimezone: input.billingTimezone,
@@ -328,7 +324,6 @@ export async function signupWithPassword(input: SignupInput) {
     authProviderUserId: null,
     operatorWalletAddress: null,
     onboardingStatus: "business",
-    governanceEnabled: true,
   });
 
   try {
@@ -612,7 +607,6 @@ export async function exchangePrivySession(input: PrivySessionInput) {
               normalizeSolanaAddress(input.operatorWalletAddress) ??
               `merchant:${randomBytes(16).toString("hex")}`,
             payoutWallet: createUnconfiguredAddress(),
-            reserveWallet: null,
             name: null,
             metadataHash: "0x0",
             status: "active",
@@ -621,7 +615,6 @@ export async function exchangePrivySession(input: PrivySessionInput) {
             operatorWalletAddress:
               normalizeSolanaAddress(input.operatorWalletAddress),
             onboardingStatus: "business",
-            governanceEnabled: true,
           });
           createdMerchant = true;
         }

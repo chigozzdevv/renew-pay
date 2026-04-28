@@ -9,7 +9,6 @@ export type AuditCategory =
   | "security"
   | "developer"
   | "payments"
-  | "treasury"
   | "protocol";
 
 export type AuditStatus = "ok" | "warning" | "error";

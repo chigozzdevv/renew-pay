@@ -19,10 +19,7 @@ export function DashboardSidebar({
   mobile = false,
   onNavigate,
 }: DashboardSidebarProps) {
-  const { signOut, user } = useDashboardSession();
-  const navItems = dashboardNav.filter(
-    (item) => item.key !== "governance" || user?.governanceEnabled
-  );
+  const { signOut } = useDashboardSession();
 
   return (
     <div
@@ -44,7 +41,7 @@ export function DashboardSidebar({
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
         <div className="space-y-1 pb-4">
-          {navItems.map((item) => {
+          {dashboardNav.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -156,14 +153,6 @@ function SidebarIcon({ icon, className }: SidebarIconProps) {
           <rect x="3" y="5" width="14" height="10" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
           <path d="M3 8.5H17" stroke="currentColor" strokeWidth="1.7" />
           <path d="M6.5 12.3H9.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        </svg>
-      );
-    case "vault":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
-          <rect x="4" y="4" width="12" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
-          <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M10 7.2V5.8M12.8 10H14.2M10 14.2V12.8M7.2 10H5.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       );
     case "team":

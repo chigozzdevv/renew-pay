@@ -105,7 +105,7 @@ const audiences: Audience[] = [
   },
   {
     title: "Platforms and marketplaces",
-    body: "Collect local fiat from customers and manage settlement, treasury, and payouts from one system.",
+    body: "Collect local fiat from customers and manage settlement and payouts from one system.",
     accent: "#82d1ff",
     art: <PlatformTrace />,
   },
@@ -117,7 +117,7 @@ const audiences: Audience[] = [
   },
   {
     title: "Global merchants",
-    body: "Expand into fiat-first markets while keeping treasury and settlement in stablecoins.",
+    body: "Expand into fiat-first markets while keeping settlement in stablecoins.",
     accent: "#ffb387",
     art: <MerchantTrace />,
   },

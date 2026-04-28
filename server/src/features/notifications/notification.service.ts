@@ -23,8 +23,6 @@ import { PlanModel } from "@/features/plans/plan.model";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
 import { TeamMemberModel } from "@/features/teams/team.model";
-import { TreasuryOperationModel } from "@/features/treasury/treasury-operation.model";
-import { PayoutBatchModel } from "@/features/treasury/payout-batch.model";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
@@ -433,7 +431,7 @@ async function loadMerchantBranding(merchantId: string) {
 
 async function resolveMerchantRecipients(input: {
   merchantId: string;
-  group: "billing" | "treasury" | "verification" | "team" | "developer" | "security";
+  group: "billing" | "verification" | "team" | "developer" | "security";
 }) {
   const members = await TeamMemberModel.find({
     merchantId: input.merchantId,
@@ -453,12 +451,6 @@ async function resolveMerchantRecipients(input: {
           permissions.has("invoices") ||
           permissions.has("payments") ||
           permissions.has("subscriptions") ||
-          permissions.has("team_admin")
-        );
-      case "treasury":
-        return (
-          ["owner", "admin", "finance"].includes(member.role) ||
-          permissions.has("treasury") ||
           permissions.has("team_admin")
         );
       case "verification":
@@ -1353,222 +1345,6 @@ export async function queueVerificationNotification(input: {
         "verification",
         input.subjectType,
         input.status,
-        recipient.email,
-        String(Date.now()),
-      ]),
-    });
-    await queueNotificationRecord(notification._id.toString());
-    notifications.push(notification);
-  }
-
-  return notifications;
-}
-
-export async function queueTreasuryApprovalNeededNotification(input: {
-  merchantId: string;
-  environment: RuntimeMode;
-  operationId: string;
-}) {
-  const [setting, operation] = await Promise.all([
-    getOrCreateMerchantSetting(input.merchantId),
-    TreasuryOperationModel.findById(input.operationId).exec(),
-  ]);
-
-  if (!setting.notifications.governanceAlerts || !operation) {
-    return [];
-  }
-
-  const recipients = await resolveMerchantRecipients({
-    merchantId: input.merchantId,
-    group: "treasury",
-  });
-  const notifications = [];
-
-  for (const recipient of recipients) {
-    const notification = await createNotificationRecord({
-      merchantId: input.merchantId,
-      environment: input.environment,
-      templateKey: "merchant.treasury.approval_needed",
-      audience: "merchant",
-      category: "treasury",
-      recipient,
-      payload: {
-        operationLabel: operation.kind.replace(/_/g, " "),
-        approvedCount: String(operation.signatures.length),
-        threshold: String(operation.threshold),
-        dashboardUrl: getDashboardUrl("/dashboard/governance"),
-      },
-      metadata: {
-        operationId: operation._id.toString(),
-        kind: operation.kind,
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "treasury-approval-needed",
-        operation._id.toString(),
-        recipient.email,
-      ]),
-    });
-    await queueNotificationRecord(notification._id.toString());
-    notifications.push(notification);
-  }
-
-  return notifications;
-}
-
-export async function queueTreasuryOperationStatusNotification(input: {
-  merchantId: string;
-  environment: RuntimeMode;
-  operationId: string;
-  status: "approved" | "rejected" | "executed";
-  reason?: string | null;
-}) {
-  const [setting, operation] = await Promise.all([
-    getOrCreateMerchantSetting(input.merchantId),
-    TreasuryOperationModel.findById(input.operationId).exec(),
-  ]);
-
-  if (!setting.notifications.treasuryAlerts || !operation) {
-    return [];
-  }
-
-  const templateKey =
-    input.status === "approved"
-      ? "merchant.treasury.operation_approved"
-      : input.status === "rejected"
-        ? "merchant.treasury.operation_rejected"
-        : "merchant.treasury.operation_executed";
-  const recipients = await resolveMerchantRecipients({
-    merchantId: input.merchantId,
-    group: "treasury",
-  });
-  const notifications = [];
-
-  for (const recipient of recipients) {
-    const notification = await createNotificationRecord({
-      merchantId: input.merchantId,
-      environment: input.environment,
-      templateKey,
-      audience: "merchant",
-      category: "treasury",
-      recipient,
-      payload: {
-        operationLabel: operation.kind.replace(/_/g, " "),
-        threshold: String(operation.threshold),
-        reason: input.reason,
-        txHash: operation.txHash,
-        dashboardUrl: getDashboardUrl("/dashboard/governance"),
-      },
-      metadata: {
-        operationId: operation._id.toString(),
-        kind: operation.kind,
-        status: input.status,
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "treasury-status",
-        input.status,
-        operation._id.toString(),
-        recipient.email,
-      ]),
-    });
-    await queueNotificationRecord(notification._id.toString());
-    notifications.push(notification);
-  }
-
-  return notifications;
-}
-
-export async function queuePayoutBatchNotification(input: {
-  merchantId: string;
-  environment: RuntimeMode;
-  batchId: string;
-  templateKey:
-    | "merchant.treasury.payout_batch_opened"
-    | "merchant.treasury.payout_completed";
-}) {
-  const [setting, batch] = await Promise.all([
-    getOrCreateMerchantSetting(input.merchantId),
-    PayoutBatchModel.findById(input.batchId).exec(),
-  ]);
-
-  if (!setting.notifications.treasuryAlerts || !batch) {
-    return [];
-  }
-
-  const recipients = await resolveMerchantRecipients({
-    merchantId: input.merchantId,
-    group: "treasury",
-  });
-  const notifications = [];
-
-  for (const recipient of recipients) {
-    const notification = await createNotificationRecord({
-      merchantId: input.merchantId,
-      environment: input.environment,
-      templateKey: input.templateKey,
-      audience: "merchant",
-      category: "treasury",
-      recipient,
-      payload: {
-        batchId: batch._id.toString(),
-        netUsdc: `USDC ${batch.netUsdc.toLocaleString()}`,
-        settlementCount: String(batch.settlementIds.length),
-        txHash: batch.txHash,
-        dashboardUrl: getDashboardUrl("/dashboard/treasury"),
-      },
-      metadata: {
-        batchId: batch._id.toString(),
-        status: batch.status,
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "payout-batch",
-        input.templateKey,
-        batch._id.toString(),
-        recipient.email,
-      ]),
-    });
-    await queueNotificationRecord(notification._id.toString());
-    notifications.push(notification);
-  }
-
-  return notifications;
-}
-
-export async function queueGovernanceToggleNotification(input: {
-  merchantId: string;
-  environment: RuntimeMode;
-  enabled: boolean;
-}) {
-  const setting = await getOrCreateMerchantSetting(input.merchantId);
-
-  if (!setting.notifications.governanceAlerts) {
-    return [];
-  }
-
-  const recipients = await resolveMerchantRecipients({
-    merchantId: input.merchantId,
-    group: "treasury",
-  });
-  const notifications = [];
-
-  for (const recipient of recipients) {
-    const notification = await createNotificationRecord({
-      merchantId: input.merchantId,
-      environment: input.environment,
-      templateKey: input.enabled
-        ? "merchant.governance.enabled"
-        : "merchant.governance.disabled",
-      audience: "merchant",
-      category: "treasury",
-      recipient,
-      payload: {
-        dashboardUrl: getDashboardUrl("/dashboard/governance"),
-      },
-      metadata: {
-        enabled: input.enabled,
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "governance-toggle",
-        input.enabled ? "enabled" : "disabled",
         recipient.email,
         String(Date.now()),
       ]),

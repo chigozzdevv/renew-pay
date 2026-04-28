@@ -5,30 +5,11 @@ import { useEffect, useRef, useState } from "react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
-import { useResource } from "@/components/dashboard/use-resource";
-import { loadWorkspaceSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 type DashboardTopbarProps = {
   onOpenSidebar: () => void;
 };
-
-const operationLabels: Record<string, string> = {
-  payout_wallet_change_request: "Primary wallet change",
-  payout_wallet_change_confirm: "Primary wallet confirmation",
-  payout_batch_withdraw: "Payout batch withdrawal",
-  reserve_wallet_update: "Reserve wallet update",
-  reserve_wallet_clear: "Reserve wallet removal",
-  reserve_wallet_promote: "Reserve wallet promotion",
-  governance_threshold_change: "Governance threshold change",
-  governance_owner_add: "Governance approver added",
-  governance_owner_remove: "Governance approver removed",
-  settlement_sweep: "Settlement sweep",
-};
-
-function formatOpLabel(kind: string) {
-  return operationLabels[kind] ?? kind.replace(/_/g, " ");
-}
 
 export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   const { mode, isUpdating, setMode } = useWorkspaceMode();
@@ -37,26 +18,6 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
-
-  const { data: settingsData, reload: reloadSettings } = useResource(
-    ({ token, merchantId }) =>
-      loadWorkspaceSettings({ token, merchantId, environment: mode }),
-    [mode]
-  );
-
-  useEffect(() => {
-    const handleSettingsUpdate = () => {
-      void reloadSettings();
-    };
-
-    window.addEventListener("treasury-updated", handleSettingsUpdate);
-    return () => window.removeEventListener("treasury-updated", handleSettingsUpdate);
-  }, [reloadSettings]);
-
-  const pendingOps = (settingsData?.treasury.pendingOperations ?? []).filter(
-    (op) => op.status === "pending_signatures" || op.status === "approved"
-  );
-  const pendingCount = pendingOps.length;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -160,68 +121,22 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                 />
               </svg>
 
-              {pendingCount > 0 ? (
-                <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#922f25] px-1 text-[10px] font-bold leading-none text-white">
-                  {pendingCount > 9 ? "9+" : pendingCount}
-                </span>
-              ) : null}
             </button>
 
             {notifOpen ? (
               <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
                 <div className="border-b border-[color:var(--line)] px-5 py-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                    Protected approvals
+                    Notifications
                   </p>
                   <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                    {pendingCount > 0
-                      ? `${pendingCount} operation${pendingCount === 1 ? "" : "s"} need${pendingCount === 1 ? "s" : ""} signing`
-                      : "No pending approvals"}
+                    No pending notifications
                   </p>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto">
-                  {pendingOps.length > 0 ? (
-                    pendingOps.map((op) => (
-                      <div
-                        key={op.id}
-                        className="flex items-center justify-between gap-3 border-b border-[color:var(--line)] px-5 py-3 last:border-b-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                            {formatOpLabel(op.kind)}
-                          </p>
-                          <p className="mt-0.5 text-xs uppercase tracking-[0.12em] text-[color:var(--muted)]">
-                            {op.status.replace(/_/g, " ")}
-                          </p>
-                        </div>
-                        <Link
-                          href={user?.governanceEnabled ? "/dashboard/governance" : "/dashboard/treasury"}
-                          onClick={() => setNotifOpen(false)}
-                          className="shrink-0 rounded-xl border border-[color:var(--line)] bg-[#f2f1eb] px-3 py-1.5 text-xs font-semibold tracking-[-0.01em] text-[color:var(--ink)] transition-colors hover:bg-[#ebe9e1]"
-                        >
-                          Review
-                        </Link>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="px-5 py-6 text-center text-sm text-[color:var(--muted)]">
-                      All protected operations are up to date.
-                    </div>
-                  )}
+                <div className="px-5 py-6 text-center text-sm text-[color:var(--muted)]">
+                  Payment, invoice, and verification alerts will appear here.
                 </div>
-
-                {pendingOps.length > 0 ? (
-                  <div className="border-t border-[color:var(--line)] px-5 py-3">
-                    <Link
-                      href={user?.governanceEnabled ? "/dashboard/governance" : "/dashboard/treasury"}
-                      onClick={() => setNotifOpen(false)}
-                      className="block text-center text-xs font-semibold tracking-[-0.01em] text-[color:var(--brand)] hover:underline"
-                    >
-                      View all approvals →
-                    </Link>
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </div>

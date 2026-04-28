@@ -12,11 +12,6 @@ import { appendAuditLog } from "@/features/audit/audit.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueTeamInviteNotification } from "@/features/notifications/notification.service";
 import { TeamMemberModel } from "@/features/teams/team.model";
-import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
-import {
-  assertTeamMemberCanLeaveOwnerRole,
-  syncOwnerTreasuryGovernance,
-} from "@/features/treasury/treasury.service";
 import type {
   CreateTeamMemberInput,
   ListTeamMembersQuery,
@@ -84,6 +79,22 @@ async function ensureTeamMember(teamMemberId: string, merchantId: string) {
   }
 
   return teamMember;
+}
+
+async function assertTeamMemberCanLeaveOwnerRole(input: {
+  merchantId: string;
+  teamMemberId: string;
+}) {
+  const activeOwnerCount = await TeamMemberModel.countDocuments({
+    merchantId: input.merchantId,
+    role: "owner",
+    status: "active",
+    _id: { $ne: input.teamMemberId },
+  }).exec();
+
+  if (activeOwnerCount === 0) {
+    throw new HttpError(409, "At least one active owner must remain on the workspace.");
+  }
 }
 
 export async function createTeamMember(input: CreateTeamMemberInput) {
@@ -227,7 +238,7 @@ export async function updateTeamMember(
   teamMemberId: string,
   merchantId: string,
   input: UpdateTeamMemberInput,
-  requesterTeamMemberId: string | null
+  _requesterTeamMemberId: string | null
 ) {
   const merchant = await ensureMerchant(merchantId);
   const member = await ensureTeamMember(teamMemberId, merchantId);
@@ -235,9 +246,6 @@ export async function updateTeamMember(
   const previousStatus = member.status;
   const nextRole = input.role ?? member.role;
   const nextStatus = input.status ?? member.status;
-  const becameActiveOwner =
-    previousRole !== "owner" && nextRole === "owner" && nextStatus === "active";
-
   if (
     previousRole === "owner" &&
     (nextRole !== "owner" || nextStatus !== "active")
@@ -246,24 +254,6 @@ export async function updateTeamMember(
       merchantId,
       teamMemberId,
     });
-  }
-
-  if (becameActiveOwner) {
-    const signerBinding = await TreasurySignerModel.findOne({
-      merchantId,
-      teamMemberId,
-      status: "active",
-    })
-      .select({ _id: 1 })
-      .lean()
-      .exec();
-
-    if (!signerBinding) {
-      throw new HttpError(
-        409,
-        "This team member must verify their Privy Solana wallet as a treasury signer before becoming an owner."
-      );
-    }
   }
 
   if (input.name !== undefined) {
@@ -312,20 +302,6 @@ export async function updateTeamMember(
   }
 
   await member.save();
-
-  if (becameActiveOwner) {
-    if (!requesterTeamMemberId) {
-      throw new HttpError(401, "Authenticated team member is required.");
-    }
-
-    await syncOwnerTreasuryGovernance({
-      merchantId,
-      teamMemberId: member._id.toString(),
-      requesterTeamMemberId,
-      actor: input.actor,
-      requireVerifiedSigner: true,
-    });
-  }
 
   await appendAuditLog({
     merchantId,

@@ -34,7 +34,6 @@ export type AuthenticatedDashboardUser = {
   authProvider: string;
   operatorWalletAddress: string | null;
   onboardingStatus: string;
-  governanceEnabled: boolean;
 };
 
 type DashboardSessionContextValue = {

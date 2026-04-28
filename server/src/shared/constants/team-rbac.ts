@@ -15,7 +15,6 @@ export const teamPermissions = [
   "subscriptions",
   "invoices",
   "payments",
-  "treasury",
   "developers",
   "team_admin",
 ] as const;
@@ -30,7 +29,6 @@ const rolePermissionMap: Record<TeamRole, TeamPermission[]> = {
     "subscriptions",
     "invoices",
     "payments",
-    "treasury",
     "developers",
     "team_admin",
   ],
@@ -40,12 +38,11 @@ const rolePermissionMap: Record<TeamRole, TeamPermission[]> = {
     "subscriptions",
     "invoices",
     "payments",
-    "treasury",
     "developers",
     "team_admin",
   ],
   operations: ["customers", "plans", "subscriptions", "invoices"],
-  finance: ["invoices", "payments", "treasury"],
+  finance: ["invoices", "payments"],
   developer: ["developers"],
   support: ["customers", "subscriptions"],
 };
@@ -71,19 +68,14 @@ export function describeAccessFromPermissions(permissions: TeamPermission[]) {
     normalized.has("subscriptions") &&
     normalized.has("invoices") &&
     normalized.has("payments") &&
-    normalized.has("treasury") &&
     normalized.has("developers") &&
     normalized.has("team_admin")
   ) {
     return "Full workspace";
   }
 
-  if (normalized.has("invoices") && normalized.has("payments") && normalized.has("treasury")) {
-    return "Invoicing + treasury";
-  }
-
-  if (normalized.has("payments") && normalized.has("treasury")) {
-    return "Payments + treasury";
+  if (normalized.has("invoices") && normalized.has("payments")) {
+    return "Invoicing + payments";
   }
 
   if (normalized.has("customers") && normalized.has("subscriptions")) {

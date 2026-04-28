@@ -53,8 +53,8 @@ export default function AuditPage() {
   const metrics = useMemo(() => {
     const warning = items.filter((item) => item.status === "warning").length;
     const errorCount = items.filter((item) => item.status === "error").length;
-    const treasury = items.filter((item) => item.category === "treasury").length;
-    return { total: pagination.total, warning, error: errorCount, treasury };
+    const payments = items.filter((item) => item.category === "payments").length;
+    return { total: pagination.total, warning, error: errorCount, payments };
   }, [items, pagination.total]);
 
   if (isLoading && !data) {
@@ -78,7 +78,7 @@ export default function AuditPage() {
         <MetricCard label="Audit events" value={String(metrics.total)} note="Matched records" />
         <MetricCard label="Warnings" value={String(metrics.warning)} note="Current page" />
         <MetricCard label="Errors" value={String(metrics.error)} note="Current page" />
-        <MetricCard label="Treasury" value={String(metrics.treasury)} note="Treasury-linked events" />
+        <MetricCard label="Payments" value={String(metrics.payments)} note="Current page" />
       </StatGrid>
 
       <Card title="Audit">
@@ -92,7 +92,6 @@ export default function AuditPage() {
               <option value="security">Security</option>
               <option value="developer">Developer</option>
               <option value="payments">Payments</option>
-              <option value="treasury">Treasury</option>
               <option value="protocol">Protocol</option>
             </Select>
             <Select value={status} onChange={(e) => { setStatus(e.target.value as AuditStatus | "all"); setPage(1); }}>

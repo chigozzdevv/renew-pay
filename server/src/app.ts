@@ -22,8 +22,6 @@ import { settlementRouter } from "@/features/settlements/settlement.routes";
 import { settingRouter } from "@/features/settings/setting.routes";
 import { subscriptionRouter } from "@/features/subscriptions/subscription.routes";
 import { teamRouter } from "@/features/teams/team.routes";
-import { treasuryRouter } from "@/features/treasury/treasury.routes";
-import { governanceRouter } from "@/features/governance/governance.routes";
 import { errorHandler, notFoundHandler } from "@/shared/middleware/error-handler";
 import { blockLiveModeUntilLaunch } from "@/shared/middleware/live-mode-launch-gate";
 import {
@@ -77,7 +75,6 @@ export function createApp() {
     app.use(`${apiBasePath}/protocol`, protocolRouter);
     app.use(`${apiBasePath}/auth`, authRouter);
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
-    app.use(`${apiBasePath}/governance`, governanceRouter);
     app.use(`${apiBasePath}/checkout`, checkoutRouter);
     app.use(`${apiBasePath}/invoices/public`, publicInvoiceRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
@@ -102,7 +99,6 @@ export function createApp() {
         "subscriptions",
         "invoices",
         "payments",
-        "treasury",
         "developers",
         "team_admin",
       ]),
@@ -147,7 +143,7 @@ export function createApp() {
     app.use(
       `${apiBasePath}/settlements`,
       requirePlatformAuth,
-      requirePlatformPermissions(["treasury", "team_admin"]),
+      requirePlatformPermissions(["payments", "team_admin"]),
       blockLiveModeUntilLaunch(),
       settlementRouter
     );
@@ -159,13 +155,6 @@ export function createApp() {
       developerRouter
     );
     app.use(
-      `${apiBasePath}/treasury`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["treasury", "team_admin"]),
-      blockLiveModeUntilLaunch(),
-      treasuryRouter
-    );
-    app.use(
       `${apiBasePath}/teams`,
       requirePlatformAuth,
       requirePlatformPermissions(["team_admin"]),
@@ -174,7 +163,7 @@ export function createApp() {
     app.use(
       `${apiBasePath}/settings`,
       requirePlatformAuth,
-      requirePlatformPermissions(["team_admin", "treasury"]),
+      requirePlatformPermissions(["team_admin"]),
       blockLiveModeUntilLaunch(),
       settingRouter
     );

@@ -12,8 +12,6 @@ export const dashboardNav: DashboardNavItem[] = [
   },
   { key: "invoices", label: "Invoices", href: "/dashboard/invoices", icon: "receipt" },
   { key: "payments", label: "Payments", href: "/dashboard/payments", icon: "card" },
-  { key: "treasury", label: "Treasury", href: "/dashboard/treasury", icon: "vault" },
-  { key: "governance", label: "Governance", href: "/dashboard/governance", icon: "shield" },
   { key: "teams", label: "Teams", href: "/dashboard/teams", icon: "team" },
   { key: "developers", label: "Developers", href: "/dashboard/developers", icon: "code" },
   { key: "audit", label: "Audit", href: "/dashboard/audit", icon: "shield" },

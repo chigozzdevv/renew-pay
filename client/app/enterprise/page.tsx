@@ -13,12 +13,12 @@ const enterpriseOffers = [
     body: "Get commercial terms aligned to sustained billing volume.",
   },
   {
-    title: "Provider choice by market",
-    body: "Pick the payment providers you want for each country, corridor, or product.",
+    title: "Market expansion planning",
+    body: "Prioritize the countries, corridors, and products that matter most to your billing team.",
   },
   {
-    title: "Flexible treasury controls",
-    body: "Set settlement timing, payout rules, and approvals to match internal operations.",
+    title: "Flexible settlement controls",
+    body: "Set settlement timing and payout rules to match internal operations.",
   },
   {
     title: "Dedicated rollout support",
@@ -26,14 +26,14 @@ const enterpriseOffers = [
   },
   {
     title: "Performance visibility",
-    body: "Monitor provider quality, billing exceptions, and operational risk more closely.",
+    body: "Monitor billing exceptions, settlement timing, and operational risk more closely.",
   },
 ] as const;
 
 export const metadata: Metadata = {
   title: "Renew Enterprise | High-Volume Billing Infrastructure",
   description:
-    "Renew Enterprise is built for high-volume billing teams that need custom fees, provider choice, and tighter treasury controls.",
+    "Renew Enterprise is built for high-volume billing teams that need custom fees, market expansion support, and tighter settlement controls.",
 };
 
 export default function EnterprisePage() {

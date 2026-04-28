@@ -15,20 +15,12 @@ export const notificationTemplateKeys = [
   "merchant.subscription.created",
   "merchant.billing.payment_digest",
   "merchant.billing.payment_failed",
-  "merchant.treasury.approval_needed",
-  "merchant.treasury.operation_approved",
-  "merchant.treasury.operation_rejected",
-  "merchant.treasury.operation_executed",
-  "merchant.treasury.payout_batch_opened",
-  "merchant.treasury.payout_completed",
   "merchant.verification.owner_needs_action",
   "merchant.verification.owner_approved",
   "merchant.verification.owner_rejected",
   "merchant.verification.merchant_needs_action",
   "merchant.verification.merchant_approved",
   "merchant.verification.merchant_rejected",
-  "merchant.governance.enabled",
-  "merchant.governance.disabled",
   "team.invite.sent",
   "team.invite.resent",
 ] as const;
@@ -114,36 +106,6 @@ export const notificationTemplateCatalog: Record<
     description: "Sent internally when a subscription charge fails.",
     audience: "merchant",
   },
-  "merchant.treasury.approval_needed": {
-    label: "Treasury approval needed",
-    description: "Sent when a treasury operation needs signatures.",
-    audience: "merchant",
-  },
-  "merchant.treasury.operation_approved": {
-    label: "Treasury operation approved",
-    description: "Sent when the signature threshold is reached.",
-    audience: "merchant",
-  },
-  "merchant.treasury.operation_rejected": {
-    label: "Treasury operation rejected",
-    description: "Sent when an operation is rejected.",
-    audience: "merchant",
-  },
-  "merchant.treasury.operation_executed": {
-    label: "Treasury operation executed",
-    description: "Sent after a treasury action is executed.",
-    audience: "merchant",
-  },
-  "merchant.treasury.payout_batch_opened": {
-    label: "Payout batch opened",
-    description: "Sent when a payout batch is opened for review or signing.",
-    audience: "merchant",
-  },
-  "merchant.treasury.payout_completed": {
-    label: "Payout completed",
-    description: "Sent after a payout batch is successfully withdrawn.",
-    audience: "merchant",
-  },
   "merchant.verification.owner_needs_action": {
     label: "Owner KYC needs action",
     description: "Sent when owner verification requires more information.",
@@ -172,16 +134,6 @@ export const notificationTemplateCatalog: Record<
   "merchant.verification.merchant_rejected": {
     label: "Merchant KYB rejected",
     description: "Sent when business verification is rejected.",
-    audience: "merchant",
-  },
-  "merchant.governance.enabled": {
-    label: "Governance enabled",
-    description: "Sent when workspace governance is enabled.",
-    audience: "merchant",
-  },
-  "merchant.governance.disabled": {
-    label: "Governance disabled",
-    description: "Sent when workspace governance is disabled.",
     audience: "merchant",
   },
   "team.invite.sent": {
@@ -291,7 +243,6 @@ function buildTemplateDocument(input: {
   const invoiceNumber = normalizeValue(payload.invoiceNumber, "RNL-20260328-A1B2C3");
   const amount = normalizeValue(payload.amount, "NGN 120,000");
   const customerName = normalizeValue(payload.customerName, "Amina Yusuf");
-  const operationLabel = normalizeValue(payload.operationLabel, "Treasury payout");
   const recipientName = normalizeOptionalValue(payload.recipientName);
   const supportUrl =
     normalizeOptionalValue(payload.supportUrl) ??
@@ -306,12 +257,7 @@ function buildTemplateDocument(input: {
   const paidAt = toDateLabel(payload.paidAt, "today");
   const periodLabel = normalizeValue(payload.periodLabel, "Daily");
   const digestMode = normalizeValue(payload.digestMode, "counts");
-  const batchId = normalizeValue(payload.batchId, "PB-24A7F1");
   const receiptRef = normalizeValue(payload.receiptRef, "RCT-20381");
-  const threshold = normalizeValue(payload.threshold, "2");
-  const approvedCount = normalizeValue(payload.approvedCount, "1");
-  const txHash = normalizeValue(payload.txHash, "5Yg8...eM7t");
-  const reason = normalizeValue(payload.reason, "Review required before execution.");
   const role = normalizeValue(payload.role, "admin");
   const teamName = normalizeValue(payload.teamName, "Ifeoma Okafor");
   const statusLabel = normalizeValue(payload.statusLabel, "approved");
@@ -757,160 +703,6 @@ function buildTemplateDocument(input: {
           },
         ],
       } satisfies NotificationTemplateDocument;
-    case "merchant.treasury.approval_needed":
-      return {
-        subject: `Approval needed: ${operationLabel}`,
-        eyebrow: "Treasury approval",
-        heading: `${operationLabel} needs signatures.`,
-        body: [
-          `A protected treasury action is waiting for approval in ${merchantName}.`,
-          `${approvedCount} of ${threshold} required approvals have been received so far.`,
-        ],
-        cta: {
-          label: "Open governance",
-          url: dashboardUrl,
-        },
-        summary: [
-          ...summaryCommon,
-          {
-            label: "Operation",
-            value: operationLabel,
-          },
-          {
-            label: "Approvals",
-            value: `${approvedCount} / ${threshold}`,
-          },
-        ],
-      } satisfies NotificationTemplateDocument;
-    case "merchant.treasury.operation_approved":
-      return {
-        subject: `Operation approved: ${operationLabel}`,
-        eyebrow: "Treasury update",
-        heading: `${operationLabel} is ready to execute.`,
-        body: [
-          `The required signature threshold has been reached for ${operationLabel}.`,
-          "You can move forward with execution when operations are ready.",
-        ],
-        cta: {
-          label: "Review operation",
-          url: dashboardUrl,
-        },
-        summary: [
-          ...summaryCommon,
-          {
-            label: "Operation",
-            value: operationLabel,
-          },
-          {
-            label: "Threshold",
-            value: `${threshold} approvals reached`,
-          },
-        ],
-      } satisfies NotificationTemplateDocument;
-    case "merchant.treasury.operation_rejected":
-      return {
-        subject: `Operation rejected: ${operationLabel}`,
-        eyebrow: "Treasury update",
-        heading: `${operationLabel} was rejected.`,
-        body: [
-          "The operation has been rejected and will not proceed in its current form.",
-          `Reason: ${reason}`,
-        ],
-        cta: {
-          label: "Open governance",
-          url: dashboardUrl,
-        },
-        summary: [
-          ...summaryCommon,
-          {
-            label: "Operation",
-            value: operationLabel,
-          },
-          {
-            label: "Reason",
-            value: reason,
-          },
-        ],
-      } satisfies NotificationTemplateDocument;
-    case "merchant.treasury.operation_executed":
-      return {
-        subject: `Operation executed: ${operationLabel}`,
-        eyebrow: "Treasury update",
-        heading: `${operationLabel} was executed.`,
-        body: [
-          `The protected action completed successfully for ${merchantName}.`,
-          `Transaction reference: ${txHash}`,
-        ],
-        cta: {
-          label: "Open governance",
-          url: dashboardUrl,
-        },
-        summary: [
-          ...summaryCommon,
-          {
-            label: "Operation",
-            value: operationLabel,
-          },
-          {
-            label: "Transaction",
-            value: txHash,
-          },
-        ],
-      } satisfies NotificationTemplateDocument;
-    case "merchant.treasury.payout_batch_opened":
-      return {
-        subject: `Payout batch opened: ${batchId}`,
-        eyebrow: "Treasury payout",
-        heading: `Batch ${batchId} is ready for review.`,
-        body: [
-          "A payout batch was opened and is now waiting for review, approval, or execution.",
-          "Use the treasury workspace to confirm the final payout path and timing.",
-        ],
-        cta: {
-          label: "Open treasury",
-          url: dashboardUrl,
-        },
-        summary: [
-          ...summaryCommon,
-          {
-            label: "Batch",
-            value: batchId,
-          },
-          {
-            label: "Net payout",
-            value: normalizeValue(payload.netUsdc, "USDC 6,280.41"),
-          },
-          {
-            label: "Settlements",
-            value: normalizeValue(payload.settlementCount, "12"),
-          },
-        ],
-      } satisfies NotificationTemplateDocument;
-    case "merchant.treasury.payout_completed":
-      return {
-        subject: `Payout completed: ${batchId}`,
-        eyebrow: "Treasury payout",
-        heading: `Batch ${batchId} was completed.`,
-        body: [
-          `The payout batch completed successfully. Transaction reference: ${txHash}.`,
-          "Treasury balances and settlement history are now updated in Renew.",
-        ],
-        cta: {
-          label: "Open treasury",
-          url: dashboardUrl,
-        },
-        summary: [
-          ...summaryCommon,
-          {
-            label: "Batch",
-            value: batchId,
-          },
-          {
-            label: "Transaction",
-            value: txHash,
-          },
-        ],
-      } satisfies NotificationTemplateDocument;
     case "merchant.verification.owner_needs_action":
       return {
         subject: `Owner KYC needs action for ${merchantName}`,
@@ -974,7 +766,7 @@ function buildTemplateDocument(input: {
         heading: "Business verification is approved.",
         body: [
           "Merchant KYB completed successfully.",
-          "You can continue live onboarding and treasury setup from the dashboard.",
+          "You can continue live onboarding from the dashboard.",
         ],
         cta: {
           label: "Open onboarding",
@@ -992,32 +784,6 @@ function buildTemplateDocument(input: {
         ],
         cta: {
           label: "Open onboarding",
-          url: dashboardUrl,
-        },
-      } satisfies NotificationTemplateDocument;
-    case "merchant.governance.enabled":
-      return {
-        subject: `Governance enabled for ${merchantName}`,
-        eyebrow: "Governance",
-        heading: "Advanced governance controls are now active.",
-        body: [
-          "Protected treasury actions will now follow the governance flow for review and signing.",
-        ],
-        cta: {
-          label: "Open governance",
-          url: dashboardUrl,
-        },
-      } satisfies NotificationTemplateDocument;
-    case "merchant.governance.disabled":
-      return {
-        subject: `Governance disabled for ${merchantName}`,
-        eyebrow: "Governance",
-        heading: "Advanced governance controls were turned off.",
-        body: [
-          "Treasury changes will now follow the single-owner flow until governance is enabled again.",
-        ],
-        cta: {
-          label: "Open governance",
           url: dashboardUrl,
         },
       } satisfies NotificationTemplateDocument;
@@ -1358,44 +1124,6 @@ export function buildNotificationTemplatePreviewPayload(
         retryAt: "2026-03-27T09:00:00.000Z",
         dashboardUrl: "https://app.renew.sh/dashboard/payments",
       };
-    case "merchant.treasury.approval_needed":
-      return {
-        operationLabel: "Payout wallet change",
-        approvedCount: "1",
-        threshold: "2",
-        dashboardUrl: "https://app.renew.sh/dashboard/governance",
-      };
-    case "merchant.treasury.operation_approved":
-      return {
-        operationLabel: "Payout wallet change",
-        threshold: "2",
-        dashboardUrl: "https://app.renew.sh/dashboard/governance",
-      };
-    case "merchant.treasury.operation_rejected":
-      return {
-        operationLabel: "Settlement sweep",
-        reason: "Incorrect destination wallet selected.",
-        dashboardUrl: "https://app.renew.sh/dashboard/governance",
-      };
-    case "merchant.treasury.operation_executed":
-      return {
-        operationLabel: "Settlement sweep",
-        txHash: "5Yg8...eM7t",
-        dashboardUrl: "https://app.renew.sh/dashboard/governance",
-      };
-    case "merchant.treasury.payout_batch_opened":
-      return {
-        batchId: "PB-24A7F1",
-        netUsdc: "USDC 6,280.41",
-        settlementCount: "12",
-        dashboardUrl: "https://app.renew.sh/dashboard/treasury",
-      };
-    case "merchant.treasury.payout_completed":
-      return {
-        batchId: "PB-24A7F1",
-        txHash: "5Yg8...eM7t",
-        dashboardUrl: "https://app.renew.sh/dashboard/treasury",
-      };
     case "merchant.verification.owner_needs_action":
     case "merchant.verification.owner_approved":
     case "merchant.verification.owner_rejected":
@@ -1405,11 +1133,6 @@ export function buildNotificationTemplatePreviewPayload(
       return {
         statusLabel: "rejected",
         dashboardUrl: "https://app.renew.sh/dashboard",
-      };
-    case "merchant.governance.enabled":
-    case "merchant.governance.disabled":
-      return {
-        dashboardUrl: "https://app.renew.sh/dashboard/governance",
       };
     case "team.invite.sent":
     case "team.invite.resent":

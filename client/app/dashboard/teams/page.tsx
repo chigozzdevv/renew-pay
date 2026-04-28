@@ -169,7 +169,7 @@ export default function TeamsPage() {
       total: pagination.total,
       active: members.filter((member) => member.status === "active").length,
       invited: members.filter((member) => member.status === "invited").length,
-      treasury: members.filter((member) => member.permissions.includes("treasury")).length,
+      payments: members.filter((member) => member.permissions.includes("payments")).length,
     }),
     [members, pagination.total]
   );
@@ -341,7 +341,7 @@ export default function TeamsPage() {
         />
         <MetricCard label="Active" value={String(metrics.active)} note="Visible page" />
         <MetricCard label="Invited" value={String(metrics.invited)} note="Visible page" />
-        <MetricCard label="Treasury" value={String(metrics.treasury)} note="Visible page" />
+        <MetricCard label="Payments" value={String(metrics.payments)} note="Visible page" />
       </StatGrid>
 
       <Card
