@@ -1,10 +1,7 @@
 import { Router } from "express";
 
 import {
-  confirmPendingPrimaryWalletChangeController,
   getSettingsController,
-  promoteReserveWalletController,
-  removeReserveWalletController,
   saveWalletsController,
   updateSettingsController,
 } from "@/features/settings/setting.controller";
@@ -25,31 +22,10 @@ settingRouter.patch(
 );
 settingRouter.post(
   "/:merchantId/wallets/save",
-  requireMerchantKybApproved("changing treasury wallets in live mode"),
+  requireMerchantKybApproved("changing payout wallets in live mode"),
   requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["treasury", "team_admin"]),
+  requirePlatformPermissions(["team_admin"]),
   saveWalletsController
-);
-settingRouter.post(
-  "/:merchantId/wallets/confirm-primary",
-  requireMerchantKybApproved("confirming treasury payout wallet changes in live mode"),
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["treasury", "team_admin"]),
-  confirmPendingPrimaryWalletChangeController
-);
-settingRouter.post(
-  "/:merchantId/wallets/promote-reserve",
-  requireMerchantKybApproved("promoting treasury reserve wallets in live mode"),
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["treasury", "team_admin"]),
-  promoteReserveWalletController
-);
-settingRouter.post(
-  "/:merchantId/wallets/remove-reserve",
-  requireMerchantKybApproved("removing treasury reserve wallets in live mode"),
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["treasury", "team_admin"]),
-  removeReserveWalletController
 );
 
 export { settingRouter };

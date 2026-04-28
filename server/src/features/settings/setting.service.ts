@@ -7,37 +7,12 @@ import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import type { SettingDocument } from "@/features/settings/setting.model";
-import {
-  createPayoutWalletConfirmOperation,
-  createReserveClearOperation,
-  createReservePromoteOperation,
-  createWalletUpdateOperations,
-  getTreasuryByMerchantId,
-} from "@/features/treasury/treasury.service";
 import type {
   SaveWalletInput,
   UpdateSettingsInput,
-  WalletActionInput,
 } from "@/features/settings/setting.validation";
 
-function toSettingResponse(
-  document: SettingDocument,
-  treasury?: {
-    account: {
-      governanceVaultAddress: string;
-      payoutWallet: string;
-      reserveWallet?: string | null;
-      threshold: number;
-      pendingPayoutWallet?: string | null;
-      payoutWalletChangeReadyAt?: Date | null;
-    } | null;
-    operations: Array<{
-      id: string;
-      kind: string;
-      status: string;
-    }>;
-  }
-) {
+function toSettingResponse(document: SettingDocument) {
   return {
     id: document._id.toString(),
     merchantId: document.merchantId.toString(),
@@ -62,13 +37,8 @@ function toSettingResponse(
       meterApproval: document.billing.meterApproval,
     },
     wallets: {
-      primaryWallet:
-        treasury?.account?.payoutWallet ?? document.wallets.primaryWallet ?? "",
-      reserveWallet: treasury?.account?.reserveWallet ?? document.wallets.reserveWallet ?? null,
+      primaryWallet: document.wallets.primaryWallet ?? "",
       walletAlerts: document.wallets.walletAlerts,
-      governanceVaultAddress: treasury?.account?.governanceVaultAddress ?? null,
-      pendingPayoutWallet: treasury?.account?.pendingPayoutWallet ?? null,
-      payoutWalletChangeReadyAt: treasury?.account?.payoutWalletChangeReadyAt ?? null,
     },
     notifications: {
       customerSubscriptionEmails: document.notifications.customerSubscriptionEmails,
@@ -81,8 +51,6 @@ function toSettingResponse(
       merchantPaymentDigestMode:
         document.notifications.merchantPaymentDigestMode ?? "counts",
       teamInviteEmails: document.notifications.teamInviteEmails,
-      governanceAlerts: document.notifications.governanceAlerts,
-      treasuryAlerts: document.notifications.treasuryAlerts,
       verificationAlerts: document.notifications.verificationAlerts,
       developerAlerts: document.notifications.developerAlerts,
       securityAlerts:
@@ -95,10 +63,6 @@ function toSettingResponse(
       inviteDomainPolicy: document.security.inviteDomainPolicy,
       enforceTwoFactor: document.security.enforceTwoFactor,
       restrictInviteDomains: document.security.restrictInviteDomains,
-    },
-    treasury: {
-      threshold: treasury?.account?.threshold ?? 0,
-      pendingOperations: treasury?.operations ?? [],
     },
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
@@ -126,32 +90,11 @@ async function getOrCreateSetting(merchantId: string) {
 
 export async function getSettingsByMerchantId(
   merchantId: string,
-  environment: RuntimeMode = "test"
+  _environment: RuntimeMode = "test"
 ) {
   const { setting } = await getOrCreateSetting(merchantId);
-  const treasury = await getTreasuryByMerchantId(merchantId, environment).catch(() => ({
-    account: null,
-    signers: [],
-    operations: [],
-  }));
 
-  return toSettingResponse(setting, {
-    account: treasury.account
-      ? {
-          governanceVaultAddress: treasury.account.governanceVaultAddress,
-          payoutWallet: treasury.account.payoutWallet,
-          reserveWallet: treasury.account.reserveWallet,
-          threshold: treasury.account.threshold,
-          pendingPayoutWallet: treasury.account.pendingPayoutWallet,
-          payoutWalletChangeReadyAt: treasury.account.payoutWalletChangeReadyAt,
-        }
-      : null,
-    operations: treasury.operations.map((entry) => ({
-      id: entry.id,
-      kind: entry.kind,
-      status: entry.status,
-    })),
-  });
+  return toSettingResponse(setting);
 }
 
 export async function updateSettingsByMerchantId(
@@ -162,13 +105,12 @@ export async function updateSettingsByMerchantId(
 
   const mutatesWallets =
     input.wallets !== undefined &&
-    (input.wallets.primaryWallet !== undefined ||
-      input.wallets.reserveWallet !== undefined);
+    input.wallets.primaryWallet !== undefined;
 
   if (mutatesWallets) {
     await assertMerchantKybApprovedForLive(
       merchantId,
-      "changing treasury wallets",
+      "changing payout wallets",
       input.environment
     );
   }
@@ -250,8 +192,16 @@ export async function updateSettingsByMerchantId(
     }
   }
 
-  if (input.wallets && input.wallets.walletAlerts !== undefined) {
-    setting.wallets.walletAlerts = input.wallets.walletAlerts;
+  if (input.wallets) {
+    if (input.wallets.primaryWallet !== undefined) {
+      const primaryWallet = normalizeSolanaAddress(input.wallets.primaryWallet);
+      setting.wallets.primaryWallet = primaryWallet;
+      merchant.payoutWallet = primaryWallet;
+    }
+
+    if (input.wallets.walletAlerts !== undefined) {
+      setting.wallets.walletAlerts = input.wallets.walletAlerts;
+    }
   }
 
   if (input.notifications) {
@@ -289,14 +239,6 @@ export async function updateSettingsByMerchantId(
 
     if (input.notifications.teamInviteEmails !== undefined) {
       setting.notifications.teamInviteEmails = input.notifications.teamInviteEmails;
-    }
-
-    if (input.notifications.governanceAlerts !== undefined) {
-      setting.notifications.governanceAlerts = input.notifications.governanceAlerts;
-    }
-
-    if (input.notifications.treasuryAlerts !== undefined) {
-      setting.notifications.treasuryAlerts = input.notifications.treasuryAlerts;
     }
 
     if (input.notifications.verificationAlerts !== undefined) {
@@ -362,24 +304,20 @@ export async function saveWalletSettings(
 ) {
   await assertMerchantKybApprovedForLive(
     merchantId,
-    "changing treasury wallets",
+    "changing payout wallets",
     input.environment
   );
 
-  const { setting } = await getOrCreateSetting(merchantId);
+  const { merchant, setting } = await getOrCreateSetting(merchantId);
+  const primaryWallet = normalizeSolanaAddress(input.primaryWallet);
+
+  setting.wallets.primaryWallet = primaryWallet;
+  merchant.payoutWallet = primaryWallet;
 
   if (input.walletAlerts !== undefined) {
     setting.wallets.walletAlerts = input.walletAlerts;
   }
-  await setting.save();
-
-  const operations = await createWalletUpdateOperations({
-    merchantId,
-    actor: input.actor,
-    environment: input.environment,
-    primaryWallet: input.primaryWallet,
-    reserveWallet: input.reserveWallet,
-  });
+  await Promise.all([setting.save(), merchant.save()]);
 
   await appendAuditLog({
     merchantId,
@@ -387,12 +325,10 @@ export async function saveWalletSettings(
     action: "Updated wallet settings",
     category: "security",
     status: "ok",
-    target: input.primaryWallet,
-    detail: "Treasury wallet change request created.",
+    target: primaryWallet,
+    detail: "Payout wallet settings were updated.",
     metadata: {
-      primaryWallet: normalizeSolanaAddress(input.primaryWallet),
-      reserveWallet: normalizeSolanaAddress(input.reserveWallet),
-      operationIds: operations.map((entry) => entry.id),
+      primaryWallet,
     },
     ipAddress: null,
     userAgent: null,
@@ -402,117 +338,5 @@ export async function saveWalletSettings(
 
   return {
     settings,
-    operations,
-  };
-}
-
-export async function promoteReserveWallet(
-  merchantId: string,
-  input: WalletActionInput
-) {
-  await assertMerchantKybApprovedForLive(
-    merchantId,
-    "promoting treasury reserve wallets",
-    input.environment
-  );
-
-  const operation = await createReservePromoteOperation({
-    merchantId,
-    actor: input.actor,
-    environment: input.environment,
-  });
-
-  await appendAuditLog({
-    merchantId,
-    actor: input.actor,
-    action: "Requested reserve wallet promotion",
-    category: "security",
-    status: "warning",
-    target: operation.id,
-    detail: "Reserve wallet promotion queued for treasury approvals.",
-    metadata: {
-      operationId: operation.id,
-    },
-    ipAddress: null,
-    userAgent: null,
-  });
-
-  return {
-    settings: await getSettingsByMerchantId(merchantId, input.environment),
-    operation,
-  };
-}
-
-export async function removeReserveWallet(
-  merchantId: string,
-  input: WalletActionInput
-) {
-  await assertMerchantKybApprovedForLive(
-    merchantId,
-    "removing treasury reserve wallets",
-    input.environment
-  );
-
-  const operation = await createReserveClearOperation({
-    merchantId,
-    actor: input.actor,
-    environment: input.environment,
-  });
-
-  await appendAuditLog({
-    merchantId,
-    actor: input.actor,
-    action: "Requested reserve wallet removal",
-    category: "security",
-    status: "warning",
-    target: operation.id,
-    detail: "Reserve wallet removal queued for treasury approvals.",
-    metadata: {
-      operationId: operation.id,
-    },
-    ipAddress: null,
-    userAgent: null,
-  });
-
-  return {
-    settings: await getSettingsByMerchantId(merchantId, input.environment),
-    operation,
-  };
-}
-
-export async function confirmPendingPrimaryWalletChange(
-  merchantId: string,
-  input: WalletActionInput
-) {
-  await assertMerchantKybApprovedForLive(
-    merchantId,
-    "confirming treasury payout wallet changes",
-    input.environment
-  );
-
-  const operation = await createPayoutWalletConfirmOperation({
-    merchantId,
-    actor: input.actor,
-    environment: input.environment,
-  });
-
-  await appendAuditLog({
-    merchantId,
-    actor: input.actor,
-    action: "Requested payout wallet confirmation",
-    category: "security",
-    status: "ok",
-    target: operation.id,
-    detail: "Pending payout wallet confirmation queued for treasury approvals.",
-    metadata: {
-      operationId: operation.id,
-    },
-    ipAddress: null,
-    userAgent: null,
-  });
-
-  return {
-    settings: await getSettingsByMerchantId(merchantId, input.environment),
-    operation,
   };
 }

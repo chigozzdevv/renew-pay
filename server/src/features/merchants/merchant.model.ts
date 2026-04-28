@@ -21,11 +21,6 @@ const merchantSchema = new Schema(
       trim: true,
       default: null,
     },
-    reserveWallet: {
-      type: String,
-      trim: true,
-      default: null,
-    },
     name: {
       type: String,
       trim: true,
@@ -80,11 +75,6 @@ const merchantSchema = new Schema(
       required: true,
       trim: true,
       default: "business",
-    },
-    governanceEnabled: {
-      type: Boolean,
-      required: true,
-      default: true,
     },
   },
   {

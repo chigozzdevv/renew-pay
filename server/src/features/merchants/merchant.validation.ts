@@ -12,7 +12,6 @@ const marketSchema = z.string().trim().min(2).max(8).toUpperCase();
 export const createMerchantSchema = z.object({
   merchantAccount: addressSchema,
   payoutWallet: addressSchema,
-  reserveWallet: addressSchema.nullish().transform((value) => value ?? null),
   name: z.string().trim().min(2).max(120),
   supportEmail: z.email().trim().toLowerCase(),
   billingTimezone: z.string().trim().min(2).default("UTC"),

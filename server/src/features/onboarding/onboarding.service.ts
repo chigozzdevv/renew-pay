@@ -7,16 +7,9 @@ import {
 } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
-import {
-  createProtocolMerchant,
-  isProtocolMerchantRegistered,
-} from "@/features/protocol/protocol.merchant";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { SettingModel } from "@/features/settings/setting.model";
 import { TeamMemberModel } from "@/features/teams/team.model";
-import { TreasuryAccountModel } from "@/features/treasury/treasury-account.model";
-import { TreasurySignerModel } from "@/features/treasury/treasury-signer.model";
-import { bootstrapTreasuryAccount } from "@/features/treasury/treasury.service";
 import type {
   OnboardingBusinessInput,
   OnboardingPayoutInput,
@@ -29,7 +22,6 @@ import {
 } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
-import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
 type StepStatus = "complete" | "current" | "pending";
 
@@ -65,106 +57,12 @@ async function loadSetting(merchantId: string) {
   return SettingModel.findOne({ merchantId }).exec();
 }
 
-async function loadTreasuryAccount(merchantId: string, environment: RuntimeMode) {
-  return TreasuryAccountModel.findOne({
-    merchantId,
-    ...createRuntimeModeCondition("environment", environment),
-  }).exec();
-}
-
-async function getActiveOwnerSigner(input: {
-  merchantId: string;
-  teamMemberId: string;
-}) {
-  const signer = await TreasurySignerModel.findOne({
-    merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
-    status: "active",
-  }).exec();
-
-  if (!signer) {
-    throw new HttpError(
-      409,
-      "Verify the signed-in Privy wallet before registering the workspace."
-    );
-  }
-
-  return signer;
-}
-
 function assertOwnerRole(role: string) {
   if (role !== "owner") {
     throw new HttpError(
       403,
       "Only the workspace owner can finish merchant registration."
     );
-  }
-}
-
-function hasOperatorTreasuryContext(
-  value: Awaited<ReturnType<typeof loadTreasuryAccount>>
-): value is NonNullable<Awaited<ReturnType<typeof loadTreasuryAccount>>> {
-  return Boolean(
-    value?.governanceMultisigAddress?.trim() &&
-      value.governanceVaultAddress?.trim() &&
-      value.operatorMultisigAddress?.trim() &&
-      value.operatorVaultAddress?.trim()
-  );
-}
-
-async function ensureOnboardingProtocolReady(input: {
-  merchantId: string;
-  teamMemberId: string;
-  actor: string;
-  environment: RuntimeMode;
-  merchantPayoutWallet: string;
-  metadataHash: string;
-}) {
-  const treasuryAccount =
-    (await loadTreasuryAccount(input.merchantId, input.environment)) ??
-    null;
-
-  if (!hasOperatorTreasuryContext(treasuryAccount)) {
-    await bootstrapTreasuryAccount({
-      merchantId: input.merchantId,
-      actor: input.actor,
-      requesterTeamMemberId: input.teamMemberId,
-      payload: {
-        environment: input.environment,
-        mode: "create",
-        ownerTeamMemberIds: [input.teamMemberId],
-        threshold: 1,
-      },
-    });
-  }
-
-  const readyTreasuryAccount = await loadTreasuryAccount(
-    input.merchantId,
-    input.environment
-  );
-
-  if (!hasOperatorTreasuryContext(readyTreasuryAccount)) {
-    throw new HttpError(
-      409,
-      "Merchant treasury setup is incomplete. Verify the owner signer and try again."
-    );
-  }
-
-  const merchantRegistered = await isProtocolMerchantRegistered(
-    input.environment,
-    input.merchantId
-  );
-
-  if (!merchantRegistered) {
-    await createProtocolMerchant({
-      environment: input.environment,
-      merchantId: input.merchantId,
-      payoutWallet: input.merchantPayoutWallet,
-      metadataHash: input.metadataHash,
-      operatorMultisigAddress: readyTreasuryAccount.operatorMultisigAddress!,
-      operatorVaultAddress: readyTreasuryAccount.operatorVaultAddress!,
-      operatorVaultIndex: readyTreasuryAccount.operatorVaultIndex ?? 0,
-    });
   }
 }
 
@@ -482,7 +380,7 @@ export async function saveOnboardingPayout(input: {
     merchantId: input.merchantId,
     actor: input.actor,
     action: "Configured onboarding payout wallet",
-    category: "treasury",
+    category: "workspace",
     status: "ok",
     target: input.payload.payoutWallet,
     detail: "Payout wallet was configured during onboarding.",
@@ -520,27 +418,12 @@ export async function registerOnboardingMerchant(input: {
 
   assertOwnerRole(state.owner.role);
 
-  const activeSigner = await getActiveOwnerSigner({
-    merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
-  });
   const merchantPayoutWallet = state.merchant.payoutWallet;
 
   if (!merchantPayoutWallet) {
     throw new HttpError(409, "Configure a payout wallet before registering the workspace.");
   }
 
-  await ensureOnboardingProtocolReady({
-    merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
-    actor: input.actor,
-    environment: input.payload.environment,
-    merchantPayoutWallet,
-    metadataHash: state.merchant.metadataHash,
-  });
-
-  state.merchant.operatorWalletAddress = activeSigner.walletAddress;
-  state.merchant.governanceEnabled = true;
   state.merchant.onboardingStatus = "workspace_active";
   await state.merchant.save();
 
@@ -551,12 +434,10 @@ export async function registerOnboardingMerchant(input: {
     category: "workspace",
     status: "ok",
     target: state.merchant.name ?? state.merchant.supportEmail ?? null,
-    detail:
-      "Merchant registration completed and the initial 1-of-1 signer/governance context was created.",
+    detail: "Merchant registration completed.",
     metadata: {
       environment: input.payload.environment,
-      governanceEnabled: true,
-      signerWallet: activeSigner.walletAddress,
+      payoutWallet: merchantPayoutWallet,
     },
     ipAddress: null,
     userAgent: null,

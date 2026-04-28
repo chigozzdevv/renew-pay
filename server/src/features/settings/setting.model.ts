@@ -118,11 +118,6 @@ const walletSettingsSchema = new Schema(
       trim: true,
       default: null,
     },
-    reserveWallet: {
-      type: String,
-      trim: true,
-      default: null,
-    },
     walletAlerts: {
       type: Boolean,
       required: true,
@@ -188,16 +183,6 @@ const notificationSettingsSchema = new Schema(
       required: true,
       default: true,
     },
-    governanceAlerts: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    treasuryAlerts: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
     verificationAlerts: {
       type: Boolean,
       required: true,
@@ -244,47 +229,6 @@ const securitySettingsSchema = new Schema(
   }
 );
 
-const treasurySettingsSchema = new Schema(
-  {
-    sweepApprovalThreshold: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 5,
-      default: 1,
-    },
-    payoutMode: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "manual",
-    },
-    autoPayoutFrequency: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    autoPayoutTimeLocal: {
-      type: String,
-      trim: true,
-      default: "09:00",
-    },
-    thresholdPayoutEnabled: {
-      type: Boolean,
-      required: true,
-      default: false,
-    },
-    autoPayoutThresholdUsdc: {
-      type: Number,
-      min: 0,
-      default: null,
-    },
-  },
-  {
-    _id: false,
-  }
-);
-
 const settingSchema = new Schema(
   {
     merchantId: {
@@ -315,11 +259,6 @@ const settingSchema = new Schema(
     },
     security: {
       type: securitySettingsSchema,
-      required: true,
-      default: () => ({}),
-    },
-    treasury: {
-      type: treasurySettingsSchema,
       required: true,
       default: () => ({}),
     },

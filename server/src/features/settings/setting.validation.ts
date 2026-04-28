@@ -55,7 +55,6 @@ const billingSettingsSchema = z.object({
 
 const walletSettingsSchema = z.object({
   primaryWallet: addressSchema.optional(),
-  reserveWallet: addressSchema.nullish().transform((value) => value ?? null),
   walletAlerts: z.boolean().optional(),
 });
 
@@ -67,8 +66,6 @@ const notificationSettingsSchema = z.object({
   merchantPaymentDigestFrequency: notificationDigestFrequencySchema.optional(),
   merchantPaymentDigestMode: notificationDigestModeSchema.optional(),
   teamInviteEmails: z.boolean().optional(),
-  governanceAlerts: z.boolean().optional(),
-  treasuryAlerts: z.boolean().optional(),
   verificationAlerts: z.boolean().optional(),
   developerAlerts: z.boolean().optional(),
   securityAlerts: z.boolean().optional(),
@@ -104,19 +101,12 @@ export const updateSettingsSchema = z
     }
   );
 
-export const walletActionSchema = z.object({
-  actor: z.string().trim().min(2).max(120).default("system"),
-  environment: environmentInputSchema.default("test"),
-});
-
 export const saveWalletSchema = z.object({
   actor: z.string().trim().min(2).max(120).default("system"),
   environment: environmentInputSchema.default("test"),
   primaryWallet: addressSchema,
-  reserveWallet: addressSchema.nullish().transform((value) => value ?? null),
   walletAlerts: z.boolean().optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
 export type SaveWalletInput = z.infer<typeof saveWalletSchema>;
-export type WalletActionInput = z.infer<typeof walletActionSchema>;

@@ -14,7 +14,6 @@ function toMerchantResponse(document: {
   _id: { toString(): string };
   merchantAccount: string;
   payoutWallet?: string | null;
-  reserveWallet?: string | null;
   name?: string | null;
   supportEmail?: string | null;
   billingTimezone: string;
@@ -28,7 +27,6 @@ function toMerchantResponse(document: {
     id: document._id.toString(),
     merchantAccount: document.merchantAccount,
     payoutWallet: document.payoutWallet ?? "",
-    reserveWallet: document.reserveWallet ?? null,
     name: document.name ?? "",
     supportEmail: document.supportEmail ?? "",
     billingTimezone: document.billingTimezone,
@@ -61,7 +59,6 @@ export async function createMerchant(input: CreateMerchantInput) {
   const createdMerchant = await MerchantModel.create({
     merchantAccount,
     payoutWallet: normalizeSolanaAddress(input.payoutWallet),
-    reserveWallet: normalizeSolanaAddress(input.reserveWallet),
     name: input.name,
     supportEmail: input.supportEmail,
     billingTimezone: input.billingTimezone,
@@ -125,10 +122,6 @@ export async function updateMerchant(
 
   if (input.payoutWallet !== undefined) {
     merchant.payoutWallet = normalizeSolanaAddress(input.payoutWallet);
-  }
-
-  if (input.reserveWallet !== undefined) {
-    merchant.reserveWallet = normalizeSolanaAddress(input.reserveWallet);
   }
 
   if (input.name !== undefined) {

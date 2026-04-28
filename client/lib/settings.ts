@@ -1,7 +1,6 @@
 "use client";
 
 import { fetchApi } from "@/lib/api";
-import type { TreasuryOperation } from "@/lib/treasury";
 
 export type WorkspaceSettings = {
   id: string;
@@ -28,11 +27,7 @@ export type WorkspaceSettings = {
   };
   wallets: {
     primaryWallet: string;
-    reserveWallet: string | null;
     walletAlerts: boolean;
-    governanceVaultAddress: string | null;
-    pendingPayoutWallet: string | null;
-    payoutWalletChangeReadyAt: string | null;
   };
   notifications: {
     customerSubscriptionEmails: boolean;
@@ -42,8 +37,6 @@ export type WorkspaceSettings = {
     merchantPaymentDigestFrequency: "off" | "daily" | "weekly" | "monthly";
     merchantPaymentDigestMode: "counts" | "detailed";
     teamInviteEmails: boolean;
-    governanceAlerts: boolean;
-    treasuryAlerts: boolean;
     verificationAlerts: boolean;
     developerAlerts: boolean;
     securityAlerts: boolean;
@@ -53,14 +46,6 @@ export type WorkspaceSettings = {
     inviteDomainPolicy: string;
     enforceTwoFactor: boolean;
     restrictInviteDomains: boolean;
-  };
-  treasury: {
-    threshold: number;
-    pendingOperations: Array<{
-      id: string;
-      kind: string;
-      status: string;
-    }>;
   };
   createdAt: string;
   updatedAt: string;
@@ -88,7 +73,7 @@ export async function updateWorkspaceSettings(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  payload: Partial<Pick<WorkspaceSettings, "business" | "billing" | "notifications" | "security">>;
+  payload: Partial<Pick<WorkspaceSettings, "business" | "billing" | "wallets" | "notifications" | "security">>;
 }) {
   const response = await fetchApi<WorkspaceSettings>(
     `/settings/${input.merchantId}`,
@@ -110,77 +95,17 @@ export async function saveWalletSettings(input: {
   merchantId: string;
   environment: "test" | "live";
   primaryWallet: string;
-  reserveWallet: string | null;
   walletAlerts: boolean;
 }) {
   const response = await fetchApi<{
     settings: WorkspaceSettings;
-    operations: TreasuryOperation[];
   }>(`/settings/${input.merchantId}/wallets/save`, {
     method: "POST",
     token: input.token,
     body: JSON.stringify({
       environment: input.environment,
       primaryWallet: input.primaryWallet,
-      reserveWallet: input.reserveWallet,
       walletAlerts: input.walletAlerts,
-    }),
-  });
-
-  return response.data;
-}
-
-export async function confirmPrimaryWalletChange(input: {
-  token: string;
-  merchantId: string;
-  environment: "test" | "live";
-}) {
-  const response = await fetchApi<{
-    settings: WorkspaceSettings;
-    operation: TreasuryOperation;
-  }>(`/settings/${input.merchantId}/wallets/confirm-primary`, {
-    method: "POST",
-    token: input.token,
-    body: JSON.stringify({
-      environment: input.environment,
-    }),
-  });
-
-  return response.data;
-}
-
-export async function promoteReserveWallet(input: {
-  token: string;
-  merchantId: string;
-  environment: "test" | "live";
-}) {
-  const response = await fetchApi<{
-    settings: WorkspaceSettings;
-    operation: TreasuryOperation;
-  }>(`/settings/${input.merchantId}/wallets/promote-reserve`, {
-    method: "POST",
-    token: input.token,
-    body: JSON.stringify({
-      environment: input.environment,
-    }),
-  });
-
-  return response.data;
-}
-
-export async function removeReserveWallet(input: {
-  token: string;
-  merchantId: string;
-  environment: "test" | "live";
-}) {
-  const response = await fetchApi<{
-    settings: WorkspaceSettings;
-    operation: TreasuryOperation;
-  }>(`/settings/${input.merchantId}/wallets/remove-reserve`, {
-    method: "POST",
-    token: input.token,
-    body: JSON.stringify({
-      environment: input.environment,
     }),
   });
 

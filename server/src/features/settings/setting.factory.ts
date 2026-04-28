@@ -40,7 +40,6 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
       },
       wallets: {
         primaryWallet: merchant.payoutWallet ?? null,
-        reserveWallet: merchant.reserveWallet ?? null,
         walletAlerts: true,
       },
       notifications: {
@@ -54,8 +53,6 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
         merchantPaymentDigestFrequency: "daily",
         merchantPaymentDigestMode: "counts",
         teamInviteEmails: true,
-        governanceAlerts: true,
-        treasuryAlerts: true,
         verificationAlerts: true,
         securityAlerts: true,
       },
@@ -64,14 +61,6 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
         inviteDomainPolicy: "Allow all domains",
         enforceTwoFactor: false,
         restrictInviteDomains: false,
-      },
-      treasury: {
-        sweepApprovalThreshold: 1,
-        payoutMode: "manual",
-        autoPayoutFrequency: null,
-        autoPayoutTimeLocal: "09:00",
-        thresholdPayoutEnabled: false,
-        autoPayoutThresholdUsdc: null,
       },
     });
   }

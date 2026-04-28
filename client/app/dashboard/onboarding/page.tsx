@@ -2,18 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { usePrivy } from "@privy-io/react-auth";
-import {
-  useSignMessage,
-  useWallets as useSolanaWallets,
-} from "@privy-io/react-auth/solana";
-
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
 import { Badge, Button, InlineLoading, Input, LoadingState } from "@/components/dashboard/ui";
-import { extractPrivyEmbeddedWalletAddress } from "@/components/dashboard/dashboard-utils";
 import { ImageUpload } from "@/components/shared/image-upload";
 import { ApiError } from "@/lib/api";
 import { loadBillingMarketCatalog } from "@/lib/markets";
@@ -25,13 +18,7 @@ import {
   startOnboardingVerification,
   type OnboardingState,
 } from "@/lib/onboarding";
-import {
-  createTreasurySignerChallenge,
-  verifyTreasurySigner,
-} from "@/lib/treasury";
 
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim() ?? "";
-const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const ONBOARDING_PRIMARY_BUTTON_CLASS =
   "!border-[#111111] !bg-[#111111] !text-white hover:!bg-[#333333]";
 
@@ -54,13 +41,6 @@ const STEP_META: Record<string, { title: string; subtitle: string }> = {
     title: "Register",
     subtitle: "Finalize your merchant registration.",
   },
-};
-
-type PrivyWalletRecord = {
-  address: string;
-  walletClientType?: string;
-  chainType?: string;
-  type?: string;
 };
 
 type RegisterCardState = {
@@ -182,83 +162,6 @@ function toBadgeTone(status: string) {
   }
 
   return "neutral" as const;
-}
-
-function findEmbeddedWallet<T extends PrivyWalletRecord>(wallets: T[]) {
-  return (
-    wallets.find((entry) => {
-      const walletType = entry.chainType ?? entry.type ?? "solana";
-      return entry.walletClientType === "privy" && walletType === "solana";
-    }) ?? null
-  );
-}
-
-function findPreferredSolanaWallet<T extends PrivyWalletRecord>(
-  wallets: T[],
-  preferredAddress: string | null
-) {
-  const normalizedPreferredAddress = preferredAddress?.trim() ?? null;
-
-  if (normalizedPreferredAddress) {
-    const matchedWallet = wallets.find(
-      (entry) => entry.address?.trim() === normalizedPreferredAddress
-    );
-
-    if (matchedWallet) {
-      return matchedWallet;
-    }
-  }
-
-  const embeddedWallet = findEmbeddedWallet(wallets);
-
-  if (embeddedWallet) {
-    return embeddedWallet;
-  }
-
-  if (wallets.length === 1) {
-    return wallets[0];
-  }
-
-  return null;
-}
-
-function encodeBase58(bytes: Uint8Array) {
-  if (bytes.length === 0) {
-    return "";
-  }
-
-  const digits = [0];
-
-  for (const value of bytes) {
-    let carry = value;
-
-    for (let index = 0; index < digits.length; index += 1) {
-      carry += digits[index] * 256;
-      digits[index] = carry % 58;
-      carry = Math.floor(carry / 58);
-    }
-
-    while (carry > 0) {
-      digits.push(carry % 58);
-      carry = Math.floor(carry / 58);
-    }
-  }
-
-  let encoded = "";
-
-  for (const value of bytes) {
-    if (value !== 0) {
-      break;
-    }
-
-    encoded += BASE58_ALPHABET[0];
-  }
-
-  for (let index = digits.length - 1; index >= 0; index -= 1) {
-    encoded += BASE58_ALPHABET[digits[index]];
-  }
-
-  return encoded;
 }
 
 function formatAddress(value: string | null) {
@@ -669,7 +572,7 @@ function RegisterStep({
     <div className="space-y-4">
       <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3.5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-          Privy signer
+          Settlement wallet
         </p>
         <p className="mt-1.5 text-sm font-semibold text-[color:var(--ink)]">
           {registerCard.signerLabel}
@@ -1117,50 +1020,21 @@ function OnboardingModal({
   );
 }
 
-function PrivyOnboardingSurface() {
+function OnboardingSurface() {
   const state = useOnboardingWorkspace();
   const { token, user, mode, busyAction, data, runAction } = state;
-  const { ready: privyReady, authenticated, user: privyUser } = usePrivy();
-  const { ready: solanaWalletsReady, wallets } = useSolanaWallets();
-  const { signMessage } = useSignMessage();
-
-  const linkedEmbeddedWalletAddress = useMemo(
-    () => extractPrivyEmbeddedWalletAddress(privyUser),
-    [privyUser]
-  );
-  const embeddedWallet = useMemo(
-    () =>
-      findPreferredSolanaWallet(
-        wallets,
-        linkedEmbeddedWalletAddress ?? user?.operatorWalletAddress?.trim() ?? null
-      ),
-    [linkedEmbeddedWalletAddress, user?.operatorWalletAddress, wallets]
-  );
-  const activeWalletAddress =
-    embeddedWallet?.address?.trim() ??
-    linkedEmbeddedWalletAddress ??
-    user?.operatorWalletAddress?.trim() ??
-    null;
-  const isWalletSyncing =
-    Boolean(authenticated && activeWalletAddress && !embeddedWallet) ||
-    Boolean(authenticated && privyReady && !solanaWalletsReady);
 
   const registerCard: RegisterCardState = {
     label:
       busyAction === "register"
         ? "Registering..."
-        : isWalletSyncing
-          ? "Syncing wallet..."
-          : "Register merchant",
+        : "Register merchant",
     disabled:
       !data?.canComplete ||
       busyAction === "register" ||
-      !embeddedWallet ||
       user?.role !== "owner",
-    signerLabel: formatAddress(activeWalletAddress),
-    signerNote: isWalletSyncing
-      ? "Privy already has your Solana wallet. Waiting for the signer to attach in this browser session."
-      : "This wallet becomes the initial owner signer for 1-of-1 approvals.",
+    signerLabel: formatAddress(data?.payout.payoutWallet ?? null),
+    signerNote: "This payout wallet receives stable settlement for the workspace.",
     onRegister: () =>
       void runAction("register", async () => {
         if (!token || !user) {
@@ -1170,30 +1044,6 @@ function PrivyOnboardingSurface() {
         if (user.role !== "owner") {
           throw new Error("Only the workspace owner can register the merchant.");
         }
-
-        if (!embeddedWallet) {
-          throw new Error(
-            isWalletSyncing
-              ? "Privy is still syncing your Solana wallet into this session."
-              : "Your signed-in Privy Solana wallet is not ready yet."
-          );
-        }
-
-        const challenge = await createTreasurySignerChallenge({
-          token,
-          merchantId: user.merchantId,
-          walletAddress: embeddedWallet.address,
-        });
-        const signed = await signMessage({
-          message: new TextEncoder().encode(challenge.challengeMessage),
-          wallet: embeddedWallet,
-        });
-
-        await verifyTreasurySigner({
-          token,
-          merchantId: user.merchantId,
-          signature: encodeBase58(signed.signature),
-        });
         await registerOnboardingMerchant({
           token,
           environment: mode,
@@ -1205,26 +1055,6 @@ function PrivyOnboardingSurface() {
   return <OnboardingModal state={state} registerCard={registerCard} />;
 }
 
-function FallbackOnboardingSurface() {
-  const state = useOnboardingWorkspace();
-
-  return (
-    <OnboardingModal
-      state={state}
-      registerCard={{
-        label: "Register merchant",
-        disabled: true,
-        signerLabel: "Privy not configured",
-        signerNote: "Add NEXT_PUBLIC_PRIVY_APP_ID to finish registration in this environment.",
-      }}
-    />
-  );
-}
-
 export default function OnboardingPage() {
-  if (!PRIVY_APP_ID) {
-    return <FallbackOnboardingSurface />;
-  }
-
-  return <PrivyOnboardingSurface />;
+  return <OnboardingSurface />;
 }

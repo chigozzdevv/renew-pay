@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { MarketMultiSelect } from "@/components/dashboard/market-controls";
@@ -27,10 +26,7 @@ import {
   loadNotificationTemplates,
 } from "@/lib/notifications";
 import {
-  confirmPrimaryWalletChange,
   loadWorkspaceSettings,
-  promoteReserveWallet,
-  removeReserveWallet,
   saveWalletSettings,
   updateWorkspaceSettings,
   type WorkspaceSettings,
@@ -59,53 +55,6 @@ function formatAddress(value: string | null) {
   }
 
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "Not scheduled";
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(new Date(value));
-}
-
-function formatOperationLabel(kind: string) {
-  const labels: Record<string, string> = {
-    payout_wallet_change_request: "Primary wallet change",
-    payout_wallet_change_confirm: "Primary wallet confirmation",
-    reserve_wallet_update: "Reserve wallet update",
-    reserve_wallet_clear: "Reserve wallet removal",
-    reserve_wallet_promote: "Reserve wallet promotion",
-    governance_threshold_change: "Governance threshold change",
-    governance_owner_add: "Governance approver added",
-    governance_owner_remove: "Governance approver removed",
-    settlement_sweep: "Settlement sweep",
-  };
-
-  return labels[kind] ?? kind.replace(/_/g, " ");
-}
-
-function formatOperationTone(status: string) {
-  if (status === "executed" || status === "approved") {
-    return "brand" as const;
-  }
-
-  if (status === "rejected") {
-    return "danger" as const;
-  }
-
-  if (status === "pending_signatures") {
-    return "warning" as const;
-  }
-
-  return "neutral" as const;
 }
 
 function toErrorMessage(error: unknown) {
@@ -166,7 +115,6 @@ export default function SettingsPage() {
   const [securityDraft, setSecurityDraft] = useState<SecurityDraft | null>(null);
   const [walletDraft, setWalletDraft] = useState({
     primaryWallet: "",
-    reserveWallet: "",
     walletAlerts: true,
   });
   const [supportedMarketsDraft, setSupportedMarketsDraft] = useState<string[]>([]);
@@ -182,7 +130,6 @@ export default function SettingsPage() {
     setSecurityDraft(data.security);
     setWalletDraft({
       primaryWallet: data.wallets.primaryWallet,
-      reserveWallet: data.wallets.reserveWallet ?? "",
       walletAlerts: data.wallets.walletAlerts,
     });
   }, [data]);
@@ -233,11 +180,6 @@ export default function SettingsPage() {
 
     return () => window.clearTimeout(timeout);
   }, [actionError, actionMessage]);
-
-  const pendingOperations = data?.treasury.pendingOperations ?? [];
-  const pendingCount = pendingOperations.filter(
-    (operation) => operation.status === "pending_signatures" || operation.status === "approved",
-  ).length;
 
   const tabs = useMemo(
     () =>
@@ -377,66 +319,14 @@ export default function SettingsPage() {
     }
 
     await runMutation("wallet-save", async () => {
-      const result = await saveWalletSettings({
+      await saveWalletSettings({
         token,
         merchantId: user.merchantId,
         environment: mode,
         primaryWallet: walletDraft.primaryWallet.trim(),
-        reserveWallet: walletDraft.reserveWallet.trim() || null,
         walletAlerts: walletDraft.walletAlerts,
       });
-      const queuedCount = result.operations.length;
-      setActionMessage(
-        queuedCount > 0
-          ? `${queuedCount} treasury approval${queuedCount === 1 ? "" : "s"} queued.`
-          : "Wallet settings saved.",
-      );
-      setShowWalletEditor(false);
-    });
-  }
-
-  async function handleConfirmPendingPrimary() {
-    if (!token || !user?.merchantId) {
-      return;
-    }
-
-    await runMutation("wallet-confirm", async () => {
-      await confirmPrimaryWalletChange({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-      });
-      setActionMessage("Primary wallet confirmation queued for approvals.");
-    });
-  }
-
-  async function handlePromoteReserve() {
-    if (!token || !user?.merchantId) {
-      return;
-    }
-
-    await runMutation("wallet-promote", async () => {
-      await promoteReserveWallet({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-      });
-      setActionMessage("Reserve wallet promotion queued for approvals.");
-    });
-  }
-
-  async function handleRemoveReserve() {
-    if (!token || !user?.merchantId) {
-      return;
-    }
-
-    await runMutation("wallet-remove", async () => {
-      await removeReserveWallet({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-      });
-      setActionMessage("Reserve wallet removal queued for approvals.");
+      setActionMessage("Wallet settings saved.");
       setShowWalletEditor(false);
     });
   }
@@ -755,94 +645,11 @@ export default function SettingsPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_1fr] xl:items-start">
             <div className="space-y-4">
               <SettingsSummaryRow
-                label="Governance vault"
-                value={formatAddress(data.wallets.governanceVaultAddress)}
-                badge={data.wallets.governanceVaultAddress ? "Connected" : "Not configured"}
-                tone={data.wallets.governanceVaultAddress ? "brand" : "neutral"}
-              />
-              <SettingsSummaryRow
                 label="Primary payout wallet"
                 value={formatAddress(data.wallets.primaryWallet)}
                 badge="Primary"
                 tone="brand"
               />
-              <SettingsSummaryRow
-                label="Reserve wallet"
-                value={formatAddress(data.wallets.reserveWallet)}
-                badge={data.wallets.reserveWallet ? "Standby" : "Not configured"}
-              />
-
-              {data.wallets.pendingPayoutWallet ? (
-                <div className="rounded-2xl border border-[color:var(--line)] bg-white p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand)]">
-                        Pending primary wallet
-                      </p>
-                      <p className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                        {formatAddress(data.wallets.pendingPayoutWallet)}
-                      </p>
-                      <p className="mt-1 text-sm text-[color:var(--muted)]">
-                        Ready at {formatDateTime(data.wallets.payoutWalletChangeReadyAt)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      tone="brand"
-                      disabled={busyAction === "wallet-confirm"}
-                      onClick={() => void handleConfirmPendingPrimary()}
-                    >
-                      Queue confirm
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                      Pending treasury operations
-                    </p>
-                    <p className="mt-2 text-sm text-[color:var(--muted)]">
-                      Approval history now lives in Governance.
-                    </p>
-                  </div>
-                  <Link
-                    href="/dashboard/governance"
-                    className="inline-flex items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
-                  >
-                    Open governance
-                  </Link>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {pendingOperations.length > 0 ? (
-                    pendingOperations.map((operation) => (
-                      <div
-                        key={operation.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                            {formatOperationLabel(operation.kind)}
-                          </p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                            {operation.id.slice(-8)}
-                          </p>
-                        </div>
-                        <Badge tone={formatOperationTone(operation.status)}>
-                          {operation.status.replace(/_/g, " ")}
-                        </Badge>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-[color:var(--line)] bg-white px-4 py-5 text-sm text-[color:var(--muted)]">
-                      No pending treasury operations.
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
 
             <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
@@ -852,7 +659,7 @@ export default function SettingsPage() {
                     Wallet editor
                   </p>
                   <p className="mt-2 text-sm text-[color:var(--muted)]">
-                    Queue payout changes through approvals instead of editing addresses directly.
+                    Update payout destinations used for stable settlement.
                   </p>
                 </div>
                 <Button type="button" onClick={() => setShowWalletEditor((current) => !current)}>
@@ -885,53 +692,18 @@ export default function SettingsPage() {
                     />
                   </SettingsField>
 
-                  <SettingsField label="Reserve wallet">
-                    <Input
-                      value={walletDraft.reserveWallet}
-                      onChange={(event) =>
-                        setWalletDraft((current) => ({
-                          ...current,
-                          reserveWallet: event.target.value,
-                        }))
-                      }
-                    />
-                  </SettingsField>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex justify-end">
                     <Button
                       type="button"
                       tone="brand"
                       disabled={busyAction === "wallet-save"}
                       onClick={() => void handleWalletSave()}
                     >
-                      Queue wallet change
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={!data.wallets.reserveWallet || busyAction === "wallet-remove"}
-                      onClick={() => void handleRemoveReserve()}
-                    >
-                      Remove reserve
+                      Save wallet settings
                     </Button>
                   </div>
                 </div>
               ) : null}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button
-                  type="button"
-                  disabled={!data.wallets.reserveWallet || busyAction === "wallet-promote"}
-                  onClick={() => void handlePromoteReserve()}
-                >
-                  Promote reserve
-                </Button>
-                <Link
-                  href="/dashboard/governance"
-                  className="inline-flex items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
-                >
-                  Open governance
-                </Link>
-              </div>
             </div>
           </div>
         </Card>
@@ -1024,23 +796,6 @@ export default function SettingsPage() {
                   enabled={notificationsDraft.teamInviteEmails}
                   onToggle={() =>
                     patchNotifications("teamInviteEmails", !notificationsDraft.teamInviteEmails)
-                  }
-                />
-                <SettingsToggle
-                  label="Governance alerts"
-                  enabled={notificationsDraft.governanceAlerts}
-                  onToggle={() =>
-                    patchNotifications(
-                      "governanceAlerts",
-                      !notificationsDraft.governanceAlerts
-                    )
-                  }
-                />
-                <SettingsToggle
-                  label="Treasury alerts"
-                  enabled={notificationsDraft.treasuryAlerts}
-                  onToggle={() =>
-                    patchNotifications("treasuryAlerts", !notificationsDraft.treasuryAlerts)
                   }
                 />
                 <SettingsToggle
@@ -1177,34 +932,27 @@ export default function SettingsPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                    Governance
+                    Team access
                   </p>
                   <p className="mt-2 text-sm text-[color:var(--muted)]">
-                    Approvers, thresholds, and protected treasury controls now live outside Settings.
+                    Role defaults and invite policies keep workspace access predictable.
                   </p>
                 </div>
-                <Badge tone={data.wallets.governanceVaultAddress ? "brand" : "neutral"}>
-                  {data.wallets.governanceVaultAddress ? "Governance active" : "Hidden by default"}
+                <Badge tone={securityDraft.enforceTwoFactor ? "brand" : "neutral"}>
+                  {securityDraft.enforceTwoFactor ? "2FA required" : "2FA optional"}
                 </Badge>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <SettingsMiniStat
-                  label="Wallet mode"
-                  value={data.wallets.governanceVaultAddress ? "Governed" : "Single owner"}
+                  label="Session timeout"
+                  value={securityDraft.sessionTimeout}
                 />
                 <SettingsMiniStat
-                  label="Pending approvals"
-                  value={String(pendingCount)}
+                  label="Invite domains"
+                  value={securityDraft.restrictInviteDomains ? "Restricted" : "Open"}
                 />
               </div>
-
-              <Link
-                href="/dashboard/governance"
-                className="inline-flex items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
-              >
-                Open governance
-              </Link>
             </div>
           </div>
 

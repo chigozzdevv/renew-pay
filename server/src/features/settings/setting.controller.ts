@@ -1,10 +1,7 @@
 import type { Request, Response } from "express";
 
 import {
-  confirmPendingPrimaryWalletChange,
   getSettingsByMerchantId,
-  promoteReserveWallet,
-  removeReserveWallet,
   saveWalletSettings,
   updateSettingsByMerchantId,
 } from "@/features/settings/setting.service";
@@ -12,7 +9,6 @@ import {
   merchantParamSchema,
   saveWalletSchema,
   updateSettingsSchema,
-  walletActionSchema,
 } from "@/features/settings/setting.validation";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
 import { asyncHandler } from "@/shared/utils/async-handler";
@@ -74,67 +70,7 @@ export const saveWalletsController = asyncHandler(
 
     response.status(200).json({
       success: true,
-      message: "Treasury wallet change request created.",
-      data: result,
-    });
-  }
-);
-
-export const promoteReserveWalletController = asyncHandler(
-  async (request: Request, response: Response) => {
-    const params = merchantParamSchema.parse(request.params);
-    const actor =
-      request.platformAuthUser?.name ?? request.platformAuthUser?.email ?? "system";
-    const input = walletActionSchema.parse({
-      ...request.body,
-      actor,
-      environment: resolveEnvironmentScope(request),
-    });
-    const result = await promoteReserveWallet(params.merchantId, input);
-
-    response.status(200).json({
-      success: true,
-      message: "Reserve wallet promotion queued.",
-      data: result,
-    });
-  }
-);
-
-export const removeReserveWalletController = asyncHandler(
-  async (request: Request, response: Response) => {
-    const params = merchantParamSchema.parse(request.params);
-    const actor =
-      request.platformAuthUser?.name ?? request.platformAuthUser?.email ?? "system";
-    const input = walletActionSchema.parse({
-      ...request.body,
-      actor,
-      environment: resolveEnvironmentScope(request),
-    });
-    const result = await removeReserveWallet(params.merchantId, input);
-
-    response.status(200).json({
-      success: true,
-      message: "Reserve wallet removal queued.",
-      data: result,
-    });
-  }
-);
-
-export const confirmPendingPrimaryWalletChangeController = asyncHandler(
-  async (request: Request, response: Response) => {
-    const params = merchantParamSchema.parse(request.params);
-    const actor =
-      request.platformAuthUser?.name ?? request.platformAuthUser?.email ?? "system";
-    const input = walletActionSchema.parse({
-      ...request.body,
-      actor,
-      environment: resolveEnvironmentScope(request),
-    });
-    const result = await confirmPendingPrimaryWalletChange(params.merchantId, input);
-
-    response.status(200).json({
-      success: true,
-      message: "Payout wallet confirmation queued.",
+      message: "Wallet settings updated.",
       data: result,
     });
   }
