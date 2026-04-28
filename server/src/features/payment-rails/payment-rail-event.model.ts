@@ -6,7 +6,7 @@ const paymentRailEventSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "yellow-card",
+      default: "partna",
     },
     environment: {
       type: String,

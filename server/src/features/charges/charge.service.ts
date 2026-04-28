@@ -9,10 +9,7 @@ import { emitChargeWebhookEventForStatusChange } from "@/features/developers/dev
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import type { MerchantRecord } from "@/features/merchants/merchant.model";
 import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
-import { recordProtocolChargeFailure } from "@/features/protocol/protocol.settlement";
 import { createSettlement } from "@/features/settlements/settlement.service";
-import { deriveProtocolMerchantAddress } from "@/features/protocol/protocol.merchant";
-import { getTreasuryByMerchantId } from "@/features/treasury/treasury.service";
 import type {
   CreateChargeInput,
   ListChargesQuery,
@@ -20,9 +17,6 @@ import type {
 } from "@/features/charges/charge.validation";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import {
-  createCollectionRequest,
-  getPreferredCollectionChannel,
-  getPreferredCollectionNetwork,
   quoteUsdAmountInBillingCurrency,
 } from "@/features/payment-rails/payment-rails.service";
 import {
@@ -60,9 +54,6 @@ function toChargeResponse(document: {
   feeAmount: number;
   status: string;
   failureCode?: string | null;
-  protocolChargeId?: string | null;
-  protocolSyncStatus?: string | null;
-  protocolTxHash?: string | null;
   processedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -87,11 +78,6 @@ function toChargeResponse(document: {
     feeAmount: document.feeAmount,
     status: document.status,
     failureCode: document.failureCode ?? null,
-    onchain: {
-      id: document.protocolChargeId ?? null,
-      status: document.protocolSyncStatus ?? "not_synced",
-      txHash: document.protocolTxHash ?? null,
-    },
     processedAt: document.processedAt,
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
@@ -157,48 +143,8 @@ async function mapChargesWithContext(
   );
 }
 
-function buildFallbackAccountNumber(customerRef: string) {
-  const digits = customerRef.replace(/\D/g, "");
-
-  return (digits || "1000000000").padStart(10, "0").slice(-10);
-}
-
-function deriveAccountType(
-  explicitType: string | undefined,
-  channelType: string
-): "bank" | "momo" {
-  if (explicitType === "momo") {
-    return "momo";
-  }
-
-  if (explicitType === "bank") {
-    return "bank";
-  }
-
-  return channelType.toLowerCase().includes("momo") ? "momo" : "bank";
-}
-
 function addDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-function toNullableString(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function toProtocolFailureCode(value: string) {
-  const normalized = value
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-
-  return (normalized || "COLLECTION_FAILED").slice(0, 32);
 }
 
 async function runPartnaSubscriptionChargeJob(input: {
@@ -250,21 +196,11 @@ async function runPartnaSubscriptionChargeJob(input: {
       voucher,
     }) ?? quote.feeAmount;
   const netUsdc = Number(Math.max(0.01, usdcAmount - feeAmount).toFixed(2));
-  const treasury = await getTreasuryByMerchantId(
-    merchant._id.toString(),
-    input.environment
-  ).catch(() => ({
-    account: null,
-  }));
-  const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
+  const destinationWallet = merchant.payoutWallet;
 
   if (!destinationWallet) {
     throw new HttpError(409, "Merchant payout wallet is not configured.");
   }
-  const protocolMerchantAddress = deriveProtocolMerchantAddress({
-    environment: toStoredRuntimeMode(input.environment),
-    merchantId: merchant._id.toString(),
-  });
   const now = new Date();
 
   const charge = await ChargeModel.create({
@@ -274,7 +210,7 @@ async function runPartnaSubscriptionChargeJob(input: {
     subscriptionId: subscription._id,
     invoiceId: null,
     externalChargeId: voucher.voucherId,
-    settlementSource: protocolMerchantAddress,
+    settlementSource: destinationWallet,
     paymentProvider: "partna",
     localAmount,
     fxRate,
@@ -282,9 +218,6 @@ async function runPartnaSubscriptionChargeJob(input: {
     feeAmount,
     status: "pending",
     failureCode: null,
-    protocolChargeId: null,
-    protocolSyncStatus: "pending_execution",
-    protocolTxHash: null,
     providerMetadata: {
       email: customer.email,
       voucherCode: voucher.voucherCode,
@@ -408,9 +341,6 @@ export async function createCharge(input: CreateChargeInput) {
     feeAmount: input.feeAmount,
     status: input.status,
     failureCode: input.failureCode ?? null,
-    protocolChargeId: null,
-    protocolSyncStatus: "not_synced",
-    protocolTxHash: null,
     processedAt: input.processedAt ?? new Date(),
   });
 
@@ -576,13 +506,6 @@ export async function updateCharge(
     charge.failureCode = input.failureCode ?? null;
   }
 
-  if (input.status === "settled") {
-    charge.protocolSyncStatus =
-      charge.protocolSyncStatus === "not_synced"
-        ? "settlement_credited"
-        : charge.protocolSyncStatus;
-  }
-
   if (input.processedAt !== undefined) {
     charge.processedAt = input.processedAt;
   }
@@ -724,14 +647,6 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     throw new HttpError(409, "Plan is not active.");
   }
 
-  if (!plan.protocolPlanId || plan.protocolSyncStatus !== "synced") {
-    return {
-      skipped: true,
-      reason: "Plan is waiting for on-chain activation.",
-      subscriptionId: subscription._id.toString(),
-    };
-  }
-
   if (plan.billingMode === "metered") {
     throw new HttpError(
       409,
@@ -739,19 +654,7 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     );
   }
 
-  if (
-    !subscription.protocolSubscriptionId ||
-    subscription.protocolSyncStatus !== "synced" ||
-    subscription.status === "pending_activation"
-  ) {
-    return {
-      skipped: true,
-      reason: "Subscription is waiting for on-chain activation.",
-      subscriptionId: subscription._id.toString(),
-    };
-  }
-
-  if (subscription.status === "paused" || subscription.status === "cancelled") {
+  if (subscription.status !== "active") {
     return {
       skipped: true,
       reason: `Subscription is ${subscription.status}.`,
@@ -779,237 +682,10 @@ export async function runSubscriptionChargeJob(input: { subscriptionId: string }
     };
   }
 
-  if (subscription.paymentProvider === "partna") {
-    return runPartnaSubscriptionChargeJob({
-      merchant,
-      plan,
-      subscription,
-      environment,
-    });
-  }
-
-  const channel = await getPreferredCollectionChannel(
-    subscription.billingCurrency,
-    environment
-  );
-  const network =
-    subscription.paymentNetworkId
-      ? await getPreferredCollectionNetwork(
-          channel.externalId,
-          channel.country,
-          environment
-        ).catch(() => null)
-      : await getPreferredCollectionNetwork(
-          channel.externalId,
-          channel.country,
-          environment
-        );
-
-  const quote = await quoteUsdAmountInBillingCurrency({
+  return runPartnaSubscriptionChargeJob({
+    merchant,
+    plan,
+    subscription,
     environment,
-    currency: subscription.billingCurrency,
-    usdAmount: plan.usdAmount,
   });
-
-  const localAmount = quote.localAmount;
-  const usdcAmount = quote.usdcAmount;
-  const fxRate = quote.fxRate;
-  const feeAmount = quote.feeAmount;
-  const netUsdc = Number(Math.max(0.01, usdcAmount - feeAmount).toFixed(2));
-
-  const collection = (await createCollectionRequest({
-    merchantId: merchant._id.toString(),
-    environment,
-    channelId: channel.externalId,
-    customerRef: subscription.customerRef,
-    customerName: subscription.customerName,
-    localAmount,
-    usdAmount: usdcAmount,
-    currency: subscription.billingCurrency,
-    country: channel.country,
-    networkId:
-      subscription.paymentNetworkId ?? network?.externalId ?? null,
-    accountType: deriveAccountType(
-      subscription.paymentAccountType,
-      channel.channelType
-    ),
-    accountNumber:
-      subscription.paymentAccountNumber ??
-      buildFallbackAccountNumber(subscription.customerRef),
-  })) as Record<string, unknown>;
-
-  const collectionStatus = String(collection.status ?? "processing").toLowerCase();
-  const externalChargeId = String(
-    collection.sequenceId ?? collection.id ?? `renew-charge-${Date.now()}`
-  );
-  const collectionSnapshot = {
-    provider: "yellow_card",
-    kind: "bank_transfer",
-    id: toNullableString(collection.id),
-    sequenceId: toNullableString(collection.sequenceId) ?? externalChargeId,
-    status: collectionStatus,
-    reference: toNullableString(collection.reference),
-    expiresAt:
-      typeof collection.expiresAt === "string" || collection.expiresAt instanceof Date
-        ? new Date(collection.expiresAt)
-        : null,
-    redirectUrl: null,
-    bankTransfer:
-      typeof collection.bankInfo === "object" && collection.bankInfo !== null
-        ? {
-            bankCode: toNullableString((collection.bankInfo as Record<string, unknown>).bankCode),
-            bankName: toNullableString((collection.bankInfo as Record<string, unknown>).name),
-            accountNumber: toNullableString(
-              (collection.bankInfo as Record<string, unknown>).accountNumber
-            ),
-            accountName: toNullableString(
-              (collection.bankInfo as Record<string, unknown>).accountName
-            ),
-            currency: subscription.billingCurrency,
-          }
-        : null,
-  };
-
-  const treasury = await getTreasuryByMerchantId(
-    merchant._id.toString(),
-    environment
-  ).catch(() => ({
-    account: null,
-  }));
-  const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
-
-  if (!destinationWallet) {
-    throw new HttpError(409, "Merchant payout wallet is not configured.");
-  }
-  const protocolMerchantAddress = deriveProtocolMerchantAddress({
-    environment: toStoredRuntimeMode(environment),
-    merchantId: merchant._id.toString(),
-  });
-
-  if (collectionStatus === "failed") {
-    const failedCharge = await ChargeModel.create({
-      merchantId: merchant._id,
-      environment,
-      sourceKind: "subscription",
-      subscriptionId: subscription._id,
-      invoiceId: null,
-      externalChargeId,
-      settlementSource: protocolMerchantAddress,
-      localAmount,
-      fxRate,
-      usdcAmount,
-      feeAmount,
-      status: "failed",
-      failureCode: "collection_failed",
-      protocolChargeId: null,
-      protocolSyncStatus:
-        subscription.protocolSubscriptionId && subscription.protocolSyncStatus === "synced"
-          ? "pending_failure_record"
-          : "blocked_subscription_sync",
-      protocolTxHash: null,
-      processedAt: now,
-    });
-
-    subscription.status = "past_due";
-    subscription.retryAvailableAt = new Date(
-      now.getTime() + plan.retryWindowHours * 60 * 60 * 1000
-    );
-    await subscription.save();
-
-    if (
-      subscription.protocolSubscriptionId &&
-      subscription.protocolSyncStatus === "synced"
-    ) {
-      const protocolFailure = await recordProtocolChargeFailure({
-        environment,
-        protocolSubscriptionId: subscription.protocolSubscriptionId,
-        externalChargeId,
-        failureCode: toProtocolFailureCode("collection_failed"),
-      }).catch(() => null);
-
-      if (protocolFailure) {
-        failedCharge.protocolChargeId = protocolFailure.protocolChargeId;
-        failedCharge.protocolSyncStatus = "failed_recorded";
-        failedCharge.protocolTxHash = protocolFailure.txHash;
-        await failedCharge.save();
-      } else {
-        failedCharge.protocolSyncStatus = "protocol_error";
-        await failedCharge.save();
-      }
-    }
-
-    await emitChargeWebhookEventForStatusChange({
-      previousStatus: null,
-      chargeId: failedCharge._id.toString(),
-      nextStatus: failedCharge.status,
-    });
-    await queueChargeStatusNotifications({
-      chargeId: failedCharge._id.toString(),
-      previousStatus: null,
-      nextStatus: failedCharge.status,
-    }).catch(() => undefined);
-
-    return {
-      subscriptionId: subscription._id.toString(),
-      chargeId: failedCharge._id.toString(),
-      status: "failed",
-      retryAvailableAt: subscription.retryAvailableAt,
-      collection: collectionSnapshot,
-    };
-  }
-
-  const charge = await ChargeModel.create({
-    merchantId: merchant._id,
-    environment,
-    sourceKind: "subscription",
-    subscriptionId: subscription._id,
-    invoiceId: null,
-    externalChargeId,
-    settlementSource: protocolMerchantAddress,
-    paymentProvider: "yellow_card",
-    localAmount,
-    fxRate,
-    usdcAmount,
-    feeAmount,
-    status: "pending",
-    failureCode: null,
-    protocolChargeId: null,
-    protocolSyncStatus: "pending_execution",
-    protocolTxHash: null,
-    processedAt: now,
-  });
-
-  const settlement = await createSettlement({
-    merchantId: merchant._id.toString(),
-    environment,
-    sourceChargeId: charge._id.toString(),
-    batchRef: `settlement-${externalChargeId}`,
-    grossUsdc: Number(usdcAmount.toFixed(2)),
-    feeUsdc: feeAmount,
-    netUsdc,
-    destinationWallet,
-    sourceKind: "subscription",
-    commercialRef: null,
-    localAmount,
-    fxRate,
-    status: "queued",
-    scheduledFor: new Date(now.getTime() + 5 * 60 * 1000),
-  });
-
-  subscription.status = "active";
-  subscription.localAmount = localAmount;
-  subscription.lastChargeAt = now;
-  subscription.retryAvailableAt = null;
-  subscription.nextChargeAt = addDays(now, plan.billingIntervalDays);
-  await subscription.save();
-
-  return {
-    subscriptionId: subscription._id.toString(),
-    chargeId: charge._id.toString(),
-    externalChargeId,
-    settlementId: settlement.id,
-    collectionStatus,
-    settlementStatus: settlement.status,
-    collection: collectionSnapshot,
-  };
 }

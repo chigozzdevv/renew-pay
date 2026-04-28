@@ -50,7 +50,7 @@ const subscriptionSchema = new Schema(
     paymentProvider: {
       type: String,
       trim: true,
-      default: "yellow_card",
+      default: "partna",
     },
     paymentAccountType: {
       type: String,
@@ -89,26 +89,6 @@ const subscriptionSchema = new Schema(
     },
     retryAvailableAt: {
       type: Date,
-      default: null,
-    },
-    protocolSubscriptionId: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    protocolOperationId: {
-      type: Schema.Types.ObjectId,
-      ref: "TreasuryOperation",
-      default: null,
-    },
-    protocolSyncStatus: {
-      type: String,
-      trim: true,
-      default: "not_synced",
-    },
-    protocolTxHash: {
-      type: String,
-      trim: true,
       default: null,
     },
     paymentProfileSnapshot: {

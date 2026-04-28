@@ -57,24 +57,6 @@ export const createWidgetQuoteSchema = z
     }
   });
 
-export const resolveBankAccountSchema = z.object({
-  environment: environmentInputSchema.default("test"),
-  accountNumber: z.string().trim().min(6).max(24),
-  networkId: z.string().trim().min(2).max(120),
-});
-
-export const yellowCardWebhookSchema = z.object({
-  environment: optionalEnvironmentInputSchema,
-  id: z.string().trim().min(1).optional(),
-  sequenceId: z.string().trim().min(1).optional(),
-  state: z.string().trim().min(1).optional(),
-  event: z.string().trim().min(1).optional(),
-  status: z.string().trim().min(1).optional(),
-  data: z.record(z.string(), z.unknown()).optional(),
-  payload: z.record(z.string(), z.unknown()).optional(),
-  collection: z.record(z.string(), z.unknown()).optional(),
-});
-
 export const partnaWebhookSchema = z.object({
   environment: optionalEnvironmentInputSchema,
   event: z.string().trim().min(1).optional(),
@@ -82,15 +64,8 @@ export const partnaWebhookSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const collectionParamSchema = z.object({
-  collectionId: z.string().trim().min(3).max(140),
-});
-
 export type ListChannelsQuery = z.infer<typeof listChannelsQuerySchema>;
 export type ListNetworksQuery = z.infer<typeof listNetworksQuerySchema>;
 export type SyncPaymentRailInput = z.infer<typeof syncPaymentRailSchema>;
 export type CreateWidgetQuoteInput = z.infer<typeof createWidgetQuoteSchema>;
-export type ResolveBankAccountInput = z.infer<typeof resolveBankAccountSchema>;
-export type YellowCardWebhookInput = z.infer<typeof yellowCardWebhookSchema>;
 export type PartnaWebhookInput = z.infer<typeof partnaWebhookSchema>;
-export type CollectionParamInput = z.infer<typeof collectionParamSchema>;

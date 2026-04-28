@@ -1,4 +1,4 @@
-export const paymentRailProviderValues = ["yellow_card", "partna"] as const;
+export const paymentRailProviderValues = ["partna"] as const;
 
 export type PaymentRailProvider = (typeof paymentRailProviderValues)[number];
 

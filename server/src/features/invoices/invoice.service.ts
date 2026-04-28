@@ -19,11 +19,6 @@ import {
   queueInvoiceReminderNotification,
 } from "@/features/notifications/notification.service";
 import {
-  acceptCollectionRequest,
-  createCollectionRequest,
-  getPreferredCollectionChannel,
-  getPreferredCollectionNetwork,
-  processYellowCardWebhook,
   quoteUsdAmountInBillingCurrency,
 } from "@/features/payment-rails/payment-rails.service";
 import {
@@ -44,7 +39,6 @@ import { getPartnaProvider } from "@/features/payment-rails/providers/partna/par
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { createSettlement } from "@/features/settlements/settlement.service";
 import { SettlementModel } from "@/features/settlements/settlement.model";
-import { getTreasuryByMerchantId } from "@/features/treasury/treasury.service";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import {
@@ -457,7 +451,10 @@ function toInvoiceResponse(input: {
       : null,
     paymentInstructions: input.invoice.paymentSnapshot
       ? {
-          provider: input.invoice.paymentSnapshot.provider ?? null,
+          provider:
+            input.invoice.paymentSnapshot.provider === "partna"
+              ? input.invoice.paymentSnapshot.provider
+              : null,
           kind: input.invoice.paymentSnapshot.kind ?? null,
           externalChargeId: input.invoice.paymentSnapshot.externalChargeId ?? null,
           billingCurrency: input.invoice.paymentSnapshot.billingCurrency ?? null,
@@ -589,7 +586,10 @@ async function toPublicInvoiceResponse(input: {
       : null,
     paymentInstructions: input.invoice.paymentSnapshot
       ? {
-          provider: input.invoice.paymentSnapshot.provider ?? null,
+          provider:
+            input.invoice.paymentSnapshot.provider === "partna"
+              ? input.invoice.paymentSnapshot.provider
+              : null,
           kind: input.invoice.paymentSnapshot.kind ?? null,
           externalChargeId: input.invoice.paymentSnapshot.externalChargeId ?? null,
           billingCurrency: input.invoice.paymentSnapshot.billingCurrency ?? null,
@@ -643,7 +643,6 @@ async function createInvoicePaymentAttempt(
   invoice: Awaited<ReturnType<typeof ensurePublicInvoice>>
 ) {
   const runtimeEnvironment = toStoredRuntimeMode(invoice.environment);
-  const paymentProvider = getDefaultPaymentRailProvider(runtimeEnvironment);
 
   if (!invoice.customerId) {
     throw new HttpError(409, "Invoice customer is not ready.");
@@ -655,10 +654,7 @@ async function createInvoicePaymentAttempt(
     throw new HttpError(404, "Invoice customer was not found.");
   }
 
-  if (
-    paymentProvider === "partna" &&
-    !hasActivePartnaPaymentProfile(customer, invoice.billingCurrency)
-  ) {
+  if (!hasActivePartnaPaymentProfile(customer, invoice.billingCurrency)) {
     invoice.verificationSnapshot = buildPartnaVerificationSnapshot(invoice.billingCurrency);
     await invoice.save();
     return getPublicInvoiceByToken(invoice.publicToken);
@@ -684,167 +680,6 @@ async function createInvoicePaymentAttempt(
     }
   }
 
-  if (paymentProvider === "yellow_card") {
-    const [treasury, merchant] = await Promise.all([
-      getTreasuryByMerchantId(invoice.merchantId.toString(), runtimeEnvironment).catch(() => ({
-        account: null,
-      })),
-      MerchantModel.findById(invoice.merchantId).exec(),
-    ]);
-
-    if (!merchant) {
-      throw new HttpError(404, "Merchant was not found.");
-    }
-
-    const channel = await getPreferredCollectionChannel(
-      invoice.billingCurrency,
-      runtimeEnvironment
-    );
-    const network = await getPreferredCollectionNetwork(
-      channel.externalId,
-      channel.country,
-      runtimeEnvironment
-    ).catch(() => null);
-    const collection = (await createCollectionRequest({
-      merchantId: invoice.merchantId.toString(),
-      environment: runtimeEnvironment,
-      channelId: channel.externalId,
-      customerRef: customer.customerRef,
-      customerName: customer.name,
-      localAmount: invoice.localAmount,
-      usdAmount: invoice.usdcAmount,
-      currency: invoice.billingCurrency,
-      country: channel.country,
-      networkId: network?.externalId ?? null,
-      accountType: channel.channelType === "momo" ? "momo" : "bank",
-    })) as Record<string, unknown>;
-
-    const collectionStatus = String(collection.status ?? "processing").toLowerCase();
-    const externalChargeId = String(
-      collection.sequenceId ?? collection.id ?? `renew-invoice-${Date.now()}`
-    );
-    const collectionSnapshot = {
-      provider: "yellow_card" as const,
-      kind: "bank_transfer" as const,
-      externalChargeId,
-      billingCurrency: invoice.billingCurrency,
-      localAmount: invoice.localAmount,
-      usdcAmount: invoice.usdcAmount,
-      feeAmount: invoice.feeAmount,
-      status: collectionStatus,
-      reference:
-        typeof collection.reference === "string" ? collection.reference : null,
-      expiresAt:
-        typeof collection.expiresAt === "string" || collection.expiresAt instanceof Date
-          ? new Date(collection.expiresAt)
-          : null,
-      redirectUrl: null,
-      bankTransfer:
-        typeof collection.bankInfo === "object" && collection.bankInfo !== null
-          ? {
-              bankCode:
-                typeof (collection.bankInfo as Record<string, unknown>).bankCode === "string"
-                  ? ((collection.bankInfo as Record<string, unknown>).bankCode as string)
-                  : null,
-              bankName:
-                typeof (collection.bankInfo as Record<string, unknown>).name === "string"
-                  ? ((collection.bankInfo as Record<string, unknown>).name as string)
-                  : null,
-              accountNumber:
-                typeof (collection.bankInfo as Record<string, unknown>).accountNumber === "string"
-                  ? ((collection.bankInfo as Record<string, unknown>).accountNumber as string)
-                  : null,
-              accountName:
-                typeof (collection.bankInfo as Record<string, unknown>).accountName === "string"
-                  ? ((collection.bankInfo as Record<string, unknown>).accountName as string)
-                  : null,
-              currency: invoice.billingCurrency,
-            }
-          : null,
-    };
-
-    const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
-
-    if (!destinationWallet) {
-      throw new HttpError(409, "Merchant payout wallet is not configured.");
-    }
-
-    const charge = await ChargeModel.create({
-      merchantId: invoice.merchantId,
-      environment: runtimeEnvironment,
-      sourceKind: "invoice",
-      subscriptionId: null,
-      invoiceId: invoice._id,
-      externalChargeId,
-      settlementSource: merchant.payoutWallet,
-      paymentProvider: "yellow_card",
-      localAmount: invoice.localAmount,
-      fxRate: invoice.fxRate,
-      usdcAmount: invoice.usdcAmount,
-      feeAmount: invoice.feeAmount,
-      status: "pending",
-      failureCode: null,
-      protocolChargeId: null,
-      protocolSyncStatus: "pending_execution",
-      protocolTxHash: null,
-      providerMetadata: {
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceId: invoice._id.toString(),
-        paymentInstructions: collectionSnapshot,
-      },
-      processedAt: new Date(),
-    });
-
-    const settlement = await createSettlement({
-      merchantId: invoice.merchantId.toString(),
-      environment: runtimeEnvironment,
-      sourceChargeId: charge._id.toString(),
-      sourceKind: "invoice",
-      batchRef: externalChargeId,
-      commercialRef: invoice.invoiceNumber,
-      grossUsdc: Number(invoice.usdcAmount.toFixed(2)),
-      feeUsdc: invoice.feeAmount,
-      netUsdc: Number(Math.max(0.01, invoice.usdcAmount - invoice.feeAmount).toFixed(2)),
-      destinationWallet,
-      localAmount: invoice.localAmount,
-      fxRate: invoice.fxRate,
-      status: "queued",
-      scheduledFor: new Date(Date.now() + 5 * 60 * 1000),
-    });
-
-    invoice.status = "pending_payment";
-    invoice.paymentProvider = "yellow_card";
-    invoice.paymentSnapshot = {
-      provider: collectionSnapshot.provider,
-      kind: collectionSnapshot.kind,
-      externalChargeId: collectionSnapshot.externalChargeId,
-      billingCurrency: collectionSnapshot.billingCurrency,
-      localAmount: collectionSnapshot.localAmount,
-      usdcAmount: collectionSnapshot.usdcAmount,
-      feeAmount: collectionSnapshot.feeAmount,
-      status: collectionSnapshot.status,
-      reference: collectionSnapshot.reference,
-      expiresAt: collectionSnapshot.expiresAt,
-      redirectUrl: null,
-      bankTransfer: collectionSnapshot.bankTransfer,
-    };
-    invoice.verificationSnapshot = {
-      provider: "yellow_card",
-      status: "verified",
-      country: channel.country,
-      currency: invoice.billingCurrency,
-      instructions: "Payment details are ready.",
-      verificationHint: null,
-      verificationMethods: [],
-      requiredFields: [],
-    };
-    invoice.chargeId = charge._id;
-    invoice.settlementId = new Types.ObjectId(settlement.id);
-    await invoice.save();
-
-    return getPublicInvoiceByToken(invoice.publicToken);
-  }
-
   const { voucher, paymentSnapshot } = await createPartnaChargeInstruction({
     environment: runtimeEnvironment,
     customerEmail: customer.email,
@@ -857,12 +692,6 @@ async function createInvoicePaymentAttempt(
       fxRate: invoice.fxRate,
       voucher,
     }) ?? invoice.feeAmount;
-  const treasury = await getTreasuryByMerchantId(
-    invoice.merchantId.toString(),
-    runtimeEnvironment
-  ).catch(() => ({
-    account: null,
-  }));
   const merchant = await MerchantModel.findById(invoice.merchantId).exec();
 
   if (!merchant) {
@@ -884,9 +713,6 @@ async function createInvoicePaymentAttempt(
     feeAmount,
     status: "pending",
     failureCode: null,
-    protocolChargeId: null,
-    protocolSyncStatus: "pending_execution",
-    protocolTxHash: null,
     providerMetadata: {
       email: customer.email,
       voucherCode: voucher.voucherCode,
@@ -903,7 +729,7 @@ async function createInvoicePaymentAttempt(
     processedAt: new Date(),
   });
 
-  const destinationWallet = treasury.account?.payoutWallet ?? merchant.payoutWallet;
+  const destinationWallet = merchant.payoutWallet;
 
   if (!destinationWallet) {
     throw new HttpError(409, "Merchant payout wallet is not configured.");
@@ -1576,40 +1402,10 @@ export async function completePublicInvoiceTestPayment(publicToken: string) {
     );
   }
 
-  if (invoice.paymentProvider === "yellow_card") {
-    if (!invoice.paymentSnapshot?.externalChargeId) {
-      throw new HttpError(409, "Invoice has no pending payment instructions.");
-    }
-
-    const acceptedCollection = await acceptCollectionRequest(
-      invoice.paymentSnapshot.externalChargeId,
-      "test"
-    );
-
-    await processYellowCardWebhook(
-      {
-        event: "collection.updated",
-        status: "success",
-        sequenceId: invoice.paymentSnapshot.externalChargeId,
-        id:
-          typeof (acceptedCollection as Record<string, unknown>).id === "string"
-            ? ((acceptedCollection as Record<string, unknown>).id as string)
-            : invoice.paymentSnapshot.externalChargeId,
-        data: {
-          ...(acceptedCollection as Record<string, unknown>),
-          status: "success",
-        },
-      },
-      "test"
-    );
-
-    return getPublicInvoiceByToken(publicToken);
-  }
-
   if (invoice.paymentProvider !== "partna") {
     throw new HttpError(
       409,
-      "Sandbox payment completion is not implemented for this invoice provider."
+      "Sandbox payment completion is not available for this invoice."
     );
   }
 

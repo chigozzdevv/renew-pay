@@ -42,7 +42,7 @@ const chargeSchema = new Schema(
     paymentProvider: {
       type: String,
       trim: true,
-      default: "yellow_card",
+      default: "partna",
     },
     localAmount: {
       type: Number,
@@ -72,21 +72,6 @@ const chargeSchema = new Schema(
       default: "pending",
     },
     failureCode: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    protocolChargeId: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    protocolSyncStatus: {
-      type: String,
-      trim: true,
-      default: "not_synced",
-    },
-    protocolTxHash: {
       type: String,
       trim: true,
       default: null,

@@ -17,8 +17,6 @@ const envSchema = z
     MONGODB_DB_NAME: z.string().trim().min(1).default("renew_v2"),
     CORS_ORIGINS: z.string().trim().default("http://localhost:3000"),
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
-    PAYMENT_RAIL_PROVIDER_TEST: z.enum(["yellow_card", "partna"]).default("partna"),
-    PAYMENT_RAIL_PROVIDER_LIVE: z.enum(["yellow_card", "partna"]).default("partna"),
     SOLANA_CLUSTER_TEST: z
       .string()
       .trim()
@@ -71,31 +69,10 @@ const envSchema = z
     SOLANA_ADMIN_SECRET_KEY_LIVE: z.string().trim().default(""),
     SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_TEST: z.string().trim().default(""),
     SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_LIVE: z.string().trim().default(""),
-    SQUADS_DEFAULT_VAULT_INDEX: z.coerce.number().int().min(0).default(0),
     ENABLE_WORKERS: booleanEnv.default(true),
     REDIS_URL: z.string().trim().min(1).default("redis://127.0.0.1:6379"),
     REDIS_QUEUE_PREFIX: z.string().trim().min(1).default("renew"),
     REDIS_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(4),
-    YELLOW_CARD_BASE_URL_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://sandbox.api.yellowcard.io/business"),
-    YELLOW_CARD_BASE_URL_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://api.yellowcard.io/business"),
-    YELLOW_CARD_API_KEY_TEST: z.string().trim().default(""),
-    YELLOW_CARD_API_KEY_LIVE: z.string().trim().default(""),
-    YELLOW_CARD_TIMESTAMP_HEADER: z
-      .string()
-      .trim()
-      .min(1)
-      .default("X-YC-Timestamp"),
-    YELLOW_CARD_WEBHOOK_SECRET_TEST: z.string().trim().default(""),
-    YELLOW_CARD_WEBHOOK_SECRET_LIVE: z.string().trim().default(""),
-    YELLOW_CARD_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
     PARTNA_V4_BASE_URL_TEST: z
       .string()
       .trim()

@@ -1,16 +1,11 @@
 import { Router } from "express";
 
 import {
-  acceptCollectionRequestController,
   createWidgetQuoteController,
-  denyCollectionRequestController,
   enqueuePaymentRailSyncController,
-  getCollectionRequestController,
   listChannelsController,
   listNetworksController,
   processPartnaWebhookController,
-  processYellowCardWebhookController,
-  resolveBankAccountController,
   syncChannelsController,
   syncNetworksController,
 } from "@/features/payment-rails/payment-rails.controller";
@@ -21,12 +16,11 @@ import {
 
 const paymentRailRouter = Router();
 
-paymentRailRouter.post("/webhooks/yellow-card", processYellowCardWebhookController);
 paymentRailRouter.post("/webhooks/partna", processPartnaWebhookController);
 
 paymentRailRouter.use(requirePlatformAuth);
 paymentRailRouter.use(
-  requirePlatformPermissions(["payments", "treasury", "developers", "team_admin"])
+  requirePlatformPermissions(["payments", "developers", "team_admin"])
 );
 
 paymentRailRouter.get("/channels", listChannelsController);
@@ -47,9 +41,5 @@ paymentRailRouter.post(
   enqueuePaymentRailSyncController
 );
 paymentRailRouter.post("/quotes", createWidgetQuoteController);
-paymentRailRouter.post("/banks/resolve", resolveBankAccountController);
-paymentRailRouter.get("/collections/:collectionId", getCollectionRequestController);
-paymentRailRouter.post("/collections/:collectionId/accept", acceptCollectionRequestController);
-paymentRailRouter.post("/collections/:collectionId/deny", denyCollectionRequestController);
 
 export { paymentRailRouter };
