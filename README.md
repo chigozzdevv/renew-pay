@@ -4,11 +4,11 @@
 
 Renew lets merchants charge customers in local fiat, reconcile billing off-chain, and settle completed payments in USDC on Solana. It is built to solve the friction, low success rates, and poor reliability of card-based billing across many African markets by letting customers pay with the methods and currencies they already use and trust.
 
-Renew uses Partna and Yellow Card for local collection, Privy for authentication and wallet management, Sumsub for KYC and KYB, and Squads for treasury control.
+Renew uses Partna for local collection, Privy for authentication and wallet management, and Sumsub for KYC and KYB.
 
 ## Runtime Status
 
-Renew currently runs in test mode on Solana devnet with Partna and Yellow Card test rails and Sumsub test KYC during onboarding.
+Renew currently runs in test mode on Solana devnet with Partna test rails and Sumsub test KYC during onboarding.
 
 Live mode is not active yet. It will follow the Solana mainnet deployment and the production compliance rollout. The live stack will include KYC, KYB, AML, KYT, and Travel Rule controls for real-money activity, through our existing Sumsub integration.
 
@@ -36,18 +36,15 @@ Current compliance config:
 |---------|-------|
 | Auth | Privy |
 | Onboarding | Owner, business, market, payout wallet, verification |
-| Payment rails | Partna + Yellow Card |
-| Local billing markets | `BWP`, `CDF`, `GHS`, `KES`, `MWK`, `NGN`, `RWF`, `TZS`, `UGX`, `XAF`, `XOF`, `ZAR`, `ZMW` |
+| Payment rail | Partna |
+| Local billing markets | `GHS`, `KES`, `NGN` |
 | Settlement asset | `USDC` |
 | Settlement network | Solana |
-| Treasury / approvals | Squads multisig |
 | Verification | Sumsub |
 | Protocol program | Anchor program: `renew_protocol` |
 
 Server defaults come from [server/.env.example](./server/.env.example):
 
-- `PAYMENT_RAIL_PROVIDER_TEST=partna`
-- `PAYMENT_RAIL_PROVIDER_LIVE=partna`
 - `SOLANA_CLUSTER_TEST=devnet`
 - `SOLANA_CLUSTER_LIVE=mainnet-beta`
 
@@ -56,11 +53,11 @@ Server defaults come from [server/.env.example](./server/.env.example):
 1. The merchant signs in with Privy.
 2. Onboarding completes the actual workspace setup: owner details, business details, supported billing markets, payout wallet, and verification.
 3. The merchant creates a subscription plan or invoice from the dashboard or API.
-4. Renew creates a checkout or invoice payment flow and provisions the customer’s local collection instructions through the active payment rail.
+4. Renew creates a checkout or invoice payment flow and provisions the customer’s local collection instructions through Partna.
 5. The customer pays in local fiat.
 6. Renew reconciles the payment rail event, normalizes the value into USDC, and records settlement state.
-7. The protocol records the billing and settlement state on Solana.
-8. Treasury actions and payout controls are managed through Squads-backed governance and approved payout wallets.
+7. The protocol publishes route and settlement commitments on Solana where an auditable public anchor is useful.
+8. Stable settlement is paid to the merchant’s configured payout wallet.
 
 ## Architecture
 
@@ -68,24 +65,22 @@ Renew uses a hybrid off-chain and on-chain architecture.
 
 Off-chain handles business logic, customer data, payment-rail orchestration, and operational workflows.
 
-On-chain records the protocol and settlement state that benefits from transparency, balances, and treasury-controlled execution.
+On-chain records only the route and settlement commitments that benefit from transparency without moving merchant operations into contract-heavy workflows.
 
 ### Off-chain
 
 - Privy authentication and session exchange
 - Onboarding state and merchant workspace management
 - Hosted checkout, customer records, invoices, and subscriptions
-- Partna and Yellow Card payment-rail orchestration, webhooks, and FX quotes
+- Partna payment-rail orchestration, webhooks, and FX quotes
 - Notification delivery, job queues, and dashboard aggregation
 - Sumsub KYC / KYB orchestration
 
 ### On-chain
 
-- Merchant protocol identity
-- Plan lifecycle and subscription lifecycle
-- Charge and settlement recording
-- Merchant settlement balances
-- Treasury-controlled payout execution on Solana
+- Route configuration commitments
+- Settlement batch commitments
+- Public audit anchors for payment-route and settlement integrity
 
 ## Project Structure
 
@@ -109,7 +104,7 @@ The client is a Next.js 16 app used for:
 - marketing pages
 - Privy sign-in
 - onboarding
-- dashboard surfaces for customers, plans, subscriptions, invoices, treasury, developers, and settings
+- dashboard surfaces for customers, plans, subscriptions, invoices, payments, developers, and settings
 - playground checkout testing
 
 ### Server
@@ -119,9 +114,8 @@ The server is an Express + TypeScript API used for:
 - auth and workspace session management
 - onboarding and verification orchestration
 - customers, plans, subscriptions, charges, and invoices
-- Partna and Yellow Card payment-rail integration and webhooks
-- Solana protocol execution and settlement tracking
-- Squads treasury coordination
+- Partna payment-rail integration and webhooks
+- Solana commitment publishing and settlement tracking
 - developer keys and webhook delivery
 
 ### Contracts
@@ -136,7 +130,7 @@ The `contracts/` workspace contains the `renew_protocol` Solana program.
 
 ### SDK
 
-[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides headless checkout clients, server-side helpers, React checkout components, webhook verification helpers, and protocol clients.
+[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides headless checkout clients, invoice helpers, server-side helpers, React checkout components, and webhook verification helpers.
 
 Install:
 
@@ -209,9 +203,8 @@ export function CheckoutExample() {
 | Backend | Node.js, Express, MongoDB, Mongoose, BullMQ, Zod |
 | Auth | Privy |
 | Verification | Sumsub |
-| Payments | Partna + Yellow Card |
+| Payments | Partna |
 | Protocol | Solana, Anchor, SPL Token |
-| Treasury | Squads multisig |
 | SDK | TypeScript, npm |
 
 ## Getting Started
@@ -278,11 +271,6 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 - `REDIS_URL`
 - `PAYMENT_ENV`
 
-### Payment rail selection
-
-- `PAYMENT_RAIL_PROVIDER_TEST`
-- `PAYMENT_RAIL_PROVIDER_LIVE`
-
 ### Solana / protocol
 
 - `SOLANA_CLUSTER_TEST`
@@ -312,17 +300,6 @@ The full list lives in [server/.env.example](./server/.env.example). The most im
 - `PARTNA_API_USER_LIVE`
 - `PARTNA_WEBHOOK_PUBLIC_KEY_TEST`
 - `PARTNA_WEBHOOK_PUBLIC_KEY_LIVE`
-
-### Yellow Card
-
-- `YELLOW_CARD_BASE_URL_TEST`
-- `YELLOW_CARD_BASE_URL_LIVE`
-- `YELLOW_CARD_API_KEY_TEST`
-- `YELLOW_CARD_API_KEY_LIVE`
-- `YELLOW_CARD_TIMESTAMP_HEADER`
-- `YELLOW_CARD_WEBHOOK_SECRET_TEST`
-- `YELLOW_CARD_WEBHOOK_SECRET_LIVE`
-- `YELLOW_CARD_TIMEOUT_MS`
 
 ### Auth and verification
 

@@ -101,7 +101,7 @@ const solidityPatterns: Pattern[] = [
   {
     type: "type",
     regex:
-      /^(?:address|bool|bytes\d*|bytes32|string|uint\d*|int\d*|IERC20|IRenewVault|BillingMode|SubscriptionStatus|ChargeStatus|Merchant|Plan|Subscription|Charge)\b/,
+      /^(?:address|bool|bytes\d*|bytes32|string|uint\d*|int\d*|IERC20|BillingMode|SubscriptionStatus|ChargeStatus|Merchant|Plan|Subscription|Charge)\b/,
   },
   {
     type: "number",

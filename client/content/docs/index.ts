@@ -113,8 +113,7 @@ SERVER_KEY_PREFIX=rw_live_`,
         ],
         steps: [
           "Create an account.",
-          "Add your treasury wallet.",
-          "Enable governance only if your treasury needs shared approvals.",
+          "Add your payout wallet.",
           "Create a plan in the workspace.",
           "Create an `rw_test_` key in the Developers page.",
           "Use the key to list plans and create a session.",
@@ -576,7 +575,7 @@ SERVER_KEY_PREFIX=rw_live_`,
           "Review pricing, interval, and `supportedMarkets`.",
           "Update the plan when pricing or availability changes.",
           "Move the plan to `active` when you want checkout to surface it.",
-          "Wait until the plan is synced before relying on checkout.",
+          "Use checkout only after the plan is active.",
         ],
       },
       {
@@ -645,12 +644,6 @@ SERVER_KEY_PREFIX=rw_live_`,
               supportedMarkets: ["NGN", "KES"],
               status: "draft",
               pendingStatus: null,
-              onchain: {
-                id: null,
-                status: "not_synced",
-                operationId: null,
-                txHash: null,
-              },
               createdAt: "2026-03-09T10:00:00.000Z",
               updatedAt: "2026-03-09T10:00:00.000Z",
             },
@@ -683,12 +676,6 @@ SERVER_KEY_PREFIX=rw_live_`,
               supportedMarkets: ["NGN", "KES"],
               status: "draft",
               pendingStatus: "active",
-              onchain: {
-                id: null,
-                status: "pending_activation",
-                operationId: "64f8ca10f1d2c11d0e63b820",
-                txHash: null,
-              },
               createdAt: "2026-03-09T10:00:00.000Z",
               updatedAt: "2026-03-09T10:12:00.000Z",
             },
@@ -713,7 +700,7 @@ SERVER_KEY_PREFIX=rw_live_`,
           "A subscription connects one customer to one plan and stores the billing snapshot Renew uses for future charges.",
         ],
         steps: [
-          "Make sure the plan is active and synced.",
+          "Make sure the plan is active.",
           "Create the subscription from the workspace API or during checkout.",
           "Read or update the subscription when timing or payment routing changes.",
           "Queue the next charge when you want Renew to run billing.",
@@ -792,12 +779,6 @@ SERVER_KEY_PREFIX=rw_live_`,
               nextChargeAt: "2026-03-16T08:00:00.000Z",
               lastChargeAt: null,
               retryAvailableAt: null,
-              onchain: {
-                id: null,
-                status: "pending_activation",
-                operationId: "64f8ca60f1d2c11d0e63b840",
-                txHash: null,
-              },
               createdAt: "2026-03-09T10:20:00.000Z",
               updatedAt: "2026-03-09T10:20:00.000Z",
             },
@@ -832,12 +813,6 @@ SERVER_KEY_PREFIX=rw_live_`,
               nextChargeAt: "2026-03-18T08:00:00.000Z",
               lastChargeAt: null,
               retryAvailableAt: null,
-              onchain: {
-                id: "301",
-                status: "synced",
-                operationId: null,
-                txHash: "0x1111111111111111111111111111111111111111111111111111111111111111",
-              },
               createdAt: "2026-03-09T10:20:00.000Z",
               updatedAt: "2026-03-09T10:30:00.000Z",
             },
@@ -935,11 +910,6 @@ SERVER_KEY_PREFIX=rw_live_`,
               feeAmount: 1.5,
               status: "pending",
               failureCode: null,
-              onchain: {
-                id: null,
-                status: "not_synced",
-                txHash: null,
-              },
               processedAt: "2026-03-09T10:40:00.000Z",
               createdAt: "2026-03-09T10:40:00.000Z",
               updatedAt: "2026-03-09T10:40:00.000Z",
@@ -1207,22 +1177,12 @@ const isValid = verifyRenewWebhookSignature({
         id: "guide-markets-list",
         title: "Billing currencies",
         paragraphs: [
-          "Renew supports billing in the following local currencies. Each market maps to payment rails in that region. Settlement is always in USDC regardless of billing currency.",
+          "Renew supports billing in the following local currencies through Partna. Settlement is always in USDC regardless of billing currency.",
         ],
         references: [
           { label: "NGN", value: "Nigerian Naira (₦)", detail: "Nigeria" },
           { label: "KES", value: "Kenyan Shilling (KSh)", detail: "Kenya" },
-          { label: "UGX", value: "Ugandan Shilling (USh)", detail: "Uganda" },
           { label: "GHS", value: "Ghanaian Cedi (GH₵)", detail: "Ghana" },
-          { label: "ZAR", value: "South African Rand (R)", detail: "South Africa" },
-          { label: "TZS", value: "Tanzanian Shilling (TSh)", detail: "Tanzania" },
-          { label: "RWF", value: "Rwandan Franc (FRw)", detail: "Rwanda" },
-          { label: "ZMW", value: "Zambian Kwacha (ZK)", detail: "Zambia" },
-          { label: "MWK", value: "Malawian Kwacha (MK)", detail: "Malawi" },
-          { label: "BWP", value: "Botswana Pula (P)", detail: "Botswana" },
-          { label: "CDF", value: "Congolese Franc (FC)", detail: "DR Congo" },
-          { label: "XAF", value: "Central African CFA (FCFA)", detail: "CEMAC region" },
-          { label: "XOF", value: "West African CFA (CFA)", detail: "WAEMU region" },
         ],
       },
       {
@@ -1248,7 +1208,7 @@ const isValid = verifyRenewWebhookSignature({
     navTitle: "Overview",
     title: "SDK overview",
     description:
-      "Checkout, webhook, and contract helpers for server and React apps.",
+      "Checkout, invoice, webhook, and React helpers for payment apps.",
     sections: [
       {
         id: "sdk-overview-packages",
@@ -1260,7 +1220,7 @@ const isValid = verifyRenewWebhookSignature({
           {
             label: "Package",
             value: "@renew.sh/sdk",
-            detail: "Checkout client, contract clients, events, and shared types.",
+            detail: "Checkout client, invoice client, events, and shared types.",
           },
           {
             label: "Package",
@@ -1494,57 +1454,6 @@ export function CustomCheckout({ clientSecret }) {
             detail: "React checkout UI helpers.",
           },
         ],
-      },
-      {
-        id: "sdk-clients-contracts",
-        title: "Contract clients, events, and types",
-        paragraphs: [
-          "The core package also exports protocol and vault clients plus shared contract event helpers.",
-        ],
-        references: [
-          {
-            label: "Client",
-            value: "createRenewProtocolClient(transport, address)",
-            detail: "Protocol contract client.",
-          },
-          {
-            label: "Client",
-            value: "createRenewVaultClient(transport, address)",
-            detail: "Vault contract client.",
-          },
-          {
-            label: "Helper",
-            value: "renewEventNames | isRenewEventName(value)",
-            detail: "Event helper exports.",
-          },
-          {
-            label: "Type",
-            value: "RenewProtocolConfig | RenewCheckoutSession | RenewCheckoutPlan",
-            detail: "Shared types for runtime config and checkout records.",
-          },
-        ],
-        sample: {
-          label: "Bootstrap contract clients from /v1/protocol",
-          language: "ts",
-          filename: "renew-contracts.ts",
-          code: `import {
-  createRenewProtocolClient,
-  createRenewVaultClient,
-  type ContractTransport,
-  type RenewProtocolConfig,
-} from "@renew.sh/sdk";
-
-async function getRuntimeConfig(apiOrigin: string): Promise<RenewProtocolConfig> {
-  const response = await fetch(\`\${apiOrigin}/v1/protocol\`);
-  const payload = await response.json();
-  return payload.data.config;
-}
-
-const config = await getRuntimeConfig("https://staging-pay.renew.sh");
-
-const protocol = createRenewProtocolClient(transport, config.protocolAddress);
-const vault = createRenewVaultClient(transport, config.vaultAddress);`,
-        },
       },
     ],
   },
