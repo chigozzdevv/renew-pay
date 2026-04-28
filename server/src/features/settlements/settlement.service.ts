@@ -10,11 +10,7 @@ import { InvoiceModel } from "@/features/invoices/invoice.model";
 import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import { PlanModel } from "@/features/plans/plan.model";
-import { executeProtocolSettlement } from "@/features/protocol/protocol.settlement";
 import { SettlementModel } from "@/features/settlements/settlement.model";
-import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
-import { deriveProtocolMerchantAddress } from "@/features/protocol/protocol.merchant";
 import type {
   CreateSettlementInput,
   ListSettlementsQuery,
@@ -42,9 +38,6 @@ function toSettlementResponse(document: {
   bridgeSourceTxHash?: string | null;
   bridgeReceiveTxHash?: string | null;
   creditTxHash?: string | null;
-  protocolExecutionKind?: string | null;
-  protocolAmountUsdc?: number | null;
-  protocolChargeId?: string | null;
   submittedAt?: Date | null;
   bridgeAttestedAt?: Date | null;
   scheduledFor: Date;
@@ -72,12 +65,6 @@ function toSettlementResponse(document: {
     bridgeSourceTxHash: document.bridgeSourceTxHash ?? null,
     bridgeReceiveTxHash: document.bridgeReceiveTxHash ?? null,
     creditTxHash: document.creditTxHash ?? null,
-    onchain: {
-      id: document.protocolChargeId ?? null,
-      executionKind: document.protocolExecutionKind ?? null,
-      amountUsdc: document.protocolAmountUsdc ?? null,
-      txHash: document.creditTxHash ?? null,
-    },
     submittedAt: document.submittedAt ?? null,
     bridgeAttestedAt: document.bridgeAttestedAt ?? null,
     scheduledFor: document.scheduledFor,
@@ -237,9 +224,6 @@ export async function createSettlement(input: CreateSettlementInput) {
     bridgeSourceTxHash: input.bridgeSourceTxHash ?? null,
     bridgeReceiveTxHash: input.bridgeReceiveTxHash ?? null,
     creditTxHash: input.creditTxHash ?? null,
-    protocolExecutionKind: input.protocolExecutionKind ?? null,
-    protocolAmountUsdc: input.protocolAmountUsdc ?? null,
-    protocolChargeId: input.protocolChargeId ?? null,
     submittedAt: input.submittedAt ?? null,
     scheduledFor: input.scheduledFor,
     settledAt: input.settledAt ?? null,
@@ -358,18 +342,6 @@ export async function updateSettlement(
 
   if (input.creditTxHash !== undefined) {
     settlement.creditTxHash = input.creditTxHash ?? null;
-  }
-
-  if (input.protocolExecutionKind !== undefined) {
-    settlement.protocolExecutionKind = input.protocolExecutionKind ?? null;
-  }
-
-  if (input.protocolAmountUsdc !== undefined) {
-    settlement.protocolAmountUsdc = input.protocolAmountUsdc ?? null;
-  }
-
-  if (input.protocolChargeId !== undefined) {
-    settlement.protocolChargeId = input.protocolChargeId ?? null;
   }
 
   if (input.submittedAt !== undefined) {
@@ -539,12 +511,7 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
     };
   }
 
-  const [merchant, sourceCharge] = await Promise.all([
-    MerchantModel.findById(settlement.merchantId).exec(),
-    settlement.sourceChargeId
-      ? ChargeModel.findById(settlement.sourceChargeId).exec()
-      : Promise.resolve(null),
-  ]);
+  const merchant = await MerchantModel.findById(settlement.merchantId).exec();
 
   if (!merchant) {
     throw new HttpError(404, "Merchant was not found.");
@@ -553,145 +520,14 @@ export async function runSettlementBridgeJob(input: { settlementId: string }) {
   const runtimeEnvironment = toStoredRuntimeMode(settlement.environment);
   const postExecutionStatus = runtimeEnvironment === "test" ? "settled" : "confirming";
 
-  const protocolMerchantAddress = deriveProtocolMerchantAddress({
-    environment: runtimeEnvironment,
-    merchantId: settlement.merchantId.toString(),
-  });
-
-  if (!sourceCharge || settlement.sourceKind === "invoice") {
-    const externalChargeId = sourceCharge?.externalChargeId ?? settlement.batchRef;
-
-    if (settlement.sourceKind !== "invoice") {
-      throw new HttpError(
-        409,
-        "Settlement is missing its subscription charge context and cannot be bridged."
-      );
-    }
-
-    if (!settlement.commercialRef) {
-      throw new HttpError(409, "Invoice settlement is missing its commercial reference.");
-    }
-
-    if (settlement.localAmount == null || !Number.isFinite(settlement.localAmount) || settlement.localAmount <= 0) {
-      throw new HttpError(409, "Invoice settlement is missing its local amount.");
-    }
-
-    if (settlement.fxRate == null || !Number.isFinite(settlement.fxRate) || settlement.fxRate <= 0) {
-      throw new HttpError(409, "Invoice settlement is missing its FX rate.");
-    }
-
-    const localAmount = settlement.localAmount;
-    const fxRate = settlement.fxRate;
-    const bridgeResult = await executeProtocolSettlement({
-      environment: runtimeEnvironment,
-      mode: "invoice_settlement",
-      providerRef: sourceCharge?.paymentProvider ?? "partna",
-      merchantAddress: protocolMerchantAddress,
-      externalChargeId,
-      commercialRef: settlement.commercialRef,
-      localAmount,
-      fxRate,
-      amountUsdc: settlement.grossUsdc,
-    });
-
-    settlement.status = postExecutionStatus;
-    settlement.bridgeSourceTxHash = bridgeResult.bridgeSourceTxHash;
-    settlement.bridgeReceiveTxHash = bridgeResult.bridgeReceiveTxHash;
-    settlement.creditTxHash = bridgeResult.creditTxHash;
-    settlement.protocolExecutionKind = bridgeResult.protocolExecutionKind;
-    settlement.protocolAmountUsdc = settlement.grossUsdc;
-    settlement.protocolChargeId = bridgeResult.protocolChargeId ?? null;
-    settlement.bridgeAttestedAt = bridgeResult.attestedAt;
-    settlement.submittedAt = settlement.submittedAt ?? new Date();
-    settlement.settledAt = postExecutionStatus === "settled" ? new Date() : null;
-    await settlement.save();
-
-    if (sourceCharge) {
-      sourceCharge.protocolChargeId = bridgeResult.protocolChargeId ?? null;
-      sourceCharge.protocolTxHash = bridgeResult.creditTxHash;
-      sourceCharge.protocolSyncStatus = "executed";
-      await sourceCharge.save();
-      await syncLinkedChargeFromSettlement(settlement);
-    }
-
-    console.log(
-      `[settlement-bridge] run-complete ${JSON.stringify({
-        settlementId: input.settlementId,
-        status: settlement.status,
-        bridgeSourceTxHash: settlement.bridgeSourceTxHash,
-        bridgeReceiveTxHash: settlement.bridgeReceiveTxHash,
-        creditTxHash: settlement.creditTxHash,
-      })}`
-    );
-
-    return {
-      settlementId: input.settlementId,
-      status: settlement.status,
-      bridgeSourceTxHash: settlement.bridgeSourceTxHash,
-      bridgeReceiveTxHash: settlement.bridgeReceiveTxHash,
-      creditTxHash: settlement.creditTxHash,
-      payoutReady: true,
-    };
-  }
-
-  const subscription = await SubscriptionModel.findById(sourceCharge.subscriptionId).exec();
-  const plan = subscription ? await PlanModel.findById(subscription.planId).exec() : null;
-
-  if (!subscription || !plan) {
-    throw new HttpError(
-      409,
-      "Settlement charge is missing its activated subscription context."
-    );
-  }
-
-  if (
-    subscription.status !== "active" ||
-    !subscription.protocolSubscriptionId ||
-    subscription.protocolSyncStatus !== "synced"
-  ) {
-    throw new HttpError(
-      409,
-      "Subscription must be active on-chain before settlement execution."
-    );
-  }
-
-  if (plan.billingMode !== "fixed") {
-    throw new HttpError(
-      409,
-      "Metered subscriptions require usage units before settlement execution."
-    );
-  }
-
-  const protocolAmountUsdc = sourceCharge.usdcAmount;
-  const bridgeResult = await executeProtocolSettlement({
-    environment: runtimeEnvironment,
-    mode: "subscription_charge_success",
-    providerRef: sourceCharge.paymentProvider ?? "yellow_card",
-    externalChargeId: sourceCharge.externalChargeId,
-    protocolSubscriptionId: subscription.protocolSubscriptionId,
-    billingPeriodStart: subscription.nextChargeAt,
-    localAmount: sourceCharge.localAmount,
-    fxRate: sourceCharge.fxRate,
-    usageUnits: 0,
-    usdcAmount: sourceCharge.usdcAmount,
-  });
-
   settlement.status = postExecutionStatus;
-  settlement.bridgeSourceTxHash = bridgeResult.bridgeSourceTxHash;
-  settlement.bridgeReceiveTxHash = bridgeResult.bridgeReceiveTxHash;
-  settlement.creditTxHash = bridgeResult.creditTxHash;
-  settlement.protocolExecutionKind = bridgeResult.protocolExecutionKind;
-  settlement.protocolAmountUsdc = protocolAmountUsdc;
-  settlement.protocolChargeId = bridgeResult.protocolChargeId ?? null;
-  settlement.bridgeAttestedAt = bridgeResult.attestedAt;
+  settlement.bridgeSourceTxHash = null;
+  settlement.bridgeReceiveTxHash = null;
+  settlement.creditTxHash = null;
+  settlement.bridgeAttestedAt = new Date();
   settlement.submittedAt = settlement.submittedAt ?? new Date();
   settlement.settledAt = postExecutionStatus === "settled" ? new Date() : null;
   await settlement.save();
-
-  sourceCharge.protocolChargeId = bridgeResult.protocolChargeId ?? null;
-  sourceCharge.protocolTxHash = bridgeResult.creditTxHash;
-  sourceCharge.protocolSyncStatus = "executed";
-  await sourceCharge.save();
 
   await syncLinkedChargeFromSettlement(settlement);
 

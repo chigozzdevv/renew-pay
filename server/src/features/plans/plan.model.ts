@@ -81,26 +81,6 @@ const planSchema = new Schema(
       trim: true,
       default: null,
     },
-    protocolPlanId: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    protocolOperationId: {
-      type: Schema.Types.ObjectId,
-      ref: "TreasuryOperation",
-      default: null,
-    },
-    protocolSyncStatus: {
-      type: String,
-      trim: true,
-      default: "not_synced",
-    },
-    protocolTxHash: {
-      type: String,
-      trim: true,
-      default: null,
-    },
   },
   {
     timestamps: true,

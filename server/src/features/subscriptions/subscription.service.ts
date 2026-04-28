@@ -8,13 +8,6 @@ import { queueSubscriptionCreatedNotifications } from "@/features/notifications/
 import { quoteUsdAmountInBillingCurrency } from "@/features/payment-rails/payment-rails.service";
 import { PlanModel } from "@/features/plans/plan.model";
 import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
-import {
-  queueSubscriptionProtocolCancel,
-  queueSubscriptionProtocolCreate,
-  queueSubscriptionProtocolMandateUpdate,
-  queueSubscriptionProtocolPause,
-  queueSubscriptionProtocolResume,
-} from "@/features/treasury/treasury.service";
 import type {
   CreateSubscriptionInput,
   ListSubscriptionsQuery,
@@ -44,10 +37,6 @@ function toSubscriptionResponse(document: {
   nextChargeAt: Date;
   lastChargeAt?: Date | null;
   retryAvailableAt?: Date | null;
-  protocolSubscriptionId?: string | null;
-  protocolOperationId?: { toString(): string } | null;
-  protocolSyncStatus?: string | null;
-  protocolTxHash?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -67,12 +56,6 @@ function toSubscriptionResponse(document: {
     nextChargeAt: document.nextChargeAt,
     lastChargeAt: document.lastChargeAt ?? null,
     retryAvailableAt: document.retryAvailableAt ?? null,
-    onchain: {
-      id: document.protocolSubscriptionId ?? null,
-      status: document.protocolSyncStatus ?? "not_synced",
-      operationId: document.protocolOperationId?.toString() ?? null,
-      txHash: document.protocolTxHash ?? null,
-    },
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
   };
@@ -112,18 +95,17 @@ function resolveSubscriptionCreateState(inputStatus: CreateSubscriptionInput["st
   if (inputStatus !== "active" && inputStatus !== "pending_activation") {
     throw new HttpError(
       409,
-      "Subscriptions can only enter the active lifecycle after protocol activation."
+      "Subscriptions can only be created in the active lifecycle."
     );
   }
 
   return {
-    status: "pending_activation",
-    pendingStatus: "active",
-    protocolSyncStatus: "pending_activation",
+    status: "active",
+    pendingStatus: null,
   } as const;
 }
 
-export async function createSubscription(input: CreateSubscriptionInput, actor = "system") {
+export async function createSubscription(input: CreateSubscriptionInput) {
   const [merchant, plan] = await Promise.all([
     MerchantModel.findById(input.merchantId).exec(),
     PlanModel.findOne({
@@ -141,11 +123,8 @@ export async function createSubscription(input: CreateSubscriptionInput, actor =
     throw new HttpError(404, "Plan was not found.");
   }
 
-  if (plan.status !== "active" || !plan.protocolPlanId || plan.protocolSyncStatus !== "synced") {
-    throw new HttpError(
-      409,
-      "Plan must be active on-chain before subscriptions can be created."
-    );
+  if (plan.status !== "active") {
+    throw new HttpError(409, "Plan must be active before subscriptions can be created.");
   }
 
   if (!merchant.supportedMarkets.includes(input.billingCurrency)) {
@@ -182,24 +161,8 @@ export async function createSubscription(input: CreateSubscriptionInput, actor =
     paymentNetworkId: input.paymentNetworkId ?? null,
     status: requestedState.status,
     pendingStatus: requestedState.pendingStatus,
-    protocolSyncStatus: requestedState.protocolSyncStatus,
     nextChargeAt: input.nextChargeAt,
   });
-
-  const activationOperation = await queueSubscriptionProtocolCreate({
-    merchantId: input.merchantId,
-    actor,
-    environment: input.environment,
-    subscriptionId: createdSubscription._id.toString(),
-  });
-
-  if (!activationOperation) {
-    await SubscriptionModel.findByIdAndDelete(createdSubscription._id).exec();
-    throw new HttpError(
-      409,
-      "Subscription could not be created on-chain."
-    );
-  }
 
   const refreshedSubscription = await ensureSubscriptionScope(
     createdSubscription._id.toString(),
@@ -300,61 +263,17 @@ export async function updateSubscription(
   subscriptionId: string,
   input: UpdateSubscriptionInput,
   merchantId?: string,
-  environment?: RuntimeMode,
-  actor = "system"
+  environment?: RuntimeMode
 ) {
   const subscription = await ensureSubscriptionScope(
     subscriptionId,
     merchantId,
     environment
   );
-  const previousStatus = subscription.status;
-  const previousSnapshot = {
-    status: subscription.status,
-    pendingStatus: subscription.pendingStatus ?? null,
-    nextChargeAt: subscription.nextChargeAt,
-    lastChargeAt: subscription.lastChargeAt ?? null,
-    retryAvailableAt: subscription.retryAvailableAt ?? null,
-    localAmount: subscription.localAmount,
-    paymentAccountType: subscription.paymentAccountType,
-    paymentAccountNumber: subscription.paymentAccountNumber ?? null,
-    paymentNetworkId: subscription.paymentNetworkId ?? null,
-    protocolOperationId: subscription.protocolOperationId ?? null,
-    protocolSyncStatus: subscription.protocolSyncStatus ?? null,
-    protocolTxHash: subscription.protocolTxHash ?? null,
-  };
-  const paymentRoutingChanged =
-    input.paymentAccountType !== undefined ||
-    input.paymentAccountNumber !== undefined ||
-    input.paymentNetworkId !== undefined;
-
   if (input.status !== undefined) {
-    if (!subscription.protocolSubscriptionId && subscription.status === "pending_activation") {
-      if (input.status === "cancelled") {
-        subscription.status = "cancelled";
-        subscription.pendingStatus = null;
-        subscription.protocolSyncStatus = "not_synced";
-        subscription.protocolOperationId = null;
-        subscription.protocolTxHash = null;
-      } else if (input.status === "active" || input.status === "pending_activation") {
-        subscription.status = "pending_activation";
-        subscription.pendingStatus = "active";
-      } else {
-        throw new HttpError(
-          409,
-          "Subscription cannot change lifecycle state until protocol activation completes."
-        );
-      }
-    } else if (input.status === "paused") {
-      subscription.pendingStatus = "paused";
-    } else if (input.status === "cancelled") {
-      subscription.pendingStatus = "cancelled";
-    } else if (input.status === "active") {
-      subscription.pendingStatus = "active";
-    } else if (input.status === "past_due") {
-      subscription.status = "past_due";
-      subscription.pendingStatus = null;
-    }
+    subscription.status =
+      input.status === "pending_activation" ? "active" : input.status;
+    subscription.pendingStatus = null;
   }
 
   if (input.nextChargeAt !== undefined) {
@@ -388,94 +307,6 @@ export async function updateSubscription(
   await subscription.save();
   const runtimeEnvironment = environment ?? toRuntimeMode(subscription.environment);
 
-  try {
-    if (!subscription.protocolSubscriptionId && subscription.status === "pending_activation") {
-      const activationOperation = await queueSubscriptionProtocolCreate({
-        merchantId: subscription.merchantId.toString(),
-        actor,
-        environment: runtimeEnvironment,
-        subscriptionId: subscription._id.toString(),
-      });
-
-      if (!activationOperation) {
-        throw new HttpError(
-          409,
-          "Subscription could not be created on-chain."
-        );
-      }
-    } else {
-      if (subscription.pendingStatus === "cancelled") {
-        const cancelOperation = await queueSubscriptionProtocolCancel({
-          merchantId: subscription.merchantId.toString(),
-          actor,
-          environment: runtimeEnvironment,
-          subscriptionId: subscription._id.toString(),
-        });
-
-        if (!cancelOperation) {
-          throw new HttpError(409, "Subscription cancellation could not be queued.");
-        }
-      } else if (subscription.pendingStatus === "paused") {
-        const pauseOperation = await queueSubscriptionProtocolPause({
-          merchantId: subscription.merchantId.toString(),
-          actor,
-          environment: runtimeEnvironment,
-          subscriptionId: subscription._id.toString(),
-        });
-
-        if (!pauseOperation) {
-          throw new HttpError(409, "Subscription pause could not be queued.");
-        }
-      } else if (
-        subscription.pendingStatus === "active" ||
-        (input.nextChargeAt !== undefined &&
-          (previousStatus === "active" || previousStatus === "paused" || previousStatus === "past_due"))
-      ) {
-        const resumeOperation = await queueSubscriptionProtocolResume({
-          merchantId: subscription.merchantId.toString(),
-          actor,
-          environment: runtimeEnvironment,
-          subscriptionId: subscription._id.toString(),
-        });
-
-        if (!resumeOperation) {
-          throw new HttpError(409, "Subscription resume could not be queued.");
-        }
-      }
-
-      if (paymentRoutingChanged) {
-        const mandateOperation = await queueSubscriptionProtocolMandateUpdate({
-          merchantId: subscription.merchantId.toString(),
-          actor,
-          environment: runtimeEnvironment,
-          subscriptionId: subscription._id.toString(),
-        });
-
-        if (!mandateOperation) {
-          throw new HttpError(
-            409,
-            "Subscription mandate update could not be queued."
-          );
-        }
-      }
-    }
-  } catch (error) {
-    subscription.status = previousSnapshot.status;
-    subscription.pendingStatus = previousSnapshot.pendingStatus;
-    subscription.nextChargeAt = previousSnapshot.nextChargeAt;
-    subscription.lastChargeAt = previousSnapshot.lastChargeAt;
-    subscription.retryAvailableAt = previousSnapshot.retryAvailableAt;
-    subscription.localAmount = previousSnapshot.localAmount;
-    subscription.paymentAccountType = previousSnapshot.paymentAccountType;
-    subscription.paymentAccountNumber = previousSnapshot.paymentAccountNumber;
-    subscription.paymentNetworkId = previousSnapshot.paymentNetworkId;
-    subscription.protocolOperationId = previousSnapshot.protocolOperationId;
-    subscription.protocolSyncStatus = previousSnapshot.protocolSyncStatus;
-    subscription.protocolTxHash = previousSnapshot.protocolTxHash;
-    await subscription.save();
-    throw error;
-  }
-
   const refreshedSubscription = await ensureSubscriptionScope(
     subscription._id.toString(),
     subscription.merchantId.toString(),
@@ -496,15 +327,8 @@ export async function queueSubscriptionCharge(
     environment
   );
 
-  if (
-    subscription.status !== "active" ||
-    !subscription.protocolSubscriptionId ||
-    subscription.protocolSyncStatus !== "synced"
-  ) {
-    throw new HttpError(
-      409,
-      "Subscription must be active on-chain before a charge can be queued."
-    );
+  if (subscription.status !== "active") {
+    throw new HttpError(409, "Subscription must be active before a charge can be queued.");
   }
 
   const queuedJob = await enqueueQueueJob(

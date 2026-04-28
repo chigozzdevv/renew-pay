@@ -2,21 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { usePrivy } from "@privy-io/react-auth";
-import {
-  useSignMessage,
-  useWallets as useSolanaWallets,
-} from "@privy-io/react-auth/solana";
-
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import {
   StatusBadge,
-  extractPrivyEmbeddedWalletAddress,
   formatCurrency,
-  formatTxHash,
-  getSolanaTxUrl,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
 import { useResource } from "@/components/dashboard/use-resource";
@@ -37,21 +28,8 @@ import {
 } from "@/components/dashboard/ui";
 import { loadBillingMarketCatalog } from "@/lib/markets";
 import { createPlan, loadPlansPage, updatePlan, type PlanRecord } from "@/lib/plans";
-import {
-  approveTreasuryOperation,
-  createTreasurySignerChallenge,
-  executeTreasuryOperation,
-  getTreasuryOperationSigningPayload,
-  verifyTreasurySigner,
-} from "@/lib/treasury";
 
 type PlanStatusFilter = PlanRecord["status"] | "all";
-type PrivyWalletRecord = {
-  address: string;
-  walletClientType?: string;
-  chainType?: string;
-  type?: string;
-};
 
 const EMPTY_DRAFT = {
   planCode: "",
@@ -83,91 +61,9 @@ const RETRY_WINDOWS: Record<string, { label: string; hours: number }> = {
   custom: { label: "Custom", hours: 0 },
 };
 
-const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-function findEmbeddedWallet<T extends PrivyWalletRecord>(wallets: T[]) {
-  return (
-    wallets.find((entry) => {
-      const walletType = entry.chainType ?? entry.type ?? "solana";
-      return entry.walletClientType === "privy" && walletType === "solana";
-    }) ?? null
-  );
-}
-
-function findPreferredSolanaWallet<T extends PrivyWalletRecord>(
-  wallets: T[],
-  preferredAddress: string | null
-) {
-  const normalizedPreferredAddress = preferredAddress?.trim() ?? null;
-
-  if (normalizedPreferredAddress) {
-    const matchedWallet = wallets.find(
-      (entry) => entry.address?.trim() === normalizedPreferredAddress
-    );
-
-    if (matchedWallet) {
-      return matchedWallet;
-    }
-  }
-
-  const embeddedWallet = findEmbeddedWallet(wallets);
-
-  if (embeddedWallet) {
-    return embeddedWallet;
-  }
-
-  if (wallets.length === 1) {
-    return wallets[0];
-  }
-
-  return null;
-}
-
-function encodeBase58(bytes: Uint8Array) {
-  if (bytes.length === 0) {
-    return "";
-  }
-
-  const digits = [0];
-
-  for (const value of bytes) {
-    let carry = value;
-
-    for (let index = 0; index < digits.length; index += 1) {
-      carry += digits[index] * 256;
-      digits[index] = carry % 58;
-      carry = Math.floor(carry / 58);
-    }
-
-    while (carry > 0) {
-      digits.push(carry % 58);
-      carry = Math.floor(carry / 58);
-    }
-  }
-
-  let encoded = "";
-
-  for (const value of bytes) {
-    if (value !== 0) {
-      break;
-    }
-
-    encoded += BASE58_ALPHABET[0];
-  }
-
-  for (let index = digits.length - 1; index >= 0; index -= 1) {
-    encoded += BASE58_ALPHABET[digits[index]];
-  }
-
-  return encoded;
-}
-
 export default function PlansPage() {
-  const { token, user, refresh } = useDashboardSession();
+  const { token, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
-  const { ready: privyReady, authenticated, user: privyUser } = usePrivy();
-  const { ready: solanaWalletsReady, wallets } = useSolanaWallets();
-  const { signMessage } = useSignMessage();
   const [status, setStatus] = useState<PlanStatusFilter>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -219,27 +115,6 @@ export default function PlansPage() {
     marketCatalog?.markets.filter((market) =>
       marketCatalog.merchantSupportedMarkets.includes(market.currency)
     ) ?? [];
-  const linkedEmbeddedWalletAddress = useMemo(
-    () => extractPrivyEmbeddedWalletAddress(privyUser),
-    [privyUser]
-  );
-  const embeddedWallet = useMemo(
-    () =>
-      findPreferredSolanaWallet(
-        wallets,
-        linkedEmbeddedWalletAddress ?? user?.operatorWalletAddress?.trim() ?? null
-      ),
-    [linkedEmbeddedWalletAddress, user?.operatorWalletAddress, wallets]
-  );
-  const activeWalletAddress =
-    embeddedWallet?.address?.trim() ??
-    linkedEmbeddedWalletAddress ??
-    user?.operatorWalletAddress?.trim() ??
-    null;
-  const isWalletSyncing =
-    Boolean(authenticated && activeWalletAddress && !embeddedWallet) ||
-    Boolean(authenticated && privyReady && !solanaWalletsReady);
-
   useEffect(() => {
     if (!message && !errorMessage) return;
     const timeout = window.setTimeout(() => {
@@ -284,126 +159,6 @@ export default function PlansPage() {
     }
   }
 
-  async function ensureCurrentWalletVerified() {
-    if (!token || !user) {
-      throw new Error("Dashboard session is missing. Sign in again.");
-    }
-
-    if (user.role !== "owner") {
-      throw new Error("This plan change is waiting for an owner treasury approval.");
-    }
-
-    if (!embeddedWallet) {
-      throw new Error(
-        isWalletSyncing
-          ? "Privy is still syncing your Solana wallet into this session."
-          : "Your signed-in Privy Solana wallet is not ready yet."
-      );
-    }
-
-    const boundWallet = user.operatorWalletAddress?.trim() ?? null;
-
-    if (boundWallet && boundWallet !== embeddedWallet.address.trim()) {
-      throw new Error(
-        "Your signed-in Privy wallet does not match the current treasury signer."
-      );
-    }
-
-    const challenge = await createTreasurySignerChallenge({
-      token,
-      merchantId: user.merchantId,
-      walletAddress: embeddedWallet.address,
-    });
-    const signed = await signMessage({
-      message: new TextEncoder().encode(challenge.challengeMessage),
-      wallet: embeddedWallet,
-    });
-
-    await verifyTreasurySigner({
-      token,
-      merchantId: user.merchantId,
-      signature: encodeBase58(signed.signature),
-    });
-    await refresh();
-  }
-
-  async function finalizePlanOperation(input: {
-    plan: PlanRecord;
-    successMessage: string;
-    pendingMessage: string;
-  }) {
-    if (!token || !user) {
-      return input.pendingMessage;
-    }
-
-    const operationId = input.plan.onchain.operationId?.trim() ?? null;
-
-    if (!operationId) {
-      return input.successMessage;
-    }
-
-    if (user.role !== "owner") {
-      return input.pendingMessage;
-    }
-
-    if (!embeddedWallet) {
-      throw new Error(
-        isWalletSyncing
-          ? "Privy is still syncing your Solana wallet into this session."
-          : "Your signed-in Privy Solana wallet is not ready yet."
-      );
-    }
-
-    const boundWallet = user.operatorWalletAddress?.trim() ?? null;
-
-    if (boundWallet && boundWallet !== embeddedWallet.address.trim()) {
-      throw new Error(
-        "Your signed-in Privy wallet does not match the current treasury signer."
-      );
-    }
-
-    let signingPayload;
-
-    try {
-      signingPayload = await getTreasuryOperationSigningPayload({
-        token,
-        operationId,
-      });
-    } catch (error) {
-      if (toErrorMessage(error) !== "Treasury signer is not verified for this team member.") {
-        throw error;
-      }
-
-      await ensureCurrentWalletVerified();
-      signingPayload = await getTreasuryOperationSigningPayload({
-        token,
-        operationId,
-      });
-    }
-
-    const signedApproval = await signMessage({
-      message: new TextEncoder().encode(signingPayload.signingPayload.message),
-      wallet: embeddedWallet,
-    });
-
-    const approvedOperation = await approveTreasuryOperation({
-      token,
-      operationId,
-      signature: encodeBase58(signedApproval.signature),
-    });
-
-    if (!approvedOperation.canExecute) {
-      return input.pendingMessage;
-    }
-
-    await executeTreasuryOperation({
-      token,
-      operationId,
-    });
-
-    return input.successMessage;
-  }
-
   function isCreateValid() {
     return (
       draft.planCode.trim() &&
@@ -427,7 +182,7 @@ export default function PlansPage() {
   async function handleCreate(publishStatus: PlanRecord["status"]) {
     if (!token || !user?.merchantId) return;
     await runAction("create-plan", async () => {
-      const createdPlan = await createPlan({
+      await createPlan({
         token,
         merchantId: user.merchantId,
         environment: mode,
@@ -450,17 +205,7 @@ export default function PlansPage() {
         return;
       }
 
-      try {
-        const nextMessage = await finalizePlanOperation({
-          plan: createdPlan,
-          successMessage: "Plan published.",
-          pendingMessage: "Plan publish is waiting for approval.",
-        });
-        setMessage(nextMessage);
-      } catch (error) {
-        setErrorMessage(toErrorMessage(error));
-        setMessage("Plan publish is waiting for approval.");
-      }
+      setMessage("Plan published.");
     });
   }
 
@@ -490,7 +235,7 @@ export default function PlansPage() {
   async function handleEdit() {
     if (!token || !editPlan) return;
     await runAction("edit-plan", async () => {
-      const updatedPlan = await updatePlan({
+      await updatePlan({
         token,
         planId: editPlan.id,
         environment: mode,
@@ -508,24 +253,14 @@ export default function PlansPage() {
       });
       setEditPlan(null);
 
-      try {
-        const nextMessage = await finalizePlanOperation({
-          plan: updatedPlan,
-          successMessage: "Plan updated.",
-          pendingMessage: "Plan update is waiting for approval.",
-        });
-        setMessage(nextMessage);
-      } catch (error) {
-        setErrorMessage(toErrorMessage(error));
-        setMessage("Plan update is waiting for approval.");
-      }
+      setMessage("Plan updated.");
     });
   }
 
   async function handleArchive() {
     if (!token || !archivePlan) return;
     await runAction("archive-plan", async () => {
-      const updatedPlan = await updatePlan({
+      await updatePlan({
         token,
         planId: archivePlan.id,
         environment: mode,
@@ -533,24 +268,14 @@ export default function PlansPage() {
       });
       setArchivePlan(null);
 
-      try {
-        const nextMessage = await finalizePlanOperation({
-          plan: updatedPlan,
-          successMessage: "Plan archived.",
-          pendingMessage: "Plan archive is waiting for approval.",
-        });
-        setMessage(nextMessage);
-      } catch (error) {
-        setErrorMessage(toErrorMessage(error));
-        setMessage("Plan archive is waiting for approval.");
-      }
+      setMessage("Plan archived.");
     });
   }
 
   async function handleStatusChange(plan: PlanRecord, nextStatus: PlanRecord["status"]) {
     if (!token) return;
     await runAction("update-status", async () => {
-      const updatedPlan = await updatePlan({
+      await updatePlan({
         token,
         planId: plan.id,
         environment: mode,
@@ -566,26 +291,7 @@ export default function PlansPage() {
             : nextStatus === "archived"
               ? "Plan archived."
               : "Plan status updated.";
-      const pendingMessage =
-        nextStatus === "active"
-          ? "Plan publish is waiting for approval."
-          : nextStatus === "draft"
-            ? "Plan unpublish is waiting for approval."
-            : nextStatus === "archived"
-              ? "Plan archive is waiting for approval."
-              : "Plan status change is waiting for approval.";
-
-      try {
-        const nextMessage = await finalizePlanOperation({
-          plan: updatedPlan,
-          successMessage,
-          pendingMessage,
-        });
-        setMessage(nextMessage);
-      } catch (error) {
-        setErrorMessage(toErrorMessage(error));
-        setMessage(pendingMessage);
-      }
+      setMessage(successMessage);
     });
   }
 
@@ -807,21 +513,7 @@ export default function PlansPage() {
         footer={
           detailPlan ? (
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {detailPlan.onchain.txHash ? (
-                  <a
-                    href={getSolanaTxUrl(mode, detailPlan.onchain.txHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
-                  >
-                    View tx
-                    <svg className="h-3 w-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-                    </svg>
-                  </a>
-                ) : null}
-              </div>
+              <div />
               <div className="flex items-center gap-2">
                 {detailPlan.status === "draft" ? (
                   <Button
@@ -860,8 +552,6 @@ export default function PlansPage() {
             <Field label="Interval" value={`${detailPlan.billingIntervalDays} days`} />
             <Field label="Trial" value={`${detailPlan.trialDays} days`} />
             <Field label="Retry window" value={`${detailPlan.retryWindowHours} hours`} />
-            <Field label="Onchain status" value={<StatusBadge value={detailPlan.onchain.status} />} />
-            <Field label="Protocol plan" value={detailPlan.onchain.id ?? "Pending"} />
             <Field
               label="Markets"
               value={
@@ -872,23 +562,6 @@ export default function PlansPage() {
                     </span>
                   ))}
                 </div>
-              }
-            />
-            <Field
-              label="Latest tx"
-              value={
-                detailPlan.onchain.txHash ? (
-                  <a
-                    href={getSolanaTxUrl(mode, detailPlan.onchain.txHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-block max-w-full break-all text-[color:var(--ink)] underline decoration-[color:var(--line)] underline-offset-4 transition-colors hover:text-[color:var(--muted)] [overflow-wrap:anywhere]"
-                  >
-                    {formatTxHash(detailPlan.onchain.txHash)}
-                  </a>
-                ) : (
-                  "Waiting for execution"
-                )
               }
             />
           </div>

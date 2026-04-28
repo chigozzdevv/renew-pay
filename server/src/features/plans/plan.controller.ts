@@ -18,10 +18,6 @@ function resolveMerchantScope(request: Request, fallback?: string) {
   return request.platformAuthUser?.merchantId ?? fallback;
 }
 
-function resolveActor(request: Request) {
-  return request.platformAuthUser?.name ?? request.platformAuthUser?.email ?? "system";
-}
-
 function resolveEnvironmentScope(request: Request) {
   return optionalEnvironmentInputSchema.parse(
     typeof request.query.environment === "string"
@@ -37,7 +33,7 @@ export const createPlanController = asyncHandler(
       merchantId: resolveMerchantScope(request, request.body?.merchantId),
       environment: resolveEnvironmentScope(request),
     });
-    const plan = await createPlan(input, resolveActor(request));
+    const plan = await createPlan(input);
 
     response.status(201).json({
       success: true,
@@ -91,8 +87,7 @@ export const updatePlanController = asyncHandler(
       String(request.params.planId),
       input,
       resolveMerchantScope(request),
-      resolveEnvironmentScope(request),
-      resolveActor(request)
+      resolveEnvironmentScope(request)
     );
 
     response.status(200).json({

@@ -8,8 +8,6 @@ import {
   StatusBadge,
   formatCurrency,
   formatDateTime,
-  formatTxHash,
-  getSolanaTxUrl,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
 import { useResource } from "@/components/dashboard/use-resource";
@@ -650,31 +648,7 @@ export default function SubscriptionsPage() {
         footer={
           detailSubscription ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {detailSubscription.onchain.txHash ? (
-                  <a
-                    href={getSolanaTxUrl(mode, detailSubscription.onchain.txHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
-                  >
-                    View tx
-                    <svg
-                      className="h-3 w-3 opacity-60"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-                      />
-                    </svg>
-                  </a>
-                ) : null}
-              </div>
+              <div />
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={() => openEditModal(detailSubscription)}>Edit</Button>
@@ -735,31 +709,6 @@ export default function SubscriptionsPage() {
             <Field label="Last charge" value={formatDateTime(detailSubscription.lastChargeAt)} />
             <Field label="Collection method" value={detailSubscription.paymentAccountType} />
             <Field label="Retry opens" value={formatDateTime(detailSubscription.retryAvailableAt)} />
-            <Field
-              label="Onchain status"
-              value={<StatusBadge value={detailSubscription.onchain.status} />}
-            />
-            <Field
-              label="Protocol subscription"
-              value={detailSubscription.onchain.id ?? "Pending"}
-            />
-            <Field
-              label="Latest tx"
-              value={
-                detailSubscription.onchain.txHash ? (
-                  <a
-                    href={getSolanaTxUrl(mode, detailSubscription.onchain.txHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[color:var(--ink)] underline decoration-[color:var(--line)] underline-offset-4 transition-colors hover:text-[color:var(--muted)]"
-                  >
-                    {formatTxHash(detailSubscription.onchain.txHash)}
-                  </a>
-                ) : (
-                  "Waiting for execution"
-                )
-              }
-            />
           </div>
         ) : null}
       </Modal>

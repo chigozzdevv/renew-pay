@@ -12,7 +12,6 @@ const auditCategorySchema = z.enum([
   "security",
   "developer",
   "payments",
-  "treasury",
   "protocol",
 ]);
 

@@ -19,10 +19,6 @@ function resolveMerchantScope(request: Request, fallback?: string) {
   return request.platformAuthUser?.merchantId ?? fallback;
 }
 
-function resolveActor(request: Request) {
-  return request.platformAuthUser?.name ?? request.platformAuthUser?.email ?? "system";
-}
-
 function resolveEnvironmentScope(request: Request) {
   return optionalEnvironmentInputSchema.parse(
     typeof request.query.environment === "string"
@@ -38,7 +34,7 @@ export const createSubscriptionController = asyncHandler(
       merchantId: resolveMerchantScope(request, request.body?.merchantId),
       environment: resolveEnvironmentScope(request),
     });
-    const subscription = await createSubscription(input, resolveActor(request));
+    const subscription = await createSubscription(input);
 
     response.status(201).json({
       success: true,
@@ -92,8 +88,7 @@ export const updateSubscriptionController = asyncHandler(
       String(request.params.subscriptionId),
       input,
       resolveMerchantScope(request),
-      resolveEnvironmentScope(request),
-      resolveActor(request)
+      resolveEnvironmentScope(request)
     );
 
     response.status(200).json({

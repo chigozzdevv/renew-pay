@@ -95,21 +95,6 @@ const settlementSchema = new Schema(
       trim: true,
       default: null,
     },
-    protocolExecutionKind: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    protocolAmountUsdc: {
-      type: Number,
-      min: 0,
-      default: null,
-    },
-    protocolChargeId: {
-      type: String,
-      trim: true,
-      default: null,
-    },
     submittedAt: {
       type: Date,
       default: null,

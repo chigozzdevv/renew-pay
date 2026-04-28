@@ -2,13 +2,6 @@
 
 import { fetchApi, type ApiPagination } from "@/lib/api";
 
-export type OnchainRecord = {
-  id: string | null;
-  status: string;
-  operationId: string | null;
-  txHash: string | null;
-};
-
 export type PlanRecord = {
   id: string;
   merchantId: string;
@@ -23,7 +16,6 @@ export type PlanRecord = {
   supportedMarkets: string[];
   status: "draft" | "active" | "archived";
   pendingStatus?: "active" | "archived" | null;
-  onchain: OnchainRecord;
   createdAt: string;
   updatedAt: string;
 };
@@ -126,10 +118,7 @@ export async function updatePlan(input: {
   planId: string;
   environment: "test" | "live";
   payload: Partial<
-    Omit<
-      PlanRecord,
-      "id" | "merchantId" | "pendingStatus" | "onchain" | "createdAt" | "updatedAt"
-    >
+    Omit<PlanRecord, "id" | "merchantId" | "pendingStatus" | "createdAt" | "updatedAt">
   >;
 }) {
   const response = await fetchApi<PlanRecord>(`/plans/${input.planId}`, {

@@ -1,7 +1,7 @@
 "use client";
 
 import { fetchApi, type ApiPagination } from "@/lib/api";
-import { loadPlans, type OnchainRecord, type PlanRecord } from "@/lib/plans";
+import { loadPlans, type PlanRecord } from "@/lib/plans";
 
 export type SubscriptionRecord = {
   id: string;
@@ -19,7 +19,6 @@ export type SubscriptionRecord = {
   nextChargeAt: string;
   lastChargeAt: string | null;
   retryAvailableAt: string | null;
-  onchain: OnchainRecord;
   createdAt: string;
   updatedAt: string;
 };
