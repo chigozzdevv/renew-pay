@@ -445,11 +445,7 @@ function humanizeValue(value: string) {
   return value.replace(/_/g, " ");
 }
 
-function getProviderLabel(provider: "partna" | "yellow_card" | null) {
-  if (provider === "yellow_card") {
-    return "Yellow Card";
-  }
-
+function getProviderLabel(provider: "partna" | null) {
   if (provider === "partna") {
     return "Partna";
   }
@@ -615,8 +611,7 @@ export function RenewCheckoutModal({
     currentSession.verification?.requiredFields.includes("verificationMethod") ?? false;
   const paymentProviderLabel = getProviderLabel(paymentInstructions?.provider ?? null);
   const paymentDetailsLabel = "Payment details";
-  const bankLabel =
-    paymentInstructions?.provider === "yellow_card" ? "Collection bank" : "Bank";
+  const bankLabel = "Bank";
 
   const handleSubmitCustomer = async () => {
     const payload: SubmitCheckoutCustomerInput = {

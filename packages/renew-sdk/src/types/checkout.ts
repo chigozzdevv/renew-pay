@@ -39,7 +39,7 @@ export type RenewCheckoutSessionCustomer = {
 };
 
 export type RenewCheckoutVerification = {
-  readonly provider: "partna" | "yellow_card" | null;
+  readonly provider: "partna" | null;
   readonly status: string | null;
   readonly country: string | null;
   readonly currency: string | null;
@@ -75,7 +75,7 @@ export type RenewCheckoutSessionSettlement = {
 };
 
 export type RenewCheckoutPaymentInstructions = {
-  readonly provider: "partna" | "yellow_card" | null;
+  readonly provider: "partna" | null;
   readonly kind: "bank_transfer" | "redirect" | null;
   readonly externalChargeId: string | null;
   readonly billingCurrency: string | null;

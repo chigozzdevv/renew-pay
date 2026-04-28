@@ -23,7 +23,7 @@ export type RenewInvoiceLineItem = {
 };
 
 export type RenewInvoicePaymentInstructions = {
-  readonly provider: "partna" | "yellow_card" | null;
+  readonly provider: "partna" | null;
   readonly kind: "bank_transfer" | "redirect" | null;
   readonly externalChargeId: string | null;
   readonly billingCurrency: string | null;
@@ -44,7 +44,7 @@ export type RenewInvoicePaymentInstructions = {
 } | null;
 
 export type RenewInvoiceVerification = {
-  readonly provider: "partna" | "yellow_card" | null;
+  readonly provider: "partna" | null;
   readonly status: string | null;
   readonly country: string | null;
   readonly currency: string | null;

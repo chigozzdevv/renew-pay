@@ -6,7 +6,7 @@ Renew SDK for:
 - server-side checkout helpers
 - React checkout modal and session polling
 - webhook signing and verification helpers
-- protocol and vault contract clients
+- invoice helpers for hosted billing flows
 
 ## Install
 
@@ -106,7 +106,7 @@ const isValid = verifyRenewWebhookSignature({
 - `@renew.sh/sdk`
   - core exports
   - checkout client
-  - contract clients
+  - invoice client
 - `@renew.sh/sdk/server`
   - server integration helpers
   - webhook signing and verification
