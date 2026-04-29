@@ -41,42 +41,11 @@ const customerSchema = new Schema(
       trim: true,
       default: "active",
     },
-    billingState: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "healthy",
-    },
-    paymentMethodState: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "ok",
-    },
-    subscriptionCount: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0,
-    },
     monthlyVolumeUsdc: {
       type: Number,
       required: true,
       min: 0,
       default: 0,
-    },
-    nextRenewalAt: {
-      type: Date,
-      default: null,
-    },
-    lastChargeAt: {
-      type: Date,
-      default: null,
-    },
-    autoReminderEnabled: {
-      type: Boolean,
-      required: true,
-      default: true,
     },
     blacklistedAt: {
       type: Date,

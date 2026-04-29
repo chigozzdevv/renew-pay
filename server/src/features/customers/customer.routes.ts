@@ -5,8 +5,6 @@ import {
   createCustomerController,
   getCustomerController,
   listCustomersController,
-  pauseCustomerController,
-  resumeCustomerController,
   updateCustomerController,
 } from "@/features/customers/customer.controller";
 
@@ -16,8 +14,6 @@ customerRouter.get("/", listCustomersController);
 customerRouter.post("/", createCustomerController);
 customerRouter.get("/:customerId", getCustomerController);
 customerRouter.patch("/:customerId", updateCustomerController);
-customerRouter.post("/:customerId/pause", pauseCustomerController);
-customerRouter.post("/:customerId/resume", resumeCustomerController);
 customerRouter.post("/:customerId/blacklist", blacklistCustomerController);
 
 export { customerRouter };

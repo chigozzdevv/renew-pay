@@ -26,13 +26,18 @@ const merchantSchema = new Schema(
       trim: true,
       default: null,
     },
+    ownerName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     supportEmail: {
       type: String,
       trim: true,
       lowercase: true,
       default: null,
     },
-    billingTimezone: {
+    timezone: {
       type: String,
       required: true,
       trim: true,

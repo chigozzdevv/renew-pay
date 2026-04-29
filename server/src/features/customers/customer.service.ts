@@ -6,7 +6,6 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import type {
   BlacklistCustomerInput,
   CreateCustomerInput,
-  CustomerActionInput,
   ListCustomersQuery,
   UpdateCustomerInput,
 } from "@/features/customers/customer.validation";
@@ -26,13 +25,7 @@ function toCustomerResponse(document: {
   email: string;
   market: string;
   status: string;
-  billingState: string;
-  paymentMethodState: string;
-  subscriptionCount: number;
   monthlyVolumeUsdc: number;
-  nextRenewalAt?: Date | null;
-  lastChargeAt?: Date | null;
-  autoReminderEnabled: boolean;
   blacklistedAt?: Date | null;
   blacklistReason?: string | null;
   metadata?: Record<string, unknown>;
@@ -47,13 +40,7 @@ function toCustomerResponse(document: {
     email: document.email,
     market: document.market,
     status: document.status,
-    billingState: document.billingState,
-    paymentMethodState: document.paymentMethodState,
-    subscriptionCount: document.subscriptionCount,
     monthlyVolumeUsdc: document.monthlyVolumeUsdc,
-    nextRenewalAt: document.nextRenewalAt ?? null,
-    lastChargeAt: document.lastChargeAt ?? null,
-    autoReminderEnabled: document.autoReminderEnabled,
     blacklistedAt: document.blacklistedAt ?? null,
     blacklistReason: document.blacklistReason ?? null,
     metadata: document.metadata ?? {},
@@ -203,13 +190,7 @@ export async function createCustomer(input: CreateCustomerInput) {
     email: input.email,
     market: input.market,
     status: input.status,
-    billingState: input.billingState,
-    paymentMethodState: input.paymentMethodState,
-    subscriptionCount: input.subscriptionCount,
     monthlyVolumeUsdc: input.monthlyVolumeUsdc,
-    nextRenewalAt: input.nextRenewalAt,
-    lastChargeAt: input.lastChargeAt,
-    autoReminderEnabled: input.autoReminderEnabled,
     metadata: input.metadata,
     blacklistedAt: input.status === "blacklisted" ? new Date() : null,
     blacklistReason: null,
@@ -219,7 +200,7 @@ export async function createCustomer(input: CreateCustomerInput) {
     merchantId: input.merchantId,
     actor: input.actor,
     action: "Created customer",
-    category: "billing",
+    category: "customer",
     status: "ok",
     target: input.email,
     detail: `${input.name} was added to customer directory.`,
@@ -271,32 +252,8 @@ export async function updateCustomer(
     }
   }
 
-  if (input.billingState !== undefined) {
-    customer.billingState = input.billingState;
-  }
-
-  if (input.paymentMethodState !== undefined) {
-    customer.paymentMethodState = input.paymentMethodState;
-  }
-
-  if (input.subscriptionCount !== undefined) {
-    customer.subscriptionCount = input.subscriptionCount;
-  }
-
   if (input.monthlyVolumeUsdc !== undefined) {
     customer.monthlyVolumeUsdc = input.monthlyVolumeUsdc;
-  }
-
-  if (input.nextRenewalAt !== undefined) {
-    customer.nextRenewalAt = input.nextRenewalAt;
-  }
-
-  if (input.lastChargeAt !== undefined) {
-    customer.lastChargeAt = input.lastChargeAt;
-  }
-
-  if (input.autoReminderEnabled !== undefined) {
-    customer.autoReminderEnabled = input.autoReminderEnabled;
   }
 
   if (input.metadata !== undefined) {
@@ -312,81 +269,13 @@ export async function updateCustomer(
     merchantId,
     actor: input.actor,
     action: "Updated customer",
-    category: "billing",
+    category: "customer",
     status: "ok",
     target: customer.email,
     detail: `Updated profile for ${customer.name}.`,
     metadata: {
       status: customer.status,
-      billingState: customer.billingState,
-      paymentMethodState: customer.paymentMethodState,
     },
-    ipAddress: null,
-    userAgent: null,
-  });
-
-  return toCustomerResponse(customer);
-}
-
-export async function pauseCustomerBilling(
-  customerId: string,
-  input: CustomerActionInput
-) {
-  await ensureMerchant(input.merchantId);
-  const customer = await ensureCustomer(
-    customerId,
-    input.merchantId,
-    input.environment
-  );
-
-  customer.status = "paused";
-  customer.billingState = "paused";
-  await customer.save();
-
-  await appendAuditLog({
-    merchantId: input.merchantId,
-    actor: input.actor,
-    action: "Paused customer billing",
-    category: "billing",
-    status: "warning",
-    target: customer.email,
-    detail: `Billing paused for ${customer.name}.`,
-    metadata: {},
-    ipAddress: null,
-    userAgent: null,
-  });
-
-  return toCustomerResponse(customer);
-}
-
-export async function resumeCustomerBilling(
-  customerId: string,
-  input: CustomerActionInput
-) {
-  await ensureMerchant(input.merchantId);
-  const customer = await ensureCustomer(
-    customerId,
-    input.merchantId,
-    input.environment
-  );
-
-  if (customer.status === "blacklisted") {
-    throw new HttpError(409, "Blacklisted customer cannot be resumed.");
-  }
-
-  customer.status = "active";
-  customer.billingState = customer.paymentMethodState === "ok" ? "healthy" : "at_risk";
-  await customer.save();
-
-  await appendAuditLog({
-    merchantId: input.merchantId,
-    actor: input.actor,
-    action: "Resumed customer billing",
-    category: "billing",
-    status: "ok",
-    target: customer.email,
-    detail: `Billing resumed for ${customer.name}.`,
-    metadata: {},
     ipAddress: null,
     userAgent: null,
   });
@@ -406,10 +295,8 @@ export async function blacklistCustomer(
   );
 
   customer.status = "blacklisted";
-  customer.billingState = "paused";
   customer.blacklistedAt = new Date();
   customer.blacklistReason = input.reason;
-  customer.autoReminderEnabled = false;
   await customer.save();
 
   await appendAuditLog({

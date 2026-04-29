@@ -8,7 +8,6 @@ import {
 import {
   requirePlatformAuth,
   requirePlatformPermissions,
-  requirePlatformRoles,
 } from "@/shared/middleware/platform-auth";
 
 const notificationRouter = Router();
@@ -22,14 +21,12 @@ notificationRouter.use(requirePlatformAuth);
 
 notificationRouter.get(
   "/:merchantId/templates",
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["team_admin"]),
+  requirePlatformPermissions(["settings"]),
   listNotificationTemplatesController
 );
 notificationRouter.get(
   "/:merchantId/templates/:templateKey/preview",
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["team_admin"]),
+  requirePlatformPermissions(["settings"]),
   previewNotificationTemplateController
 );
 

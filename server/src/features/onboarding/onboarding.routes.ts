@@ -7,32 +7,19 @@ import {
   saveOnboardingPayoutController,
   startOnboardingVerificationController,
 } from "@/features/onboarding/onboarding.controller";
-import { requirePlatformAuth, requirePlatformRoles } from "@/shared/middleware/platform-auth";
+import { requirePlatformAuth } from "@/shared/middleware/platform-auth";
 
 const onboardingRouter = Router();
 
 onboardingRouter.use(requirePlatformAuth);
 
 onboardingRouter.get("/", getOnboardingController);
-onboardingRouter.post(
-  "/business",
-  requirePlatformRoles(["owner", "admin"]),
-  saveOnboardingBusinessController
-);
+onboardingRouter.post("/business", saveOnboardingBusinessController);
 onboardingRouter.post(
   "/verification/start",
-  requirePlatformRoles(["owner", "admin"]),
   startOnboardingVerificationController
 );
-onboardingRouter.post(
-  "/payout",
-  requirePlatformRoles(["owner", "admin"]),
-  saveOnboardingPayoutController
-);
-onboardingRouter.post(
-  "/register",
-  requirePlatformRoles(["owner"]),
-  registerOnboardingMerchantController
-);
+onboardingRouter.post("/payout", saveOnboardingPayoutController);
+onboardingRouter.post("/register", registerOnboardingMerchantController);
 
 export { onboardingRouter };

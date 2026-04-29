@@ -24,9 +24,6 @@ const nullableUrlSchema = z
     return normalized.length > 0 ? normalized : null;
   });
 
-const notificationDigestFrequencySchema = z.enum(["off", "daily", "weekly", "monthly"]);
-const notificationDigestModeSchema = z.enum(["counts", "detailed"]);
-
 export const merchantParamSchema = z.object({
   merchantId: objectIdSchema,
 });
@@ -35,22 +32,13 @@ const businessSettingsSchema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
   supportEmail: z.email().trim().toLowerCase().optional(),
   defaultMarket: z.string().trim().min(2).max(8).toUpperCase().optional(),
-  invoicePrefix: z.string().trim().min(2).max(12).toUpperCase().optional(),
-  billingTimezone: z.string().trim().min(2).max(80).optional(),
-  billingDisplay: z.string().trim().min(2).max(40).optional(),
+  timezone: z.string().trim().min(2).max(80).optional(),
+  displayMode: z.string().trim().min(2).max(40).optional(),
   fallbackCurrency: z.string().trim().min(2).max(12).toUpperCase().optional(),
   statementDescriptor: z.string().trim().min(2).max(40).optional(),
   brandAccent: z.string().trim().min(2).max(40).optional(),
   logoUrl: nullableUrlSchema.optional(),
   customerDomain: z.string().trim().min(2).max(160).optional(),
-  invoiceFooter: z.string().trim().min(2).max(240).optional(),
-});
-
-const billingSettingsSchema = z.object({
-  retryPolicy: z.string().trim().min(2).max(80).optional(),
-  invoiceGraceDays: z.coerce.number().int().min(0).max(30).optional(),
-  autoRetries: z.boolean().optional(),
-  meterApproval: z.boolean().optional(),
 });
 
 const walletSettingsSchema = z.object({
@@ -59,13 +47,6 @@ const walletSettingsSchema = z.object({
 });
 
 const notificationSettingsSchema = z.object({
-  customerSubscriptionEmails: z.boolean().optional(),
-  customerReceiptEmails: z.boolean().optional(),
-  customerPaymentFollowUps: z.boolean().optional(),
-  merchantSubscriptionAlerts: z.boolean().optional(),
-  merchantPaymentDigestFrequency: notificationDigestFrequencySchema.optional(),
-  merchantPaymentDigestMode: notificationDigestModeSchema.optional(),
-  teamInviteEmails: z.boolean().optional(),
   verificationAlerts: z.boolean().optional(),
   developerAlerts: z.boolean().optional(),
   securityAlerts: z.boolean().optional(),
@@ -73,9 +54,7 @@ const notificationSettingsSchema = z.object({
 
 const securitySettingsSchema = z.object({
   sessionTimeout: z.string().trim().min(2).max(80).optional(),
-  inviteDomainPolicy: z.string().trim().min(2).max(120).optional(),
   enforceTwoFactor: z.boolean().optional(),
-  restrictInviteDomains: z.boolean().optional(),
 });
 
 export const updateSettingsSchema = z
@@ -83,7 +62,6 @@ export const updateSettingsSchema = z
     actor: z.string().trim().min(2).max(120).default("system"),
     environment: environmentInputSchema.default("test"),
     business: businessSettingsSchema.optional(),
-    billing: billingSettingsSchema.optional(),
     wallets: walletSettingsSchema.optional(),
     notifications: notificationSettingsSchema.optional(),
     security: securitySettingsSchema.optional(),
@@ -91,7 +69,6 @@ export const updateSettingsSchema = z
   .refine(
     (value) =>
       value.business !== undefined ||
-      value.billing !== undefined ||
       value.wallets !== undefined ||
       value.notifications !== undefined ||
       value.security !== undefined,

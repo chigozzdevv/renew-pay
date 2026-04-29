@@ -7,8 +7,7 @@ const objectIdSchema = z
 
 const auditCategorySchema = z.enum([
   "workspace",
-  "team",
-  "billing",
+  "customer",
   "security",
   "developer",
   "payments",

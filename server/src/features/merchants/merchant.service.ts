@@ -2,7 +2,7 @@ import { HttpError } from "@/shared/errors/http-error";
 
 import { env } from "@/config/env.config";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
+import { assertSupportedCollectionMarkets } from "@/features/payment-rails/payment-rails.service";
 import type {
   CreateMerchantInput,
   ListMerchantsQuery,
@@ -16,7 +16,7 @@ function toMerchantResponse(document: {
   payoutWallet?: string | null;
   name?: string | null;
   supportEmail?: string | null;
-  billingTimezone: string;
+  timezone: string;
   supportedMarkets: string[];
   metadataHash: string;
   status: string;
@@ -29,7 +29,7 @@ function toMerchantResponse(document: {
     payoutWallet: document.payoutWallet ?? "",
     name: document.name ?? "",
     supportEmail: document.supportEmail ?? "",
-    billingTimezone: document.billingTimezone,
+    timezone: document.timezone ?? "UTC",
     supportedMarkets: document.supportedMarkets,
     metadataHash: document.metadataHash,
     status: document.status,
@@ -39,7 +39,7 @@ function toMerchantResponse(document: {
 }
 
 export async function createMerchant(input: CreateMerchantInput) {
-  await assertSupportedBillingMarkets({
+  await assertSupportedCollectionMarkets({
     markets: input.supportedMarkets,
     environment: env.PAYMENT_ENV,
   });
@@ -61,7 +61,7 @@ export async function createMerchant(input: CreateMerchantInput) {
     payoutWallet: normalizeSolanaAddress(input.payoutWallet),
     name: input.name,
     supportEmail: input.supportEmail,
-    billingTimezone: input.billingTimezone,
+    timezone: input.timezone,
     supportedMarkets: input.supportedMarkets,
     metadataHash: input.metadataHash,
     status: input.status,
@@ -108,7 +108,7 @@ export async function updateMerchant(
   input: UpdateMerchantInput
 ) {
   if (input.supportedMarkets !== undefined) {
-    await assertSupportedBillingMarkets({
+    await assertSupportedCollectionMarkets({
       markets: input.supportedMarkets,
       environment: env.PAYMENT_ENV,
     });
@@ -132,8 +132,8 @@ export async function updateMerchant(
     merchant.supportEmail = input.supportEmail;
   }
 
-  if (input.billingTimezone !== undefined) {
-    merchant.billingTimezone = input.billingTimezone;
+  if (input.timezone !== undefined) {
+    merchant.timezone = input.timezone;
   }
 
   if (input.supportedMarkets !== undefined) {

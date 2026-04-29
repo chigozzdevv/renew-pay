@@ -2,26 +2,23 @@ import cors from "cors";
 import express from "express";
 
 import { getAllowedCorsOrigins } from "@/config/env.config";
+import { auditRouter } from "@/features/audit/audit.routes";
 import { authRouter } from "@/features/auth/auth.routes";
-import { chargeRouter } from "@/features/charges/charge.routes";
-import { checkoutRouter } from "@/features/checkout/checkout.routes";
 import { customerRouter } from "@/features/customers/customer.routes";
-import { dashboardRouter } from "@/features/dashboard/dashboard.routes";
 import { developerRouter } from "@/features/developers/developer.routes";
-import { invoiceRouter, publicInvoiceRouter } from "@/features/invoices/invoice.routes";
+import { historyRouter } from "@/features/history/history.routes";
 import { kycRouter } from "@/features/kyc/kyc.routes";
 import { merchantRouter } from "@/features/merchants/merchant.routes";
 import { mediaRouter } from "@/features/media/media.routes";
 import { notificationRouter } from "@/features/notifications/notification.routes";
 import { onboardingRouter } from "@/features/onboarding/onboarding.routes";
+import { overviewRouter } from "@/features/overview/overview.routes";
 import { paymentRailRouter } from "@/features/payment-rails/payment-rails.routes";
-import { planRouter } from "@/features/plans/plan.routes";
+import { paymentRouter } from "@/features/payments/payment.routes";
+import { payoutRouter } from "@/features/payouts/payout.routes";
 import { protocolRouter } from "@/features/protocol/protocol.routes";
-import { auditRouter } from "@/features/audit/audit.routes";
-import { settlementRouter } from "@/features/settlements/settlement.routes";
+import { settlementRouter } from "@/features/settlement/settlement.routes";
 import { settingRouter } from "@/features/settings/setting.routes";
-import { subscriptionRouter } from "@/features/subscriptions/subscription.routes";
-import { teamRouter } from "@/features/teams/team.routes";
 import { errorHandler, notFoundHandler } from "@/shared/middleware/error-handler";
 import { blockLiveModeUntilLaunch } from "@/shared/middleware/live-mode-launch-gate";
 import {
@@ -75,8 +72,6 @@ export function createApp() {
     app.use(`${apiBasePath}/protocol`, protocolRouter);
     app.use(`${apiBasePath}/auth`, authRouter);
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
-    app.use(`${apiBasePath}/checkout`, checkoutRouter);
-    app.use(`${apiBasePath}/invoices/public`, publicInvoiceRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
     app.use(`${apiBasePath}/payment-rails`, paymentRailRouter);
     app.use(
@@ -87,83 +82,70 @@ export function createApp() {
     app.use(
       `${apiBasePath}/merchants`,
       requirePlatformAuth,
-      requirePlatformPermissions(["team_admin"]),
+      requirePlatformPermissions(["settings"]),
       merchantRouter
     );
     app.use(
-      `${apiBasePath}/dashboard`,
+      `${apiBasePath}/overview`,
       requirePlatformAuth,
       requirePlatformPermissions([
         "customers",
-        "plans",
-        "subscriptions",
-        "invoices",
         "payments",
+        "settlement",
+        "payouts",
+        "history",
         "developers",
-        "team_admin",
+        "settings",
       ]),
       blockLiveModeUntilLaunch(),
-      dashboardRouter
+      overviewRouter
     );
     app.use(
       `${apiBasePath}/customers`,
       requirePlatformAuth,
-      requirePlatformPermissions(["customers", "team_admin"]),
+      requirePlatformPermissions(["customers", "settings"]),
       blockLiveModeUntilLaunch(),
       customerRouter
     );
     app.use(
-      `${apiBasePath}/plans`,
+      `${apiBasePath}/payments`,
       requirePlatformAuth,
-      requirePlatformPermissions(["plans", "team_admin"]),
+      requirePlatformPermissions(["payments", "settings"]),
       blockLiveModeUntilLaunch(),
-      planRouter
+      paymentRouter
     );
     app.use(
-      `${apiBasePath}/subscriptions`,
+      `${apiBasePath}/settlement`,
       requirePlatformAuth,
-      requirePlatformPermissions(["subscriptions", "team_admin"]),
-      blockLiveModeUntilLaunch(),
-      subscriptionRouter
-    );
-    app.use(
-      `${apiBasePath}/invoices`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["invoices", "team_admin"]),
-      blockLiveModeUntilLaunch(),
-      invoiceRouter
-    );
-    app.use(
-      `${apiBasePath}/charges`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["payments", "team_admin"]),
-      blockLiveModeUntilLaunch(),
-      chargeRouter
-    );
-    app.use(
-      `${apiBasePath}/settlements`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["payments", "team_admin"]),
+      requirePlatformPermissions(["settlement", "settings"]),
       blockLiveModeUntilLaunch(),
       settlementRouter
     );
     app.use(
+      `${apiBasePath}/payouts`,
+      requirePlatformAuth,
+      requirePlatformPermissions(["payouts", "settings"]),
+      blockLiveModeUntilLaunch(),
+      payoutRouter
+    );
+    app.use(
+      `${apiBasePath}/history`,
+      requirePlatformAuth,
+      requirePlatformPermissions(["history", "settings"]),
+      blockLiveModeUntilLaunch(),
+      historyRouter
+    );
+    app.use(
       `${apiBasePath}/developers`,
       requirePlatformAuth,
-      requirePlatformPermissions(["developers", "team_admin"]),
+      requirePlatformPermissions(["developers", "settings"]),
       blockLiveModeUntilLaunch(),
       developerRouter
     );
     app.use(
-      `${apiBasePath}/teams`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["team_admin"]),
-      teamRouter
-    );
-    app.use(
       `${apiBasePath}/settings`,
       requirePlatformAuth,
-      requirePlatformPermissions(["team_admin"]),
+      requirePlatformPermissions(["settings"]),
       blockLiveModeUntilLaunch(),
       settingRouter
     );
@@ -174,7 +156,7 @@ export function createApp() {
     app.use(
       `${apiBasePath}/audit`,
       requirePlatformAuth,
-      requirePlatformPermissions(["team_admin"]),
+      requirePlatformPermissions(["settings"]),
       auditRouter
     );
   };

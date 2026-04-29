@@ -151,7 +151,7 @@ async function listPartnaLocalAssets(environment: RuntimeMode) {
   );
 }
 
-async function listPartnaBillingMarketCatalog(environment: RuntimeMode) {
+async function listPartnaCollectionMarketCatalog(environment: RuntimeMode) {
   const localAssets = await listPartnaLocalAssets(environment);
 
   const marketsByCurrency = new Map<
@@ -217,18 +217,18 @@ async function listPartnaBillingMarketCatalog(environment: RuntimeMode) {
     }));
 }
 
-export async function assertSupportedBillingMarkets(input: {
+export async function assertSupportedCollectionMarkets(input: {
   markets: string[];
   environment: RuntimeMode;
 }) {
-  const catalog = await listBillingMarketCatalog(input.environment);
+  const catalog = await listCollectionMarketCatalog(input.environment);
   const supported = new Set(catalog.map((entry) => entry.currency));
   const unsupported = input.markets.filter((market) => !supported.has(market));
 
   if (unsupported.length > 0) {
     throw new HttpError(
       409,
-      `Unsupported Partna billing markets: ${unsupported.join(", ")}.`
+      `Unsupported Partna collection markets: ${unsupported.join(", ")}.`
     );
   }
 }
@@ -248,7 +248,7 @@ async function getPreferredPartnaMarketAsset(
   if (matches.length === 0) {
     throw new HttpError(
       404,
-      `Partna does not currently expose a billing market for ${currency}.`
+      `Partna does not currently expose a collection market for ${currency}.`
     );
   }
 
@@ -636,8 +636,8 @@ export async function createWidgetQuote(input: CreateWidgetQuoteInput) {
   };
 }
 
-export async function listBillingMarketCatalog(environment: RuntimeMode = "test") {
-  return listPartnaBillingMarketCatalog(environment);
+export async function listCollectionMarketCatalog(environment: RuntimeMode = "test") {
+  return listPartnaCollectionMarketCatalog(environment);
 }
 
 export async function enqueuePaymentRailSync(input: SyncPaymentRailInput) {
@@ -682,7 +682,7 @@ export async function runPaymentRailSyncJob(input: SyncPaymentRailInput) {
   };
 }
 
-export async function quoteUsdAmountInBillingCurrency(input: {
+export async function quoteUsdAmountInCollectionCurrency(input: {
   environment: RuntimeMode;
   currency: string;
   usdAmount: number;

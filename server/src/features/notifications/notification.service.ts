@@ -1,9 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { env } from "@/config/env.config";
-import { ChargeModel } from "@/features/charges/charge.model";
-import { CustomerModel } from "@/features/customers/customer.model";
-import { InvoiceModel } from "@/features/invoices/invoice.model";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { NotificationModel } from "@/features/notifications/notification.model";
 import {
@@ -19,10 +16,7 @@ import {
   resendEmailReceivedWebhookSchema,
   resendWebhookEnvelopeSchema,
 } from "@/features/notifications/notification.validation";
-import { PlanModel } from "@/features/plans/plan.model";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
-import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
-import { TeamMemberModel } from "@/features/teams/team.model";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
@@ -62,20 +56,6 @@ function getAppBaseUrl() {
   return trimTrailingSlash(env.APP_BASE_URL.trim() || "http://localhost:3000");
 }
 
-function getCustomerPortalBaseUrl(value: string) {
-  const normalized = value.trim();
-
-  if (!normalized) {
-    return getAppBaseUrl();
-  }
-
-  if (/^https?:\/\//i.test(normalized)) {
-    return trimTrailingSlash(normalized);
-  }
-
-  return `https://${trimTrailingSlash(normalized)}`;
-}
-
 function isResendConfigured() {
   return env.RESEND_API_KEY.trim().length > 0 && env.RESEND_FROM_EMAIL.trim().length > 0;
 }
@@ -90,12 +70,8 @@ function isResendInboundForwardingConfigured() {
   );
 }
 
-function getDashboardUrl(path: string) {
+function getAppUrl(path: string) {
   return `${getAppBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function toEnvironment(value: string | undefined | null): RuntimeMode {
-  return value === "live" ? "live" : "test";
 }
 
 function toLowerEmail(value: string) {
@@ -111,19 +87,6 @@ function createNotificationIdempotencyKey(parts: Array<string | null | undefined
     .flatMap((entry) => (entry && entry.trim() ? [entry.trim()] : []))
     .join(":")
     .slice(0, 240);
-}
-
-function createSupportMailto(email: string, merchantName: string) {
-  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(
-    `${merchantName} support`
-  )}`;
-}
-
-function resolveRecipientName(input: {
-  name?: string | null;
-  email: string;
-}) {
-  return input.name?.trim() || input.email.trim();
 }
 
 function resolveMerchantLabel(input: {
@@ -431,45 +394,23 @@ async function loadMerchantBranding(merchantId: string) {
 
 async function resolveMerchantRecipients(input: {
   merchantId: string;
-  group: "billing" | "verification" | "team" | "developer" | "security";
+  group: "verification" | "developer" | "security";
 }) {
-  const members = await TeamMemberModel.find({
-    merchantId: input.merchantId,
-    status: "active",
-  })
-    .select({ email: 1, name: 1, role: 1, permissions: 1 })
+  const merchant = await MerchantModel.findById(input.merchantId)
+    .select({ supportEmail: 1, ownerName: 1, name: 1 })
     .lean()
     .exec();
 
-  const filtered = members.filter((member) => {
-    const permissions = new Set(member.permissions ?? []);
+  if (!merchant?.supportEmail) {
+    return [];
+  }
 
-    switch (input.group) {
-      case "billing":
-        return (
-          ["owner", "admin", "finance", "operations"].includes(member.role) ||
-          permissions.has("invoices") ||
-          permissions.has("payments") ||
-          permissions.has("subscriptions") ||
-          permissions.has("team_admin")
-        );
-      case "verification":
-      case "team":
-      case "security":
-        return ["owner", "admin"].includes(member.role) || permissions.has("team_admin");
-      case "developer":
-        return (
-          ["owner", "admin", "developer"].includes(member.role) ||
-          permissions.has("developers") ||
-          permissions.has("team_admin")
-        );
-    }
-  });
-
-  const recipients = (filtered.length > 0 ? filtered : members).map((member) => ({
-    email: member.email,
-    name: member.name ?? null,
-  }));
+  const recipients = [
+    {
+      email: merchant.supportEmail,
+      name: merchant.ownerName ?? merchant.name ?? null,
+    },
+  ];
 
   return Array.from(
     new Map(
@@ -482,7 +423,7 @@ async function createNotificationRecord(input: {
   merchantId: string;
   environment: RuntimeMode;
   templateKey: NotificationTemplateKey;
-  audience: "customer" | "merchant" | "team";
+  audience: "customer" | "merchant";
   category: string;
   recipient: NotificationRecipient;
   payload: NotificationTemplatePayload;
@@ -733,570 +674,10 @@ export async function previewNotificationTemplate(input: {
   };
 }
 
-export async function queueTeamInviteNotification(input: {
-  merchantId: string;
-  environment: RuntimeMode;
-  teamMemberId: string;
-  kind: "sent" | "resent";
-}) {
-  const { merchant, setting } = await loadMerchantBranding(input.merchantId);
-
-  if (!setting.notifications.teamInviteEmails) {
-    return null;
-  }
-
-  const member = await TeamMemberModel.findOne({
-    _id: input.teamMemberId,
-    merchantId: input.merchantId,
-  })
-    .select({ email: 1, name: 1, role: 1 })
-    .exec();
-
-  if (!member) {
-    return null;
-  }
-
-  const notification = await createNotificationRecord({
-    merchantId: input.merchantId,
-    environment: input.environment,
-    templateKey: input.kind === "resent" ? "team.invite.resent" : "team.invite.sent",
-    audience: "team",
-    category: "team",
-    recipient: {
-      email: member.email,
-      name: resolveRecipientName(member),
-    },
-    payload: {
-      recipientName: resolveRecipientName(member),
-      role: member.role,
-      inviteUrl: `${getAppBaseUrl()}/login`,
-      supportUrl: createSupportMailto(
-        setting.business.supportEmail,
-        resolveMerchantLabel({
-          name: merchant.name,
-          supportEmail: merchant.supportEmail,
-        })
-      ),
-    },
-    metadata: {
-      teamMemberId: member._id.toString(),
-      role: member.role,
-    },
-    idempotencyKey: createNotificationIdempotencyKey([
-      "team",
-      input.kind,
-      member._id.toString(),
-      member.email,
-      input.kind === "resent" ? String(Date.now()) : null,
-    ]),
-  });
-
-  await queueNotificationRecord(notification._id.toString());
-  return notification;
-}
-
-export async function queueInvoiceIssuedNotification(input: {
-  invoiceId: string;
-  environment: RuntimeMode;
-}) {
-  const invoice = await InvoiceModel.findById(input.invoiceId).exec();
-
-  if (!invoice) {
-    return null;
-  }
-
-  const setting = await getOrCreateMerchantSetting(invoice.merchantId.toString());
-
-  if (!setting.notifications.customerPaymentFollowUps) {
-    return null;
-  }
-
-  const invoiceUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
-
-  const notification = await createNotificationRecord({
-    merchantId: invoice.merchantId.toString(),
-    environment: input.environment,
-    templateKey: "customer.invoice.issued",
-    audience: "customer",
-    category: "billing",
-    recipient: {
-      email: invoice.customerEmail,
-      name: invoice.customerName,
-    },
-    payload: {
-      customerName: invoice.customerName,
-      invoiceTitle: invoice.title,
-      invoiceNumber: invoice.invoiceNumber,
-      amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
-      dueDate: invoice.dueDate,
-      invoiceUrl: `${invoiceUrl}/invoices/${invoice.publicToken}`,
-    },
-    metadata: {
-      invoiceId: invoice._id.toString(),
-      invoiceNumber: invoice.invoiceNumber,
-    },
-    idempotencyKey: createNotificationIdempotencyKey([
-      "customer-invoice-issued",
-      invoice._id.toString(),
-      invoice.customerEmail,
-      invoice.sentAt?.toISOString() ?? String(Date.now()),
-    ]),
-  });
-
-  if (!notification) {
-    return null;
-  }
-
-  await queueNotificationRecord(notification._id.toString());
-  return notification;
-}
-
-export async function queueInvoiceReminderNotification(input: {
-  invoiceId: string;
-  environment: RuntimeMode;
-}) {
-  const invoice = await InvoiceModel.findById(input.invoiceId).exec();
-
-  if (!invoice) {
-    return null;
-  }
-
-  const setting = await getOrCreateMerchantSetting(invoice.merchantId.toString());
-
-  if (!setting.notifications.customerPaymentFollowUps) {
-    return null;
-  }
-
-  const baseUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
-  const notification = await createNotificationRecord({
-    merchantId: invoice.merchantId.toString(),
-    environment: input.environment,
-    templateKey: "customer.invoice.reminder",
-    audience: "customer",
-    category: "billing",
-    recipient: {
-      email: invoice.customerEmail,
-      name: invoice.customerName,
-    },
-    payload: {
-      customerName: invoice.customerName,
-      invoiceTitle: invoice.title,
-      invoiceNumber: invoice.invoiceNumber,
-      amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
-      dueDate: invoice.dueDate,
-      invoiceUrl: `${baseUrl}/invoices/${invoice.publicToken}`,
-    },
-    metadata: {
-      invoiceId: invoice._id.toString(),
-      invoiceNumber: invoice.invoiceNumber,
-    },
-    idempotencyKey: createNotificationIdempotencyKey([
-      "customer-invoice-reminder",
-      invoice._id.toString(),
-      invoice.customerEmail,
-      invoice.lastRemindedAt?.toISOString() ?? String(Date.now()),
-    ]),
-  });
-
-  await queueNotificationRecord(notification._id.toString());
-  return notification;
-}
-
-export async function queueInvoicePaidNotifications(input: {
-  invoiceId: string;
-  environment: RuntimeMode;
-}) {
-  const invoice = await InvoiceModel.findById(input.invoiceId).exec();
-
-  if (!invoice) {
-    return [];
-  }
-
-  const [setting, recipients] = await Promise.all([
-    getOrCreateMerchantSetting(invoice.merchantId.toString()),
-    resolveMerchantRecipients({
-      merchantId: invoice.merchantId.toString(),
-      group: "billing",
-    }),
-  ]);
-  const notifications = [];
-  const baseUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
-
-  if (setting.notifications.customerReceiptEmails) {
-    const customerNotification = await createNotificationRecord({
-      merchantId: invoice.merchantId.toString(),
-      environment: input.environment,
-      templateKey: "customer.invoice.paid",
-      audience: "customer",
-      category: "billing",
-      recipient: {
-        email: invoice.customerEmail,
-        name: invoice.customerName,
-      },
-      payload: {
-        customerName: invoice.customerName,
-        invoiceTitle: invoice.title,
-        invoiceNumber: invoice.invoiceNumber,
-        amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
-        paidAt: invoice.paidAt ?? new Date(),
-        invoiceUrl: `${baseUrl}/invoices/${invoice.publicToken}`,
-      },
-      metadata: {
-        invoiceId: invoice._id.toString(),
-        invoiceNumber: invoice.invoiceNumber,
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "customer-invoice-paid",
-        invoice._id.toString(),
-        invoice.customerEmail,
-      ]),
-    });
-    await queueNotificationRecord(customerNotification._id.toString());
-    notifications.push(customerNotification);
-  }
-
-  if (setting.notifications.merchantSubscriptionAlerts) {
-    for (const recipient of recipients) {
-      const merchantNotification = await createNotificationRecord({
-        merchantId: invoice.merchantId.toString(),
-        environment: input.environment,
-        templateKey: "merchant.invoice.paid",
-        audience: "merchant",
-        category: "billing",
-        recipient,
-        payload: {
-          customerName: invoice.customerName,
-          invoiceTitle: invoice.title,
-          invoiceNumber: invoice.invoiceNumber,
-          amount: `${invoice.billingCurrency} ${invoice.localAmount.toLocaleString()}`,
-          paidAt: invoice.paidAt ?? new Date(),
-          dashboardUrl: getDashboardUrl("/dashboard/invoices"),
-        },
-        metadata: {
-          invoiceId: invoice._id.toString(),
-          invoiceNumber: invoice.invoiceNumber,
-        },
-        idempotencyKey: createNotificationIdempotencyKey([
-          "merchant-invoice-paid",
-          invoice._id.toString(),
-          recipient.email,
-        ]),
-      });
-      await queueNotificationRecord(merchantNotification._id.toString());
-      notifications.push(merchantNotification);
-    }
-  }
-
-  return notifications;
-}
-
-export async function queueSubscriptionCreatedNotifications(input: {
-  merchantId: string;
-  environment: RuntimeMode;
-  subscriptionId: string;
-}) {
-  const [subscription, customer, plan, setting] = await Promise.all([
-    SubscriptionModel.findById(input.subscriptionId).exec(),
-    SubscriptionModel.findById(input.subscriptionId)
-      .select({ customerRef: 1 })
-      .lean()
-      .exec()
-      .then((entry) =>
-        entry
-          ? CustomerModel.findOne({
-              merchantId: input.merchantId,
-              environment: input.environment,
-              customerRef: entry.customerRef,
-            }).exec()
-          : null
-      ),
-    SubscriptionModel.findById(input.subscriptionId)
-      .select({ planId: 1 })
-      .lean()
-      .exec()
-      .then((entry) => (entry?.planId ? PlanModel.findById(entry.planId).exec() : null)),
-    getOrCreateMerchantSetting(input.merchantId),
-  ]);
-
-  if (!subscription) {
-    return [];
-  }
-
-  const notifications = [];
-  const portalUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
-
-  if (customer?.email && setting.notifications.customerSubscriptionEmails) {
-    const notification = await createNotificationRecord({
-      merchantId: input.merchantId,
-      environment: input.environment,
-      templateKey: "customer.subscription.created",
-      audience: "customer",
-      category: "billing",
-      recipient: {
-        email: customer.email,
-        name: customer.name,
-      },
-      payload: {
-        customerName: customer.name,
-        planName: plan?.name ?? "Subscription",
-        amount: `${subscription.billingCurrency} ${subscription.localAmount.toLocaleString()}`,
-        nextChargeAt: subscription.nextChargeAt,
-        portalUrl,
-      },
-      metadata: {
-        subscriptionId: subscription._id.toString(),
-        customerRef: subscription.customerRef,
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "customer-subscription-created",
-        subscription._id.toString(),
-        customer.email,
-      ]),
-    });
-    await queueNotificationRecord(notification._id.toString());
-    notifications.push(notification);
-  }
-
-  if (setting.notifications.merchantSubscriptionAlerts) {
-    const recipients = await resolveMerchantRecipients({
-      merchantId: input.merchantId,
-      group: "billing",
-    });
-
-    for (const recipient of recipients) {
-      const notification = await createNotificationRecord({
-        merchantId: input.merchantId,
-        environment: input.environment,
-        templateKey: "merchant.subscription.created",
-        audience: "merchant",
-        category: "billing",
-        recipient,
-        payload: {
-          customerName: customer?.name ?? subscription.customerName,
-          planName: plan?.name ?? "Subscription",
-          amount: `${subscription.billingCurrency} ${subscription.localAmount.toLocaleString()}`,
-          dashboardUrl: getDashboardUrl("/dashboard/subscriptions"),
-        },
-        metadata: {
-          subscriptionId: subscription._id.toString(),
-        },
-        idempotencyKey: createNotificationIdempotencyKey([
-          "merchant-subscription-created",
-          subscription._id.toString(),
-          recipient.email,
-        ]),
-      });
-      await queueNotificationRecord(notification._id.toString());
-      notifications.push(notification);
-    }
-  }
-
-  return notifications;
-}
-
-export async function queueChargeStatusNotifications(input: {
-  chargeId: string;
-  previousStatus: string | null;
-  nextStatus: string;
-}) {
-  const charge = await ChargeModel.findById(input.chargeId).exec();
-
-  if (!charge) {
-    return [];
-  }
-
-  if (charge.sourceKind === "invoice" && charge.invoiceId) {
-    const invoice = await InvoiceModel.findById(charge.invoiceId).exec();
-
-    if (!invoice) {
-      return [];
-    }
-
-    if (invoice.paymentSnapshot) {
-      invoice.paymentSnapshot.status = charge.status;
-    }
-
-    if (input.nextStatus === "pending") {
-      invoice.status = "pending_payment";
-    } else if (
-      input.nextStatus === "awaiting_settlement" ||
-      input.nextStatus === "confirming"
-    ) {
-      invoice.status = "processing";
-    } else if (input.nextStatus === "settled") {
-      invoice.status = "paid";
-      invoice.paidAt = invoice.paidAt ?? charge.processedAt ?? new Date();
-      await invoice.save();
-
-      return queueInvoicePaidNotifications({
-        invoiceId: invoice._id.toString(),
-        environment: toEnvironment(charge.environment),
-      });
-    } else if (
-      input.nextStatus === "failed" ||
-      input.nextStatus === "reversed"
-    ) {
-      invoice.status = invoice.dueDate.getTime() < Date.now() ? "overdue" : "issued";
-    }
-
-    await invoice.save();
-    return [];
-  }
-
-  const environment = toEnvironment(charge.environment);
-  const [subscription, customer, plan, setting] = await Promise.all([
-    SubscriptionModel.findById(charge.subscriptionId).exec(),
-    SubscriptionModel.findById(charge.subscriptionId)
-      .select({ customerRef: 1, merchantId: 1 })
-      .lean()
-      .exec()
-      .then((entry) =>
-        entry
-          ? CustomerModel.findOne({
-              merchantId: entry.merchantId,
-              environment,
-              customerRef: entry.customerRef,
-            }).exec()
-          : null
-      ),
-    SubscriptionModel.findById(charge.subscriptionId)
-      .select({ planId: 1 })
-      .lean()
-      .exec()
-      .then((entry) => (entry?.planId ? PlanModel.findById(entry.planId).exec() : null)),
-    getOrCreateMerchantSetting(charge.merchantId.toString()),
-  ]);
-
-  if (!subscription) {
-    return [];
-  }
-
-  const notifications = [];
-  const amount = `${subscription.billingCurrency} ${charge.localAmount.toLocaleString()}`;
-  const portalUrl = getCustomerPortalBaseUrl(setting.business.customerDomain);
-
-  const sendReceipt =
-    input.nextStatus === "settled" && input.previousStatus !== "settled";
-
-  if (sendReceipt && customer?.email && setting.notifications.customerReceiptEmails) {
-    const notification = await createNotificationRecord({
-      merchantId: charge.merchantId.toString(),
-      environment,
-      templateKey: "customer.payment.receipt",
-      audience: "customer",
-      category: "billing",
-      recipient: {
-        email: customer.email,
-        name: customer.name,
-      },
-      payload: {
-        customerName: customer.name,
-        planName: plan?.name ?? "Subscription",
-        amount,
-        nextChargeAt: subscription.nextChargeAt,
-        paidAt: charge.processedAt,
-        receiptRef: charge.externalChargeId,
-        portalUrl,
-      },
-      metadata: {
-        chargeId: charge._id.toString(),
-        subscriptionId: subscription._id.toString(),
-      },
-      idempotencyKey: createNotificationIdempotencyKey([
-        "customer-receipt",
-        charge._id.toString(),
-        customer.email,
-      ]),
-    });
-    await queueNotificationRecord(notification._id.toString());
-    notifications.push(notification);
-  }
-
-  const sendFailedNotice =
-    input.nextStatus === "failed" && input.previousStatus !== "failed";
-
-  if (sendFailedNotice) {
-    if (customer?.email && setting.notifications.customerPaymentFollowUps) {
-      const customerNotification = await createNotificationRecord({
-        merchantId: charge.merchantId.toString(),
-        environment,
-        templateKey:
-          subscription.status === "past_due"
-            ? "customer.subscription.past_due"
-            : "customer.payment.failed",
-        audience: "customer",
-        category: "billing",
-        recipient: {
-          email: customer.email,
-          name: customer.name,
-        },
-        payload: {
-          customerName: customer.name,
-          planName: plan?.name ?? "Subscription",
-          amount,
-          retryAt: subscription.retryAvailableAt,
-          portalUrl,
-        },
-        metadata: {
-          chargeId: charge._id.toString(),
-          subscriptionId: subscription._id.toString(),
-        },
-        idempotencyKey: createNotificationIdempotencyKey([
-          "customer-payment-failed",
-          charge._id.toString(),
-          customer.email,
-        ]),
-      });
-      await queueNotificationRecord(customerNotification._id.toString());
-      notifications.push(customerNotification);
-    }
-
-    const shouldAlertMerchant = setting.notifications.merchantSubscriptionAlerts;
-
-    if (shouldAlertMerchant) {
-      const recipients = await resolveMerchantRecipients({
-        merchantId: charge.merchantId.toString(),
-        group: "billing",
-      });
-
-      for (const recipient of recipients) {
-        const merchantNotification = await createNotificationRecord({
-          merchantId: charge.merchantId.toString(),
-          environment,
-          templateKey: "merchant.billing.payment_failed",
-          audience: "merchant",
-          category: "billing",
-          recipient,
-          payload: {
-            customerName: customer?.name ?? subscription.customerName,
-            planName: plan?.name ?? "Subscription",
-            amount,
-            retryAt: subscription.retryAvailableAt,
-            dashboardUrl: getDashboardUrl("/dashboard/payments"),
-          },
-          metadata: {
-            chargeId: charge._id.toString(),
-            subscriptionId: subscription._id.toString(),
-          },
-          idempotencyKey: createNotificationIdempotencyKey([
-            "merchant-payment-failed",
-            charge._id.toString(),
-            recipient.email,
-          ]),
-        });
-        await queueNotificationRecord(merchantNotification._id.toString());
-        notifications.push(merchantNotification);
-      }
-    }
-  }
-
-  return notifications;
-}
-
 export async function queueVerificationNotification(input: {
   merchantId: string;
   environment: RuntimeMode;
-  subjectType: "merchant" | "team_member";
+  subjectType: "merchant" | "owner";
   status: string;
   reviewAnswer?: string | null;
 }) {
@@ -1335,7 +716,7 @@ export async function queueVerificationNotification(input: {
       recipient,
       payload: {
         statusLabel: input.reviewAnswer ?? input.status,
-        dashboardUrl: getDashboardUrl("/dashboard"),
+        appUrl: getAppUrl("/overview"),
       },
       metadata: {
         subjectType: input.subjectType,

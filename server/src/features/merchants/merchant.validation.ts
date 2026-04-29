@@ -14,7 +14,7 @@ export const createMerchantSchema = z.object({
   payoutWallet: addressSchema,
   name: z.string().trim().min(2).max(120),
   supportEmail: z.email().trim().toLowerCase(),
-  billingTimezone: z.string().trim().min(2).default("UTC"),
+  timezone: z.string().trim().min(2).default("UTC"),
   supportedMarkets: z.array(marketSchema).min(1),
   metadataHash: z.string().trim().min(1).default("0x0"),
   status: z.enum(["active", "paused"]).default("active"),

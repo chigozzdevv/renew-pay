@@ -1,8 +1,7 @@
 import { runDeveloperWebhookDeliveryJob } from "@/features/developers/developer-webhook-delivery.service";
 import { runNotificationDeliveryJob } from "@/features/notifications/notification.service";
-import { runSubscriptionChargeJob } from "@/features/charges/charge.service";
 import { runPaymentRailSyncJob } from "@/features/payment-rails/payment-rails.service";
-import { runSettlementBridgeJob } from "@/features/settlements/settlement.service";
+import { runPayoutProcessingJob } from "@/features/payouts/payout.service";
 import { queueNames } from "@/shared/workers/queue-names";
 import { registerQueueProcessor } from "@/shared/workers/queue-runtime";
 
@@ -25,12 +24,8 @@ export function registerWorkerProcessors() {
     runPaymentRailSyncJob(payload as { country?: string; environment: "test" | "live" })
   );
 
-  registerQueueProcessor(queueNames.subscriptionCharge, async (payload) =>
-    runSubscriptionChargeJob(payload as { subscriptionId: string })
-  );
-
-  registerQueueProcessor(queueNames.settlementBridge, async (payload) =>
-    runSettlementBridgeJob(payload as { settlementId: string })
+  registerQueueProcessor(queueNames.payoutProcessing, async (payload) =>
+    runPayoutProcessingJob(payload as { payoutId: string })
   );
 
   processorsRegistered = true;

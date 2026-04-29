@@ -20,24 +20,24 @@ paymentRailRouter.post("/webhooks/partna", processPartnaWebhookController);
 
 paymentRailRouter.use(requirePlatformAuth);
 paymentRailRouter.use(
-  requirePlatformPermissions(["payments", "developers", "team_admin"])
+  requirePlatformPermissions(["payments", "developers", "settings"])
 );
 
 paymentRailRouter.get("/channels", listChannelsController);
 paymentRailRouter.post(
   "/channels/sync",
-  requirePlatformPermissions(["developers", "team_admin"]),
+  requirePlatformPermissions(["developers", "settings"]),
   syncChannelsController
 );
 paymentRailRouter.get("/networks", listNetworksController);
 paymentRailRouter.post(
   "/networks/sync",
-  requirePlatformPermissions(["developers", "team_admin"]),
+  requirePlatformPermissions(["developers", "settings"]),
   syncNetworksController
 );
 paymentRailRouter.post(
   "/sync",
-  requirePlatformPermissions(["developers", "team_admin"]),
+  requirePlatformPermissions(["developers", "settings"]),
   enqueuePaymentRailSyncController
 );
 paymentRailRouter.post("/quotes", createWidgetQuoteController);

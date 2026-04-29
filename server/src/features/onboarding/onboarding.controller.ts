@@ -22,15 +22,13 @@ function resolveActor(request: Request) {
 
 function requireSessionScope(request: Request) {
   const merchantId = request.platformAuthUser?.merchantId;
-  const teamMemberId = request.platformAuthUser?.teamMemberId;
 
-  if (!merchantId || !teamMemberId) {
+  if (!merchantId) {
     throw new Error("Authenticated onboarding scope is required.");
   }
 
   return {
     merchantId,
-    teamMemberId,
   };
 }
 

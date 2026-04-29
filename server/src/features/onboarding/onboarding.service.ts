@@ -1,15 +1,14 @@
 import { appendAuditLog } from "@/features/audit/audit.service";
 import {
   getMerchantKybStatusByMerchantId,
-  getTeamMemberKycStatusById,
+  getOwnerKycStatusByMerchantId,
   startMerchantKybSession,
-  startTeamMemberKycSession,
+  startOwnerKycSession,
 } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
+import { assertSupportedCollectionMarkets } from "@/features/payment-rails/payment-rails.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { SettingModel } from "@/features/settings/setting.model";
-import { TeamMemberModel } from "@/features/teams/team.model";
 import type {
   OnboardingBusinessInput,
   OnboardingPayoutInput,
@@ -22,8 +21,6 @@ import {
 } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
-
-type StepStatus = "complete" | "current" | "pending";
 
 function assertTestOnboardingOnly(environment: RuntimeMode) {
   if (environment === "live") {
@@ -41,51 +38,29 @@ async function getMerchantOrThrow(merchantId: string) {
   return merchant;
 }
 
-async function getTeamMemberOrThrow(teamMemberId: string, merchantId: string) {
-  const member = await TeamMemberModel.findById(teamMemberId).exec();
-
-  if (!member || member.merchantId.toString() !== merchantId) {
-    throw new HttpError(404, "Team member was not found.");
-  }
-
-  return member;
-}
-
 const getOrCreateSetting = getOrCreateMerchantSetting;
 
 async function loadSetting(merchantId: string) {
   return SettingModel.findOne({ merchantId }).exec();
 }
 
-function assertOwnerRole(role: string) {
-  if (role !== "owner") {
-    throw new HttpError(
-      403,
-      "Only the workspace owner can finish merchant registration."
-    );
-  }
-}
-
 async function resolveOnboardingState(input: {
   merchantId: string;
-  teamMemberId: string;
   environment: RuntimeMode;
 }) {
-  const [merchant, owner, setting, ownerKyc, merchantKyb] = await Promise.all([
+  const [merchant, setting, ownerKyc, merchantKyb] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
-    getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
     loadSetting(input.merchantId),
-    getTeamMemberKycStatusById({
+    getOwnerKycStatusByMerchantId({
       merchantId: input.merchantId,
-      teamMemberId: input.teamMemberId,
       environment: input.environment,
     }),
     getMerchantKybStatusByMerchantId(input.merchantId, input.environment),
   ]);
 
   const businessComplete =
-    typeof owner.name === "string" &&
-    owner.name.trim().length > 1 &&
+    typeof merchant.ownerName === "string" &&
+    merchant.ownerName.trim().length > 1 &&
     typeof merchant.name === "string" &&
     merchant.name.trim().length > 1 &&
     typeof merchant.supportEmail === "string" &&
@@ -149,7 +124,6 @@ async function resolveOnboardingState(input: {
 
   return {
     merchant,
-    owner,
     setting,
     ownerKyc,
     merchantKyb,
@@ -166,9 +140,11 @@ async function resolveOnboardingState(input: {
 function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboardingState>> & {
   environment: RuntimeMode;
 }) {
+  const merchantId = input.merchant._id.toString();
+
   return {
-    merchantId: input.merchant._id.toString(),
-    teamMemberId: input.owner._id.toString(),
+    merchantId,
+    accountId: merchantId,
     environment: input.environment,
     status: input.status,
     canComplete: input.canComplete,
@@ -176,7 +152,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
     steps: input.steps,
     business: {
       logoUrl: input.setting?.business.logoUrl ?? "",
-      ownerName: input.owner.name ?? "",
+      ownerName: input.merchant.ownerName ?? "",
       name: input.merchant.name ?? "",
       supportEmail: input.merchant.supportEmail ?? "",
       supportedMarkets: input.merchant.supportedMarkets,
@@ -200,7 +176,6 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
 async function persistIntermediateOnboardingStatus(input: {
   merchantId: string;
   environment: RuntimeMode;
-  teamMemberId: string;
 }) {
   const state = await resolveOnboardingState(input);
   const nextStatus =
@@ -219,7 +194,6 @@ async function persistIntermediateOnboardingStatus(input: {
 
 export async function getOnboardingState(input: {
   merchantId: string;
-  teamMemberId: string;
   environment: RuntimeMode;
 }) {
   assertTestOnboardingOnly(input.environment);
@@ -234,33 +208,30 @@ export async function getOnboardingState(input: {
 
 export async function saveOnboardingBusiness(input: {
   merchantId: string;
-  teamMemberId: string;
   actor: string;
   payload: OnboardingBusinessInput;
 }) {
   assertTestOnboardingOnly(input.payload.environment);
 
-  await assertSupportedBillingMarkets({
+  await assertSupportedCollectionMarkets({
     markets: input.payload.supportedMarkets,
     environment: input.payload.environment,
   });
 
-  const [merchant, owner, existingSetting] = await Promise.all([
+  const [merchant, existingSetting] = await Promise.all([
     getMerchantOrThrow(input.merchantId),
-    getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
     loadSetting(input.merchantId),
   ]);
 
-  owner.name = input.payload.ownerName;
-  owner.markets = input.payload.supportedMarkets;
+  merchant.ownerName = input.payload.ownerName;
   merchant.name = input.payload.name;
   merchant.supportEmail = input.payload.supportEmail;
   merchant.supportedMarkets = input.payload.supportedMarkets;
-  merchant.billingTimezone = merchant.billingTimezone?.trim()
-    ? merchant.billingTimezone
+  merchant.timezone = merchant.timezone?.trim()
+    ? merchant.timezone
     : "UTC";
 
-  await Promise.all([owner.save(), merchant.save()]);
+  await merchant.save();
 
   const setting = existingSetting ?? (await getOrCreateSetting(input.merchantId));
 
@@ -270,8 +241,8 @@ export async function saveOnboardingBusiness(input: {
     ? input.payload.logoUrl.trim()
     : null;
   setting.business.defaultMarket = input.payload.supportedMarkets[0] ?? "NGN";
-  setting.business.billingTimezone = setting.business.billingTimezone?.trim()
-    ? setting.business.billingTimezone
+  setting.business.timezone = setting.business.timezone?.trim()
+    ? setting.business.timezone
     : "UTC";
 
   await setting.save();
@@ -295,27 +266,21 @@ export async function saveOnboardingBusiness(input: {
 
   return persistIntermediateOnboardingStatus({
     merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
     environment: input.payload.environment,
   });
 }
 
 export async function startOnboardingVerification(input: {
   merchantId: string;
-  teamMemberId: string;
   actor: string;
   payload: OnboardingVerificationStartInput;
 }) {
   assertTestOnboardingOnly(input.payload.environment);
 
-  const [merchant, owner] = await Promise.all([
-    getMerchantOrThrow(input.merchantId),
-    getTeamMemberOrThrow(input.teamMemberId, input.merchantId),
-  ]);
-
+  const merchant = await getMerchantOrThrow(input.merchantId);
   const hasBusinessBasics =
-    typeof owner.name === "string" &&
-    owner.name.trim().length > 1 &&
+    typeof merchant.ownerName === "string" &&
+    merchant.ownerName.trim().length > 1 &&
     typeof merchant.name === "string" &&
     merchant.name.trim().length > 1 &&
     typeof merchant.supportEmail === "string" &&
@@ -343,9 +308,8 @@ export async function startOnboardingVerification(input: {
     });
   }
 
-  return startTeamMemberKycSession({
+  return startOwnerKycSession({
     merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
     actor: input.actor,
     environment: input.payload.environment,
     country: input.payload.country,
@@ -355,7 +319,6 @@ export async function startOnboardingVerification(input: {
 
 export async function saveOnboardingPayout(input: {
   merchantId: string;
-  teamMemberId: string;
   actor: string;
   payload: OnboardingPayoutInput;
 }) {
@@ -393,14 +356,12 @@ export async function saveOnboardingPayout(input: {
 
   return persistIntermediateOnboardingStatus({
     merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
     environment: input.payload.environment,
   });
 }
 
 export async function registerOnboardingMerchant(input: {
   merchantId: string;
-  teamMemberId: string;
   actor: string;
   payload: OnboardingRegisterInput;
 }) {
@@ -408,15 +369,12 @@ export async function registerOnboardingMerchant(input: {
 
   const state = await resolveOnboardingState({
     merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
     environment: input.payload.environment,
   });
 
   if (!state.canComplete) {
     throw new HttpError(409, "Onboarding is still missing required steps.");
   }
-
-  assertOwnerRole(state.owner.role);
 
   const merchantPayoutWallet = state.merchant.payoutWallet;
 
@@ -445,7 +403,6 @@ export async function registerOnboardingMerchant(input: {
 
   return getOnboardingState({
     merchantId: input.merchantId,
-    teamMemberId: input.teamMemberId,
     environment: input.payload.environment,
   });
 }

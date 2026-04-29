@@ -20,49 +20,26 @@ function toSettingResponse(document: SettingDocument) {
       name: document.business.name,
       supportEmail: document.business.supportEmail,
       defaultMarket: document.business.defaultMarket,
-      invoicePrefix: document.business.invoicePrefix,
-      billingTimezone: document.business.billingTimezone,
-      billingDisplay: document.business.billingDisplay,
+      timezone: document.business.timezone ?? "UTC",
+      displayMode: document.business.displayMode ?? "local-fiat",
       fallbackCurrency: document.business.fallbackCurrency,
       statementDescriptor: document.business.statementDescriptor,
       brandAccent: document.business.brandAccent,
       logoUrl: document.business.logoUrl ?? null,
       customerDomain: document.business.customerDomain,
-      invoiceFooter: document.business.invoiceFooter,
-    },
-    billing: {
-      retryPolicy: document.billing.retryPolicy,
-      invoiceGraceDays: document.billing.invoiceGraceDays,
-      autoRetries: document.billing.autoRetries,
-      meterApproval: document.billing.meterApproval,
     },
     wallets: {
       primaryWallet: document.wallets.primaryWallet ?? "",
       walletAlerts: document.wallets.walletAlerts,
     },
     notifications: {
-      customerSubscriptionEmails: document.notifications.customerSubscriptionEmails,
-      customerReceiptEmails: document.notifications.customerReceiptEmails,
-      customerPaymentFollowUps: document.notifications.customerPaymentFollowUps,
-      merchantSubscriptionAlerts: document.notifications.merchantSubscriptionAlerts,
-      merchantPaymentDigestFrequency:
-        document.notifications.merchantPaymentDigestFrequency ??
-        (document.notifications.financeDigest === false ? "off" : "daily"),
-      merchantPaymentDigestMode:
-        document.notifications.merchantPaymentDigestMode ?? "counts",
-      teamInviteEmails: document.notifications.teamInviteEmails,
       verificationAlerts: document.notifications.verificationAlerts,
       developerAlerts: document.notifications.developerAlerts,
-      securityAlerts:
-        document.notifications.securityAlerts ??
-        document.notifications.loginAlerts ??
-        true,
+      securityAlerts: document.notifications.securityAlerts,
     },
     security: {
       sessionTimeout: document.security.sessionTimeout,
-      inviteDomainPolicy: document.security.inviteDomainPolicy,
       enforceTwoFactor: document.security.enforceTwoFactor,
-      restrictInviteDomains: document.security.restrictInviteDomains,
     },
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
@@ -136,17 +113,13 @@ export async function updateSettingsByMerchantId(
       setting.business.defaultMarket = input.business.defaultMarket;
     }
 
-    if (input.business.invoicePrefix !== undefined) {
-      setting.business.invoicePrefix = input.business.invoicePrefix;
+    if (input.business.timezone !== undefined) {
+      setting.business.timezone = input.business.timezone;
+      merchant.timezone = input.business.timezone;
     }
 
-    if (input.business.billingTimezone !== undefined) {
-      setting.business.billingTimezone = input.business.billingTimezone;
-      merchant.billingTimezone = input.business.billingTimezone;
-    }
-
-    if (input.business.billingDisplay !== undefined) {
-      setting.business.billingDisplay = input.business.billingDisplay;
+    if (input.business.displayMode !== undefined) {
+      setting.business.displayMode = input.business.displayMode;
     }
 
     if (input.business.fallbackCurrency !== undefined) {
@@ -168,28 +141,6 @@ export async function updateSettingsByMerchantId(
     if (input.business.customerDomain !== undefined) {
       setting.business.customerDomain = input.business.customerDomain;
     }
-
-    if (input.business.invoiceFooter !== undefined) {
-      setting.business.invoiceFooter = input.business.invoiceFooter;
-    }
-  }
-
-  if (input.billing) {
-    if (input.billing.retryPolicy !== undefined) {
-      setting.billing.retryPolicy = input.billing.retryPolicy;
-    }
-
-    if (input.billing.invoiceGraceDays !== undefined) {
-      setting.billing.invoiceGraceDays = input.billing.invoiceGraceDays;
-    }
-
-    if (input.billing.autoRetries !== undefined) {
-      setting.billing.autoRetries = input.billing.autoRetries;
-    }
-
-    if (input.billing.meterApproval !== undefined) {
-      setting.billing.meterApproval = input.billing.meterApproval;
-    }
   }
 
   if (input.wallets) {
@@ -205,42 +156,6 @@ export async function updateSettingsByMerchantId(
   }
 
   if (input.notifications) {
-    if (input.notifications.customerSubscriptionEmails !== undefined) {
-      setting.notifications.customerSubscriptionEmails =
-        input.notifications.customerSubscriptionEmails;
-    }
-
-    if (input.notifications.customerReceiptEmails !== undefined) {
-      setting.notifications.customerReceiptEmails =
-        input.notifications.customerReceiptEmails;
-    }
-
-    if (input.notifications.customerPaymentFollowUps !== undefined) {
-      setting.notifications.customerPaymentFollowUps =
-        input.notifications.customerPaymentFollowUps;
-    }
-
-    if (input.notifications.merchantSubscriptionAlerts !== undefined) {
-      setting.notifications.merchantSubscriptionAlerts =
-        input.notifications.merchantSubscriptionAlerts;
-    }
-
-    if (input.notifications.merchantPaymentDigestFrequency !== undefined) {
-      setting.notifications.merchantPaymentDigestFrequency =
-        input.notifications.merchantPaymentDigestFrequency;
-      setting.notifications.financeDigest =
-        input.notifications.merchantPaymentDigestFrequency !== "off";
-    }
-
-    if (input.notifications.merchantPaymentDigestMode !== undefined) {
-      setting.notifications.merchantPaymentDigestMode =
-        input.notifications.merchantPaymentDigestMode;
-    }
-
-    if (input.notifications.teamInviteEmails !== undefined) {
-      setting.notifications.teamInviteEmails = input.notifications.teamInviteEmails;
-    }
-
     if (input.notifications.verificationAlerts !== undefined) {
       setting.notifications.verificationAlerts =
         input.notifications.verificationAlerts;
@@ -252,7 +167,6 @@ export async function updateSettingsByMerchantId(
 
     if (input.notifications.securityAlerts !== undefined) {
       setting.notifications.securityAlerts = input.notifications.securityAlerts;
-      setting.notifications.loginAlerts = input.notifications.securityAlerts;
     }
   }
 
@@ -261,16 +175,8 @@ export async function updateSettingsByMerchantId(
       setting.security.sessionTimeout = input.security.sessionTimeout;
     }
 
-    if (input.security.inviteDomainPolicy !== undefined) {
-      setting.security.inviteDomainPolicy = input.security.inviteDomainPolicy;
-    }
-
     if (input.security.enforceTwoFactor !== undefined) {
       setting.security.enforceTwoFactor = input.security.enforceTwoFactor;
-    }
-
-    if (input.security.restrictInviteDomains !== undefined) {
-      setting.security.restrictInviteDomains = input.security.restrictInviteDomains;
     }
   }
 
@@ -286,7 +192,6 @@ export async function updateSettingsByMerchantId(
     detail: "Workspace settings were updated.",
     metadata: {
       business: Boolean(input.business),
-      billing: Boolean(input.billing),
       wallets: Boolean(input.wallets),
       notifications: Boolean(input.notifications),
       security: Boolean(input.security),

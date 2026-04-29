@@ -20,20 +20,13 @@ const businessSettingsSchema = new Schema(
       uppercase: true,
       default: "NGN",
     },
-    invoicePrefix: {
-      type: String,
-      required: true,
-      trim: true,
-      uppercase: true,
-      default: "RNL",
-    },
-    billingTimezone: {
+    timezone: {
       type: String,
       required: true,
       trim: true,
       default: "UTC",
     },
-    billingDisplay: {
+    displayMode: {
       type: String,
       required: true,
       trim: true,
@@ -69,42 +62,6 @@ const businessSettingsSchema = new Schema(
       trim: true,
       default: "app.renew.sh",
     },
-    invoiceFooter: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "Thanks for billing with Renew.",
-    },
-  },
-  {
-    _id: false,
-  }
-);
-
-const billingSettingsSchema = new Schema(
-  {
-    retryPolicy: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "Smart retries",
-    },
-    invoiceGraceDays: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 2,
-    },
-    autoRetries: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    meterApproval: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
   },
   {
     _id: false,
@@ -131,54 +88,7 @@ const walletSettingsSchema = new Schema(
 
 const notificationSettingsSchema = new Schema(
   {
-    financeDigest: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
     developerAlerts: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    loginAlerts: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    customerSubscriptionEmails: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    customerReceiptEmails: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    customerPaymentFollowUps: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    merchantSubscriptionAlerts: {
-      type: Boolean,
-      required: true,
-      default: true,
-    },
-    merchantPaymentDigestFrequency: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "daily",
-    },
-    merchantPaymentDigestMode: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "counts",
-    },
-    teamInviteEmails: {
       type: Boolean,
       required: true,
       default: true,
@@ -207,18 +117,7 @@ const securitySettingsSchema = new Schema(
       trim: true,
       default: "30 minutes",
     },
-    inviteDomainPolicy: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "Allow all domains",
-    },
     enforceTwoFactor: {
-      type: Boolean,
-      required: true,
-      default: false,
-    },
-    restrictInviteDomains: {
       type: Boolean,
       required: true,
       default: false,
@@ -239,11 +138,6 @@ const settingSchema = new Schema(
     },
     business: {
       type: businessSettingsSchema,
-      required: true,
-      default: () => ({}),
-    },
-    billing: {
-      type: billingSettingsSchema,
       required: true,
       default: () => ({}),
     },

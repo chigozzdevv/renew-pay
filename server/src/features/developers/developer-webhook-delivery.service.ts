@@ -6,7 +6,6 @@ import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
 import { queueNames } from "@/shared/workers/queue-names";
 import { toPublicEnvironment } from "@/shared/utils/runtime-environment";
 
-import { ChargeModel } from "@/features/charges/charge.model";
 import { DeveloperDeliveryModel } from "@/features/developers/developer-delivery.model";
 import {
   decryptWebhookSecret,
@@ -14,8 +13,8 @@ import {
 } from "@/features/developers/developer-webhook-crypto";
 import type { DeveloperWebhookEventName } from "@/features/developers/developer-webhook-events";
 import { DeveloperWebhookModel } from "@/features/developers/developer-webhook.model";
-import { SettlementModel } from "@/features/settlements/settlement.model";
-import { SubscriptionModel } from "@/features/subscriptions/subscription.model";
+import { PaymentModel } from "@/features/payments/payment.model";
+import { PayoutModel } from "@/features/payouts/payout.model";
 
 type DeveloperWebhookPayload = {
   id: string;
@@ -146,65 +145,45 @@ async function createDeliveryAndDispatch(input: CreateDeliveryInput) {
   return DeveloperDeliveryModel.findById(delivery._id).exec();
 }
 
-async function buildChargeWebhookPayload(input: {
-  chargeId: string;
+async function buildPaymentWebhookPayload(input: {
+  paymentId: string;
   eventType: DeveloperWebhookEventName;
   eventId: string;
 }) {
-  const charge = await ChargeModel.findById(input.chargeId).exec();
+  const payment = await PaymentModel.findById(input.paymentId).exec();
 
-  if (!charge) {
-    throw new HttpError(404, "Charge was not found for webhook dispatch.");
+  if (!payment) {
+    throw new HttpError(404, "Payment was not found for webhook dispatch.");
   }
 
-  const [subscription, settlement] = await Promise.all([
-    SubscriptionModel.findById(charge.subscriptionId)
-      .select({
-        _id: 1,
-        planId: 1,
-        customerRef: 1,
-        customerName: 1,
-        billingCurrency: 1,
-        localAmount: 1,
-        paymentAccountType: 1,
-        paymentAccountNumber: 1,
-        paymentNetworkId: 1,
-        status: 1,
-        nextChargeAt: 1,
-        lastChargeAt: 1,
-        retryAvailableAt: 1,
-      })
-      .lean()
-      .exec(),
-    SettlementModel.findOne({ sourceChargeId: charge._id })
-      .sort({ createdAt: -1 })
-      .select({
-        _id: 1,
-        batchRef: 1,
-        grossUsdc: 1,
-        feeUsdc: 1,
-        netUsdc: 1,
-        destinationWallet: 1,
-        status: 1,
-        txHash: 1,
-        bridgeSourceTxHash: 1,
-        bridgeReceiveTxHash: 1,
-        creditTxHash: 1,
-        submittedAt: 1,
-        bridgeAttestedAt: 1,
-        scheduledFor: 1,
-        settledAt: 1,
-        reversedAt: 1,
-        reversalReason: 1,
-      })
-      .lean()
-      .exec(),
-  ]);
+  const settlement = await PayoutModel.findOne({ sourcePaymentId: payment._id })
+    .sort({ createdAt: -1 })
+    .select({
+      _id: 1,
+      batchRef: 1,
+      grossUsdc: 1,
+      feeUsdc: 1,
+      netUsdc: 1,
+      destinationWallet: 1,
+      status: 1,
+      txHash: 1,
+      bridgeSourceTxHash: 1,
+      bridgeReceiveTxHash: 1,
+      creditTxHash: 1,
+      submittedAt: 1,
+      bridgeAttestedAt: 1,
+      scheduledFor: 1,
+      settledAt: 1,
+      reversedAt: 1,
+      reversalReason: 1,
+    })
+    .lean()
+    .exec();
   const environment: RuntimeMode =
-    charge.environment === "live" ? "live" : "test";
+    payment.environment === "live" ? "live" : "test";
 
   return {
-    merchantId: charge.merchantId.toString(),
+    merchantId: payment.merchantId.toString(),
     environment,
     payload: {
       id: input.eventId,
@@ -213,40 +192,26 @@ async function buildChargeWebhookPayload(input: {
       environment: toPublicEnvironment(environment),
       livemode: environment === "live",
       data: {
-        charge: {
-          id: charge._id.toString(),
-          sourceKind: charge.sourceKind ?? "subscription",
-          subscriptionId: charge.subscriptionId?.toString() ?? null,
-          invoiceId: charge.invoiceId?.toString() ?? null,
-          externalChargeId: charge.externalChargeId,
-          settlementSource: charge.settlementSource ?? null,
-          localAmount: charge.localAmount,
-          fxRate: charge.fxRate,
-          usdcAmount: charge.usdcAmount,
-          feeAmount: charge.feeAmount,
-          status: charge.status,
-          failureCode: charge.failureCode ?? null,
-          processedAt: charge.processedAt,
-          createdAt: charge.createdAt,
-          updatedAt: charge.updatedAt,
+        payment: {
+          id: payment._id.toString(),
+          payId: payment.payId,
+          customerId: payment.customerId?.toString() ?? null,
+          settlementRouteId: payment.settlementRouteId?.toString() ?? null,
+          amount: payment.amount,
+          currency: payment.currency,
+          description: payment.description,
+          recurring: payment.recurring?.enabled ?? false,
+          status: payment.status,
+          provider: payment.collection.provider,
+          externalId: payment.collection.externalId ?? null,
+          localAmount: payment.collection.localAmount ?? null,
+          fxRate: payment.collection.fxRate ?? null,
+          stableAmount: payment.collection.stableAmount ?? null,
+          feeAmount: payment.collection.feeAmount ?? null,
+          paidAt: payment.collection.paidAt ?? null,
+          createdAt: payment.createdAt,
+          updatedAt: payment.updatedAt,
         },
-        subscription: subscription
-          ? {
-              id: subscription._id.toString(),
-              planId: subscription.planId.toString(),
-              customerRef: subscription.customerRef,
-              customerName: subscription.customerName,
-              billingCurrency: subscription.billingCurrency,
-              localAmount: subscription.localAmount,
-              paymentAccountType: subscription.paymentAccountType,
-              paymentAccountNumber: subscription.paymentAccountNumber ?? null,
-              paymentNetworkId: subscription.paymentNetworkId ?? null,
-              status: subscription.status,
-              nextChargeAt: subscription.nextChargeAt,
-              lastChargeAt: subscription.lastChargeAt ?? null,
-              retryAvailableAt: subscription.retryAvailableAt ?? null,
-            }
-          : null,
         settlement: settlement
           ? {
               id: settlement._id.toString(),
@@ -292,20 +257,23 @@ function createTestWebhookPayload(input: {
       data: {
         mode: "test_delivery",
         merchantId: input.merchantId,
-        charge: {
-          id: `test_charge_${randomBytes(6).toString("hex")}`,
-          externalChargeId: `test-seq-${randomBytes(4).toString("hex")}`,
-          status: input.eventType === "charge.failed" ? "failed" : "settled",
+        payment: {
+          id: `test_payment_${randomBytes(6).toString("hex")}`,
+          payId: `pay_${randomBytes(6).toString("hex")}`,
+          externalId: `partna_${randomBytes(4).toString("hex")}`,
+          status: input.eventType === "payment.failed" ? "failed" : "settled",
+          amount: 120000,
+          currency: "NGN",
+          description: "Test payment",
+          recurring: false,
           localAmount: 120000,
           fxRate: 1600,
-          usdcAmount: 75,
+          stableAmount: 75,
           feeAmount: 1.5,
-          failureCode:
-            input.eventType === "charge.failed" ? "collection_failed" : null,
-          processedAt: now.toISOString(),
+          paidAt: now.toISOString(),
         },
         settlement:
-          input.eventType === "charge.settled"
+          input.eventType === "payment.settled"
             ? {
                 id: `test_settlement_${randomBytes(6).toString("hex")}`,
                 status: "settled",
@@ -355,16 +323,16 @@ export async function enqueueDeveloperWebhookEvent(input: {
   );
 }
 
-export async function emitChargeWebhookEvent(input: {
-  chargeId: string;
+export async function emitPaymentWebhookEvent(input: {
+  paymentId: string;
   eventType: DeveloperWebhookEventName;
   eventId?: string;
 }) {
   const eventId =
     input.eventId ??
-    createEventId(`${input.eventType.replace(/\./g, "_")}_${input.chargeId}`);
-  const payload = await buildChargeWebhookPayload({
-    chargeId: input.chargeId,
+    createEventId(`${input.eventType.replace(/\./g, "_")}_${input.paymentId}`);
+  const payload = await buildPaymentWebhookPayload({
+    paymentId: input.paymentId,
     eventType: input.eventType,
     eventId,
   });
@@ -378,9 +346,9 @@ export async function emitChargeWebhookEvent(input: {
   });
 }
 
-export async function emitChargeWebhookEventForStatusChange(input: {
+export async function emitPaymentWebhookEventForStatusChange(input: {
   previousStatus?: string | null;
-  chargeId: string;
+  paymentId: string;
   nextStatus: string;
 }) {
   if (input.nextStatus === input.previousStatus) {
@@ -388,18 +356,18 @@ export async function emitChargeWebhookEventForStatusChange(input: {
   }
 
   if (input.nextStatus === "failed") {
-    return emitChargeWebhookEvent({
-      chargeId: input.chargeId,
-      eventType: "charge.failed",
-      eventId: `evt_charge_${input.chargeId}_failed`,
+    return emitPaymentWebhookEvent({
+      paymentId: input.paymentId,
+      eventType: "payment.failed",
+      eventId: `evt_payment_${input.paymentId}_failed`,
     });
   }
 
   if (input.nextStatus === "settled") {
-    return emitChargeWebhookEvent({
-      chargeId: input.chargeId,
-      eventType: "charge.settled",
-      eventId: `evt_charge_${input.chargeId}_settled`,
+    return emitPaymentWebhookEvent({
+      paymentId: input.paymentId,
+      eventType: "payment.settled",
+      eventId: `evt_payment_${input.paymentId}_settled`,
     });
   }
 

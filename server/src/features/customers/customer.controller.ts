@@ -5,8 +5,6 @@ import {
   createCustomer,
   getCustomerById,
   listCustomers,
-  pauseCustomerBilling,
-  resumeCustomerBilling,
   updateCustomer,
 } from "@/features/customers/customer.service";
 import {
@@ -130,44 +128,6 @@ export const updateCustomerController = asyncHandler(
     response.status(200).json({
       success: true,
       message: "Customer updated.",
-      data: customer,
-    });
-  }
-);
-
-export const pauseCustomerController = asyncHandler(
-  async (request: Request, response: Response) => {
-    const params = customerParamSchema.parse(request.params);
-    const input = customerActionSchema.parse({
-      ...request.body,
-      merchantId: resolveMerchantScope(request, request.body?.merchantId),
-      environment: resolveEnvironmentScope(request),
-      actor: resolveActor(request),
-    });
-    const customer = await pauseCustomerBilling(params.customerId, input);
-
-    response.status(200).json({
-      success: true,
-      message: "Customer billing paused.",
-      data: customer,
-    });
-  }
-);
-
-export const resumeCustomerController = asyncHandler(
-  async (request: Request, response: Response) => {
-    const params = customerParamSchema.parse(request.params);
-    const input = customerActionSchema.parse({
-      ...request.body,
-      merchantId: resolveMerchantScope(request, request.body?.merchantId),
-      environment: resolveEnvironmentScope(request),
-      actor: resolveActor(request),
-    });
-    const customer = await resumeCustomerBilling(params.customerId, input);
-
-    response.status(200).json({
-      success: true,
-      message: "Customer billing resumed.",
       data: customer,
     });
   }

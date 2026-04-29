@@ -3,7 +3,6 @@ import { createVerify, constants as cryptoConstants } from "crypto";
 import { HttpError } from "@/shared/errors/http-error";
 
 import { env } from "@/config/env.config";
-import { getPartnaConfig } from "@/config/partna.config";
 import { PaymentRailEventModel } from "@/features/payment-rails/payment-rail-event.model";
 import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
 import type {
@@ -11,13 +10,11 @@ import type {
   PartnaManagedBankAccount,
   PartnaVoucherRecord,
 } from "@/features/payment-rails/providers/partna/partna.types";
-import { ChargeModel } from "@/features/charges/charge.model";
 import { CustomerModel } from "@/features/customers/customer.model";
-import { InvoiceModel } from "@/features/invoices/invoice.model";
-import { emitChargeWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
-import { queueChargeStatusNotifications } from "@/features/notifications/notification.service";
-import { queueSettlementBridge } from "@/features/settlements/settlement.service";
-import { SettlementModel } from "@/features/settlements/settlement.model";
+import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
+import { PaymentModel } from "@/features/payments/payment.model";
+import { queuePayoutProcessing } from "@/features/payouts/payout.service";
+import { PayoutModel } from "@/features/payouts/payout.model";
 import { getSolanaSettlementAuthorityKeypair } from "@/features/solana/solana-keypair.service";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
@@ -118,18 +115,6 @@ export function derivePartnaFeeAmountUsdc(input: {
   return null;
 }
 
-export const PARTNA_CHECKOUT_VERIFICATION_FIELDS = [
-  "bvn",
-] as const;
-
-export const PARTNA_CHECKOUT_VERIFICATION_METHOD_FIELDS = [
-  "verificationMethod",
-] as const;
-
-export const PARTNA_CHECKOUT_PHONE_FIELDS = ["phone"] as const;
-
-export const PARTNA_CHECKOUT_OTP_FIELDS = ["otp"] as const;
-
 function sanitizePartnaAccountName(value: string) {
   return value
     .trim()
@@ -169,88 +154,6 @@ function isPartnaPhoneConfirmationRequiredError(error: unknown) {
     error instanceof HttpError &&
     error.message.trim().toLowerCase().includes("confirm phone")
   );
-}
-
-export function buildPartnaVerificationSnapshot(currency: string) {
-  return {
-    provider: "partna" as const,
-    status: "required",
-    country: "NG",
-    currency,
-    instructions: "Enter your BVN to verify and unlock payment details.",
-    verificationHint: null,
-    requiredFields: [...PARTNA_CHECKOUT_VERIFICATION_FIELDS],
-    verificationMethods: [],
-  };
-}
-
-export function buildPartnaOtpVerificationSnapshot(input: {
-  currency: string;
-  accountName: string;
-  verificationMethod: string;
-  verificationHint?: string | null;
-}) {
-  return {
-    provider: "partna" as const,
-    status: "otp_required",
-    country: "NG",
-    currency: input.currency,
-    instructions:
-      input.verificationHint?.trim() ||
-      "Enter the verification code Partna sent to you.",
-    verificationHint: input.verificationHint ?? null,
-    requiredFields: [...PARTNA_CHECKOUT_OTP_FIELDS],
-    accountName: input.accountName,
-    verificationMethod: input.verificationMethod,
-    verificationMethods: [],
-  };
-}
-
-export function buildPartnaPhoneVerificationSnapshot(input: {
-  currency: string;
-  accountName: string;
-  verificationMethod: string;
-  verificationHint?: string | null;
-  instructions?: string | null;
-}) {
-  return {
-    provider: "partna" as const,
-    status: "phone_required",
-    country: "NG",
-    currency: input.currency,
-    instructions:
-      input.instructions?.trim() ||
-      "Enter the 11-digit phone number linked to your BVN to continue.",
-    verificationHint: input.verificationHint ?? null,
-    requiredFields: [...PARTNA_CHECKOUT_PHONE_FIELDS],
-    accountName: input.accountName,
-    verificationMethod: input.verificationMethod,
-    verificationMethods: [],
-  };
-}
-
-export function buildPartnaMethodVerificationSnapshot(input: {
-  currency: string;
-  accountName: string;
-  verificationMethods: PartnaBvnVerificationMethod[];
-  instructions?: string | null;
-}) {
-  return {
-    provider: "partna" as const,
-    status: "method_required",
-    country: "NG",
-    currency: input.currency,
-    instructions:
-      input.instructions?.trim() || "Choose a verification option to continue.",
-    verificationHint: null,
-    requiredFields: [...PARTNA_CHECKOUT_VERIFICATION_METHOD_FIELDS],
-    accountName: input.accountName,
-    verificationMethod: null,
-    verificationMethods: input.verificationMethods.map((entry) => ({
-      method: entry.method,
-      hint: entry.hint,
-    })),
-  };
 }
 
 export function hasActivePartnaPaymentProfile(customer: {
@@ -633,56 +536,6 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
   return customer.paymentProfile;
 }
 
-export async function createPartnaChargeInstruction(input: {
-  environment: RuntimeMode;
-  customerEmail: string;
-  customerName: string;
-  localAmount: number;
-  paymentProfile: {
-    bankTransfer?: {
-      bankCode?: string | null;
-      bankName?: string | null;
-      accountName?: string | null;
-      accountNumber?: string | null;
-      currency?: string | null;
-    } | null;
-  };
-}) {
-  const config = getPartnaConfig(input.environment);
-
-  if (!config.apiUser && input.environment === "live") {
-    throw new HttpError(500, "Partna merchant user is not configured.");
-  }
-
-  const provider = getPartnaProvider(input.environment);
-  const voucher = await provider.createVoucher({
-    email: normalizeEmail(input.customerEmail),
-    fullName: input.customerName,
-    amount: Number(input.localAmount.toFixed(2)),
-    merchant: config.apiUser || "renew-sandbox",
-  });
-
-  return {
-    voucher,
-    paymentSnapshot: {
-      provider: "partna" as const,
-      kind: "bank_transfer" as const,
-      externalChargeId: voucher.voucherId,
-      status: voucher.status,
-      reference: voucher.reference ?? voucher.voucherId,
-      expiresAt: null,
-      redirectUrl: voucher.paymentUrl,
-      bankTransfer: {
-        bankCode: input.paymentProfile.bankTransfer?.bankCode ?? null,
-        bankName: input.paymentProfile.bankTransfer?.bankName ?? null,
-        accountName: input.paymentProfile.bankTransfer?.accountName ?? null,
-        accountNumber: input.paymentProfile.bankTransfer?.accountNumber ?? null,
-        currency: input.paymentProfile.bankTransfer?.currency ?? null,
-      },
-    },
-  };
-}
-
 function readPartnaWebhookEventKey(payload: PartnaWebhookPayload, environment: RuntimeMode) {
   const event = readString(payload.event) ?? "unknown";
   const data = asRecord(payload.data) ?? {};
@@ -708,10 +561,12 @@ function extractPartnaVoucherId(payload: PartnaWebhookPayload) {
 }
 
 async function applyPartnaFeeState(input: {
-  charge: {
-    fxRate: number;
-    feeAmount: number;
-    providerMetadata?: unknown;
+  payment: {
+    collection: {
+      fxRate?: number | null;
+      feeAmount?: number | null;
+    };
+    metadata?: unknown;
   };
   linkedSettlement:
     | {
@@ -726,7 +581,7 @@ async function applyPartnaFeeState(input: {
   redeemResult?: Record<string, unknown> | null;
 }) {
   const feeAmountUsdc = derivePartnaFeeAmountUsdc({
-    fxRate: input.charge.fxRate,
+    fxRate: input.payment.collection.fxRate ?? 0,
     payloadData: input.payloadData ?? null,
     redeemResult: input.redeemResult ?? null,
   });
@@ -739,10 +594,10 @@ async function applyPartnaFeeState(input: {
     readPartnaFeeBearer(input.redeemResult?.feeBearer) ??
     readPartnaFeeBearer(input.payloadData?.feeBearer) ??
     null;
-  const providerMetadata = asRecord(input.charge.providerMetadata) ?? {};
+  const metadata = asRecord(input.payment.metadata) ?? {};
 
-  input.charge.providerMetadata = {
-    ...providerMetadata,
+  input.payment.metadata = {
+    ...metadata,
     ...(voucherFeeLocal !== null ? { voucherFeeLocal } : {}),
     ...(voucherWavedFeeLocal !== null ? { voucherWavedFeeLocal } : {}),
     ...(feeBearer ? { feeBearer } : {}),
@@ -750,7 +605,7 @@ async function applyPartnaFeeState(input: {
   };
 
   if (feeAmountUsdc !== null) {
-    input.charge.feeAmount = feeAmountUsdc;
+    input.payment.collection.feeAmount = feeAmountUsdc;
   }
 
   if (
@@ -830,7 +685,7 @@ export async function processPartnaWebhook(
       idempotent: true,
       matched: Boolean(existingEvent.result),
       state,
-      externalChargeId: extractPartnaVoucherId(payload),
+      externalPaymentId: extractPartnaVoucherId(payload),
     };
   }
 
@@ -863,18 +718,18 @@ export async function processPartnaWebhook(
     return webhookEvent.result as Record<string, unknown>;
   }
 
-  const charge = await ChargeModel.findOne({
-    externalChargeId: voucherId,
-    paymentProvider: "partna",
+  const payment = await PaymentModel.findOne({
+    "collection.externalId": voucherId,
+    "collection.provider": "partna",
     ...createRuntimeModeCondition("environment", environment),
   }).exec();
 
-  if (!charge) {
+  if (!payment) {
     webhookEvent.result = {
       processed: false,
       matched: false,
       state,
-      externalChargeId: voucherId,
+      externalPaymentId: voucherId,
     };
     webhookEvent.processedAt = new Date();
     await webhookEvent.save();
@@ -882,17 +737,17 @@ export async function processPartnaWebhook(
     return webhookEvent.result as Record<string, unknown>;
   }
 
-  const linkedSettlement = await SettlementModel.findOne({
-    sourceChargeId: charge._id,
+  const linkedSettlement = await PayoutModel.findOne({
+    sourcePaymentId: payment._id,
     ...createRuntimeModeCondition("environment", environment),
   })
     .sort({ createdAt: -1 })
     .exec();
 
-  const previousChargeStatus = charge.status;
+  const previousPaymentStatus = payment.status;
   const voucherCode =
     extractPartnaVoucherCode(payload) ??
-    readString(asRecord(charge.providerMetadata)?.voucherCode);
+    readString(asRecord(payment.metadata)?.voucherCode);
   const payloadData = asRecord(payload.data) ?? null;
 
   if (eventIsVoucherSuccess(payload)) {
@@ -908,7 +763,7 @@ export async function processPartnaWebhook(
     const redeemResult = await provider.redeemVoucherAndWithdraw({
       email:
         readString(payloadData?.email) ??
-        readString(asRecord(charge.providerMetadata)?.email) ??
+        readString(asRecord(payment.metadata)?.email) ??
         "",
       voucherCode,
       currency: "USDC",
@@ -916,133 +771,102 @@ export async function processPartnaWebhook(
       cryptoAddress: settlementAuthority.publicKey.toBase58(),
     });
 
-    charge.status = linkedSettlement ? "awaiting_settlement" : "settled";
-    charge.failureCode = null;
-    charge.processedAt = new Date();
-    charge.providerMetadata = {
-      ...(asRecord(charge.providerMetadata) ?? {}),
+    payment.status = linkedSettlement ? "settling" : "paid";
+    payment.collection.status = "paid";
+    payment.collection.paidAt = payment.collection.paidAt ?? new Date();
+    payment.metadata = {
+      ...(asRecord(payment.metadata) ?? {}),
       voucherCode,
       voucherId,
       email:
         readString(payloadData?.email) ??
-        readString(asRecord(charge.providerMetadata)?.email) ??
+        readString(asRecord(payment.metadata)?.email) ??
         null,
     };
     await applyPartnaFeeState({
-      charge,
+      payment,
       linkedSettlement,
       payloadData,
       redeemResult: asRecord(redeemResult) ?? null,
     });
-    await charge.save();
+    await payment.save();
 
     if (
-      previousChargeStatus !== "settled" &&
-      previousChargeStatus !== "awaiting_settlement"
+      previousPaymentStatus !== "paid" &&
+      previousPaymentStatus !== "settling" &&
+      previousPaymentStatus !== "settled"
     ) {
-      if (charge.sourceKind === "invoice" && charge.invoiceId) {
-        const invoice = await InvoiceModel.findById(charge.invoiceId)
-          .select({ customerId: 1 })
-          .lean()
-          .exec();
+      const stableAmount = payment.collection.stableAmount ?? null;
 
-        if (invoice?.customerId) {
-          await CustomerModel.findByIdAndUpdate(invoice.customerId, {
-            $inc: { monthlyVolumeUsdc: charge.usdcAmount },
-          }).exec();
-        }
+      if (payment.customerId && stableAmount !== null) {
+        await CustomerModel.findByIdAndUpdate(payment.customerId, {
+          $inc: { monthlyVolumeUsdc: stableAmount },
+        }).exec();
       }
     }
 
     if (linkedSettlement) {
-      await queueSettlementBridge(linkedSettlement._id.toString(), {
+      await queuePayoutProcessing(linkedSettlement._id.toString(), {
         merchantId: linkedSettlement.merchantId.toString(),
         environment,
       });
     }
   } else if (state.includes("failed") || state.includes("cancel")) {
-    charge.status = "failed";
-    charge.failureCode = state;
-    charge.processedAt = new Date();
-    charge.providerMetadata = {
-      ...(asRecord(charge.providerMetadata) ?? {}),
+    payment.status = "failed";
+    payment.collection.status = "failed";
+    payment.metadata = {
+      ...(asRecord(payment.metadata) ?? {}),
       voucherId,
       voucherCode,
+      failureCode: state,
     };
     await applyPartnaFeeState({
-      charge,
+      payment,
       linkedSettlement,
       payloadData,
     });
-    await charge.save();
+    await payment.save();
 
     if (linkedSettlement && linkedSettlement.status !== "settled") {
       linkedSettlement.status = "failed";
       await linkedSettlement.save();
     }
   } else {
-    charge.status = charge.status === "settled" ? charge.status : "pending";
-    charge.processedAt = new Date();
-    charge.providerMetadata = {
-      ...(asRecord(charge.providerMetadata) ?? {}),
+    if (
+      payment.status !== "paid" &&
+      payment.status !== "settling" &&
+      payment.status !== "settled"
+    ) {
+      payment.status = "pending";
+      payment.collection.status = "pending";
+    }
+    payment.metadata = {
+      ...(asRecord(payment.metadata) ?? {}),
       voucherId,
       voucherCode,
     };
     await applyPartnaFeeState({
-      charge,
+      payment,
       linkedSettlement,
       payloadData,
     });
-    await charge.save();
+    await payment.save();
   }
 
-  if (charge.invoiceId) {
-    const invoice = await InvoiceModel.findById(charge.invoiceId).exec();
-
-    if (invoice) {
-      invoice.paymentSnapshot = invoice.paymentSnapshot
-        ? {
-            ...invoice.paymentSnapshot,
-            feeAmount: charge.feeAmount,
-            status: charge.status,
-          }
-        : { feeAmount: charge.feeAmount, status: charge.status };
-      invoice.feeAmount = charge.feeAmount;
-
-      if (charge.status === "pending") {
-        invoice.status = "pending_payment";
-      } else if (charge.status === "awaiting_settlement") {
-        invoice.status = "processing";
-      } else if (charge.status === "settled") {
-        invoice.status = "paid";
-        invoice.paidAt = invoice.paidAt ?? charge.processedAt ?? new Date();
-      } else if (charge.status === "failed" || charge.status === "reversed") {
-        invoice.status = invoice.dueDate.getTime() < Date.now() ? "overdue" : "issued";
-      }
-
-      await invoice.save();
-    }
-  }
-
-  await emitChargeWebhookEventForStatusChange({
-    previousStatus: previousChargeStatus,
-    chargeId: charge._id.toString(),
-    nextStatus: charge.status,
+  await emitPaymentWebhookEventForStatusChange({
+    previousStatus: previousPaymentStatus,
+    paymentId: payment._id.toString(),
+    nextStatus: payment.status,
   });
-  await queueChargeStatusNotifications({
-    chargeId: charge._id.toString(),
-    previousStatus: previousChargeStatus,
-    nextStatus: charge.status,
-  }).catch(() => undefined);
 
   const result = {
     processed: true,
     matched: true,
     state,
-    externalChargeId: charge.externalChargeId,
-    chargeId: charge._id.toString(),
-    chargeStatus: charge.status,
-    settlementId: linkedSettlement?._id.toString() ?? null,
+    externalPaymentId: payment.collection.externalId ?? voucherId,
+    paymentId: payment._id.toString(),
+    paymentStatus: payment.status,
+    payoutId: linkedSettlement?._id.toString() ?? null,
   };
 
   webhookEvent.result = result;
