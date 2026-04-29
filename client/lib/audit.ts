@@ -4,12 +4,10 @@ import { fetchApi } from "@/lib/api";
 
 export type AuditCategory =
   | "workspace"
-  | "team"
-  | "billing"
+  | "customer"
   | "security"
   | "developer"
-  | "payments"
-  | "protocol";
+  | "payments";
 
 export type AuditStatus = "ok" | "warning" | "error";
 

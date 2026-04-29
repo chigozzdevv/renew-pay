@@ -15,7 +15,7 @@ import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/de
 import { PaymentModel } from "@/features/payments/payment.model";
 import { queuePayoutProcessing } from "@/features/payouts/payout.service";
 import { PayoutModel } from "@/features/payouts/payout.model";
-import { getSolanaSettlementAuthorityKeypair } from "@/features/solana/solana-keypair.service";
+import { isSolanaAddress } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
@@ -53,6 +53,19 @@ function buildPartnaCallbackUrl(mode: RuntimeMode) {
   const url = new URL("/v1/payment-rails/webhooks/partna", env.API_BASE_URL);
   url.searchParams.set("environment", mode);
   return url.toString();
+}
+
+function getSolanaCollectionWallet(mode: RuntimeMode) {
+  const wallet =
+    mode === "live"
+      ? env.SOLANA_COLLECTION_WALLET_LIVE
+      : env.SOLANA_COLLECTION_WALLET_TEST;
+
+  if (!isSolanaAddress(wallet)) {
+    throw new HttpError(503, "Solana collection wallet is not configured.");
+  }
+
+  return wallet.trim();
 }
 
 function readPartnaFeeBearer(value: unknown) {
@@ -759,7 +772,7 @@ export async function processPartnaWebhook(
     }
 
     const provider = getPartnaProvider(environment);
-    const settlementAuthority = getSolanaSettlementAuthorityKeypair(environment);
+    const collectionWallet = getSolanaCollectionWallet(environment);
     const redeemResult = await provider.redeemVoucherAndWithdraw({
       email:
         readString(payloadData?.email) ??
@@ -768,7 +781,7 @@ export async function processPartnaWebhook(
       voucherCode,
       currency: "USDC",
       network: "solana",
-      cryptoAddress: settlementAuthority.publicKey.toBase58(),
+      cryptoAddress: collectionWallet,
     });
 
     payment.status = linkedSettlement ? "settling" : "paid";

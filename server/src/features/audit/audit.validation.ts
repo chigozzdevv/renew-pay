@@ -11,7 +11,6 @@ const auditCategorySchema = z.enum([
   "security",
   "developer",
   "payments",
-  "protocol",
 ]);
 
 const auditStatusSchema = z.enum(["ok", "warning", "error"]);

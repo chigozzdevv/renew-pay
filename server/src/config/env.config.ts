@@ -17,58 +17,8 @@ const envSchema = z
     MONGODB_DB_NAME: z.string().trim().min(1).default("renew_v2"),
     CORS_ORIGINS: z.string().trim().default("http://localhost:3000"),
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
-    SOLANA_CLUSTER_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("devnet"),
-    SOLANA_CLUSTER_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("mainnet-beta"),
-    SOLANA_RPC_URL_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://api.devnet.solana.com"),
-    SOLANA_RPC_URL_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://api.mainnet-beta.solana.com"),
-    SOLANA_WS_URL_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("wss://api.devnet.solana.com"),
-    SOLANA_WS_URL_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("wss://api.mainnet-beta.solana.com"),
-    RENEW_PROGRAM_ID_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh"),
-    RENEW_PROGRAM_ID_LIVE: z.string().trim().default(""),
-    RENEW_SETTLEMENT_MINT_TEST: z.string().trim().default(""),
-    RENEW_SETTLEMENT_MINT_LIVE: z.string().trim().default(""),
-    SOLANA_EXPLORER_BASE_URL_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://explorer.solana.com"),
-    SOLANA_EXPLORER_BASE_URL_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://explorer.solana.com"),
-    SOLANA_ADMIN_SECRET_KEY_TEST: z.string().trim().default(""),
-    SOLANA_ADMIN_SECRET_KEY_LIVE: z.string().trim().default(""),
-    SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_TEST: z.string().trim().default(""),
-    SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_LIVE: z.string().trim().default(""),
+    SOLANA_COLLECTION_WALLET_TEST: z.string().trim().default(""),
+    SOLANA_COLLECTION_WALLET_LIVE: z.string().trim().default(""),
     ENABLE_WORKERS: booleanEnv.default(true),
     REDIS_URL: z.string().trim().min(1).default("redis://127.0.0.1:6379"),
     REDIS_QUEUE_PREFIX: z.string().trim().min(1).default("renew"),

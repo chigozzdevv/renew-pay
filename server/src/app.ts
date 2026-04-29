@@ -16,7 +16,6 @@ import { overviewRouter } from "@/features/overview/overview.routes";
 import { paymentRailRouter } from "@/features/payment-rails/payment-rails.routes";
 import { paymentRouter } from "@/features/payments/payment.routes";
 import { payoutRouter } from "@/features/payouts/payout.routes";
-import { protocolRouter } from "@/features/protocol/protocol.routes";
 import { settlementRouter } from "@/features/settlement/settlement.routes";
 import { settingRouter } from "@/features/settings/setting.routes";
 import { errorHandler, notFoundHandler } from "@/shared/middleware/error-handler";
@@ -69,7 +68,6 @@ export function createApp() {
   });
 
   const registerApiRoutes = (apiBasePath: string) => {
-    app.use(`${apiBasePath}/protocol`, protocolRouter);
     app.use(`${apiBasePath}/auth`, authRouter);
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);

@@ -87,12 +87,10 @@ export default function AuditPage() {
             <Select value={category} onChange={(e) => { setCategory(e.target.value as AuditCategory | "all"); setPage(1); }}>
               <option value="all">All categories</option>
               <option value="workspace">Workspace</option>
-              <option value="team">Team</option>
-              <option value="billing">Billing</option>
+              <option value="customer">Customer</option>
               <option value="security">Security</option>
               <option value="developer">Developer</option>
               <option value="payments">Payments</option>
-              <option value="protocol">Protocol</option>
             </Select>
             <Select value={status} onChange={(e) => { setStatus(e.target.value as AuditStatus | "all"); setPage(1); }}>
               <option value="all">All statuses</option>
