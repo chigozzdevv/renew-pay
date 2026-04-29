@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response, RequestHandler } from "express";
 import { env } from "@/config/env.config";
 import { authTokenPayloadSchema } from "@/features/auth/auth.validation";
 import { getAuthenticatedUser } from "@/features/auth/auth.service";
-import { type TeamPermission, type TeamRole } from "@/shared/constants/team-rbac";
+import { type AppPermission } from "@/shared/constants/access-control";
 import { HttpError } from "@/shared/errors/http-error";
 import { verifyJwt } from "@/shared/utils/jwt";
 
@@ -84,7 +84,7 @@ export async function requirePlatformAuth(
 }
 
 export function requirePlatformPermissions(
-  permissions: TeamPermission[]
+  permissions: AppPermission[]
 ): RequestHandler {
   return (request, _response, next) => {
     try {
@@ -111,31 +111,6 @@ export function requirePlatformPermissions(
 
       if (!hasAnyPermission) {
         throw new HttpError(403, "Missing required permission.");
-      }
-
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
-}
-
-export function requirePlatformRoles(roles: TeamRole[]): RequestHandler {
-  return (request, _response, next) => {
-    try {
-      if (!env.PLATFORM_AUTH_ENABLED) {
-        next();
-        return;
-      }
-
-      const user = request.platformAuthUser;
-
-      if (!user) {
-        throw new HttpError(401, "Authentication is required.");
-      }
-
-      if (!roles.includes(user.role as TeamRole)) {
-        throw new HttpError(403, "Missing required role.");
       }
 
       next();

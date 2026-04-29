@@ -2,17 +2,16 @@ import { Router } from "express";
 
 import {
   getMerchantKybStatusController,
-  getTeamMemberKycStatusController,
+  getOwnerKycStatusController,
   processSumsubWebhookController,
   startMerchantKybController,
-  startTeamMemberKycController,
+  startOwnerKycController,
   syncMerchantKybController,
-  syncTeamMemberKycController,
+  syncOwnerKycController,
 } from "@/features/kyc/kyc.controller";
 import {
   requirePlatformAuth,
   requirePlatformPermissions,
-  requirePlatformRoles,
 } from "@/shared/middleware/platform-auth";
 
 const kycRouter = Router();
@@ -23,38 +22,33 @@ kycRouter.use(requirePlatformAuth);
 
 kycRouter.get(
   "/merchants/:merchantId",
-  requirePlatformPermissions(["team_admin"]),
+  requirePlatformPermissions(["settings"]),
   getMerchantKybStatusController
 );
 kycRouter.post(
   "/merchants/:merchantId/start-kyb",
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["team_admin"]),
+  requirePlatformPermissions(["settings"]),
   startMerchantKybController
 );
 kycRouter.post(
   "/merchants/:merchantId/sync",
-  requirePlatformRoles(["owner", "admin", "finance"]),
-  requirePlatformPermissions(["team_admin", "payments"]),
+  requirePlatformPermissions(["settings", "payments"]),
   syncMerchantKybController
 );
-
 kycRouter.get(
-  "/team-members/:teamMemberId",
-  requirePlatformPermissions(["team_admin", "payments"]),
-  getTeamMemberKycStatusController
+  "/owner",
+  requirePlatformPermissions(["settings", "payments"]),
+  getOwnerKycStatusController
 );
 kycRouter.post(
-  "/team-members/:teamMemberId/start-kyc",
-  requirePlatformRoles(["owner", "admin"]),
-  requirePlatformPermissions(["team_admin", "payments"]),
-  startTeamMemberKycController
+  "/owner/start-kyc",
+  requirePlatformPermissions(["settings", "payments"]),
+  startOwnerKycController
 );
 kycRouter.post(
-  "/team-members/:teamMemberId/sync",
-  requirePlatformRoles(["owner", "admin", "finance"]),
-  requirePlatformPermissions(["team_admin", "payments"]),
-  syncTeamMemberKycController
+  "/owner/sync",
+  requirePlatformPermissions(["settings", "payments"]),
+  syncOwnerKycController
 );
 
 export { kycRouter };

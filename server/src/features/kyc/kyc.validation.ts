@@ -20,10 +20,6 @@ export const merchantKybParamSchema = z.object({
   merchantId: objectIdSchema,
 });
 
-export const teamMemberKycParamSchema = z.object({
-  teamMemberId: objectIdSchema,
-});
-
 export const startMerchantKybSchema = z.object({
   merchantId: objectIdSchema,
   actor: z.string().trim().min(2).max(120).default("system"),
@@ -42,9 +38,8 @@ export const syncMerchantKybSchema = z.object({
   environment: environmentInputSchema.default("test"),
 });
 
-export const startTeamMemberKycSchema = z.object({
+export const startOwnerKycSchema = z.object({
   merchantId: objectIdSchema,
-  teamMemberId: objectIdSchema,
   actor: z.string().trim().min(2).max(120).default("system"),
   environment: environmentInputSchema.default("test"),
   levelName: z.string().trim().min(2).max(120).optional(),
@@ -52,9 +47,8 @@ export const startTeamMemberKycSchema = z.object({
   lang: z.string().trim().min(2).max(10).optional(),
 });
 
-export const syncTeamMemberKycSchema = z.object({
+export const syncOwnerKycSchema = z.object({
   merchantId: objectIdSchema,
-  teamMemberId: objectIdSchema,
   actor: z.string().trim().min(2).max(120).default("system"),
   environment: environmentInputSchema.default("test"),
 });
@@ -64,9 +58,8 @@ export const merchantKybStatusQuerySchema = z.object({
   environment: optionalEnvironmentInputSchema,
 });
 
-export const teamMemberKycStatusQuerySchema = z.object({
+export const ownerKycStatusQuerySchema = z.object({
   merchantId: objectIdSchema,
-  teamMemberId: objectIdSchema,
   environment: optionalEnvironmentInputSchema,
 });
 
@@ -93,8 +86,8 @@ export const sumsubWebhookSchema = z
 
 export type StartMerchantKybInput = z.infer<typeof startMerchantKybSchema>;
 export type SyncMerchantKybInput = z.infer<typeof syncMerchantKybSchema>;
-export type StartTeamMemberKycInput = z.infer<typeof startTeamMemberKycSchema>;
-export type SyncTeamMemberKycInput = z.infer<typeof syncTeamMemberKycSchema>;
+export type StartOwnerKycInput = z.infer<typeof startOwnerKycSchema>;
+export type SyncOwnerKycInput = z.infer<typeof syncOwnerKycSchema>;
 export type MerchantKybStatusQuery = z.infer<typeof merchantKybStatusQuerySchema>;
-export type TeamMemberKycStatusQuery = z.infer<typeof teamMemberKycStatusQuerySchema>;
+export type OwnerKycStatusQuery = z.infer<typeof ownerKycStatusQuerySchema>;
 export type SumsubWebhookInput = z.infer<typeof sumsubWebhookSchema>;

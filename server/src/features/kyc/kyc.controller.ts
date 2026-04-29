@@ -2,23 +2,22 @@ import type { Request, Response } from "express";
 
 import {
   getMerchantKybStatusByMerchantId,
-  getTeamMemberKycStatusById,
+  getOwnerKycStatusByMerchantId,
   processSumsubWebhook,
   startMerchantKybSession,
-  startTeamMemberKycSession,
+  startOwnerKycSession,
   syncMerchantKybStatus,
-  syncTeamMemberKycStatus,
+  syncOwnerKycStatus,
 } from "@/features/kyc/kyc.service";
 import {
   merchantKybParamSchema,
   merchantKybStatusQuerySchema,
+  ownerKycStatusQuerySchema,
   startMerchantKybSchema,
-  startTeamMemberKycSchema,
+  startOwnerKycSchema,
   sumsubWebhookSchema,
   syncMerchantKybSchema,
-  syncTeamMemberKycSchema,
-  teamMemberKycParamSchema,
-  teamMemberKycStatusQuerySchema,
+  syncOwnerKycSchema,
 } from "@/features/kyc/kyc.validation";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
 import { asyncHandler } from "@/shared/utils/async-handler";
@@ -96,15 +95,13 @@ export const syncMerchantKybController = asyncHandler(
   }
 );
 
-export const getTeamMemberKycStatusController = asyncHandler(
+export const getOwnerKycStatusController = asyncHandler(
   async (request: Request, response: Response) => {
-    const params = teamMemberKycParamSchema.parse(request.params);
-    const query = teamMemberKycStatusQuerySchema.parse({
-      teamMemberId: params.teamMemberId,
-      merchantId: resolveMerchantScope(request),
+    const query = ownerKycStatusQuerySchema.parse({
+      merchantId: resolveMerchantScope(request, request.body?.merchantId),
       environment: resolveEnvironmentScope(request),
     });
-    const status = await getTeamMemberKycStatusById(query);
+    const status = await getOwnerKycStatusByMerchantId(query);
 
     response.status(200).json({
       success: true,
@@ -113,41 +110,37 @@ export const getTeamMemberKycStatusController = asyncHandler(
   }
 );
 
-export const startTeamMemberKycController = asyncHandler(
+export const startOwnerKycController = asyncHandler(
   async (request: Request, response: Response) => {
-    const params = teamMemberKycParamSchema.parse(request.params);
-    const input = startTeamMemberKycSchema.parse({
+    const input = startOwnerKycSchema.parse({
       ...request.body,
       merchantId: resolveMerchantScope(request, request.body?.merchantId),
-      teamMemberId: params.teamMemberId,
       actor: resolveActor(request),
       environment: resolveEnvironmentScope(request),
     });
-    const result = await startTeamMemberKycSession(input);
+    const result = await startOwnerKycSession(input);
 
     response.status(200).json({
       success: true,
-      message: "Team member KYC session started.",
+      message: "Owner KYC session started.",
       data: result,
     });
   }
 );
 
-export const syncTeamMemberKycController = asyncHandler(
+export const syncOwnerKycController = asyncHandler(
   async (request: Request, response: Response) => {
-    const params = teamMemberKycParamSchema.parse(request.params);
-    const input = syncTeamMemberKycSchema.parse({
+    const input = syncOwnerKycSchema.parse({
       ...request.body,
       merchantId: resolveMerchantScope(request, request.body?.merchantId),
-      teamMemberId: params.teamMemberId,
       actor: resolveActor(request),
       environment: resolveEnvironmentScope(request),
     });
-    const result = await syncTeamMemberKycStatus(input);
+    const result = await syncOwnerKycStatus(input);
 
     response.status(200).json({
       success: true,
-      message: "Team member KYC status synced.",
+      message: "Owner KYC status synced.",
       data: result,
     });
   }

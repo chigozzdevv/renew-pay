@@ -10,7 +10,7 @@ const kycCheckSchema = new Schema(
     subjectType: {
       type: String,
       required: true,
-      enum: ["merchant", "team_member"],
+      enum: ["merchant", "owner"],
     },
     subjectRef: {
       type: String,

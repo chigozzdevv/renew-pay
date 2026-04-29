@@ -3,71 +3,66 @@ import { randomBytes } from "crypto";
 import { PrivyClient } from "@privy-io/node";
 
 import { env } from "@/config/env.config";
-import { MerchantModel } from "@/features/merchants/merchant.model";
-import { assertSupportedBillingMarkets } from "@/features/payment-rails/payment-rails.service";
-import { SettingModel } from "@/features/settings/setting.model";
-import { TeamMemberModel } from "@/features/teams/team.model";
-import type {
-  ActivateInviteInput,
-  AuthTokenPayload,
-  LoginInput,
-  PrivySessionInput,
-  SignupInput,
-} from "@/features/auth/auth.validation";
 import { appendAuditLog } from "@/features/audit/audit.service";
-import { HttpError } from "@/shared/errors/http-error";
+import { MerchantModel } from "@/features/merchants/merchant.model";
+import type {
+  AuthTokenPayload,
+  PrivySessionInput,
+} from "@/features/auth/auth.validation";
+import { getOwnerPermissions, normalizePermissions } from "@/shared/constants/access-control";
 import {
   createUnconfiguredWalletAddress,
   normalizeSolanaAddress,
 } from "@/shared/constants/solana";
-import { createPasswordHash, verifyPasswordHash } from "@/shared/utils/password-hash";
+import { HttpError } from "@/shared/errors/http-error";
 import { signJwt } from "@/shared/utils/jwt";
-import { getPermissionsForRole, normalizePermissions } from "@/shared/constants/team-rbac";
 
-function toAuthenticatedUser(
-  document: {
+function createUnconfiguredAddress() {
+  return createUnconfiguredWalletAddress();
+}
+
+function toAuthenticatedUser(document: {
   _id: { toString(): string };
-  merchantId: { toString(): string };
+  ownerName?: string | null;
   name?: string | null;
-  email: string;
-  role: string;
+  supportEmail?: string | null;
   status: string;
-  permissions: string[];
-  markets: string[];
-  lastActiveAt?: Date | null;
-},
-  merchant?: {
-    authProvider?: string | null;
-    operatorWalletAddress?: string | null;
-    onboardingStatus?: string | null;
-  }
-) {
-  const displayName = document.name?.trim() ? document.name.trim() : document.email;
+  supportedMarkets?: string[];
+  authProvider?: string | null;
+  operatorWalletAddress?: string | null;
+  onboardingStatus?: string | null;
+}) {
+  const accountId = document._id.toString();
+  const email = document.supportEmail?.trim().toLowerCase() ?? "";
+  const displayName =
+    document.ownerName?.trim() ||
+    document.name?.trim() ||
+    email ||
+    "Merchant";
 
   return {
-    teamMemberId: document._id.toString(),
-    merchantId: document.merchantId.toString(),
+    accountId,
+    merchantId: accountId,
     name: displayName,
-    email: document.email,
-    role: document.role,
+    email,
     status: document.status,
     workspaceMode: "test" as const,
-    permissions: normalizePermissions(document.permissions),
-    markets: document.markets,
-    lastActiveAt: document.lastActiveAt ?? null,
-    authProvider: merchant?.authProvider ?? "privy",
-    operatorWalletAddress: merchant?.operatorWalletAddress ?? null,
-    onboardingStatus: merchant?.onboardingStatus ?? "business",
+    permissions: normalizePermissions(getOwnerPermissions()),
+    markets: document.supportedMarkets ?? [],
+    lastActiveAt: null,
+    authProvider: document.authProvider ?? "privy",
+    operatorWalletAddress: document.operatorWalletAddress ?? null,
+    onboardingStatus: document.onboardingStatus ?? "business",
   };
 }
 
 function issueAccessToken(input: {
-  teamMemberId: string;
+  accountId: string;
   merchantId: string;
 }) {
   const token = signJwt(
     {
-      sub: input.teamMemberId,
+      sub: input.accountId,
       merchantId: input.merchantId,
     },
     {
@@ -80,10 +75,6 @@ function issueAccessToken(input: {
     accessToken: token,
     expiresInSeconds: env.PLATFORM_AUTH_TOKEN_TTL_SECONDS,
   };
-}
-
-function createUnconfiguredAddress() {
-  return createUnconfiguredWalletAddress();
 }
 
 function getPrivyClient() {
@@ -234,469 +225,122 @@ async function resolvePrivyProfile(input: {
   };
 }
 
-async function resolveMerchantSessionMeta(merchantId: string) {
-  const merchant = await MerchantModel.findById(merchantId)
-    .select({
-      authProvider: 1,
-      operatorWalletAddress: 1,
-      onboardingStatus: 1,
-    })
-    .lean()
-    .exec();
-
-  if (!merchant) {
-    throw new HttpError(404, "Merchant was not found.");
-  }
-
-  return merchant;
-}
-
-async function cleanupLegacyPrivyBootstrapState(input: {
-  merchantId: string;
-  ownerTeamMemberId?: string | null;
-}) {
-  const [merchant, owner, settingExists] = await Promise.all([
-    MerchantModel.findById(input.merchantId).exec(),
-    input.ownerTeamMemberId
-      ? TeamMemberModel.findById(input.ownerTeamMemberId).exec()
-      : TeamMemberModel.findOne({ merchantId: input.merchantId, role: "owner" }).exec(),
-    SettingModel.exists({ merchantId: input.merchantId }),
-  ]);
-
-  if (!merchant || settingExists) {
-    return;
-  }
-
-  const shouldCleanupBootstrapFields =
-    !merchant.name?.trim() &&
-    !merchant.payoutWallet &&
-    merchant.onboardingStatus === "business";
-
-  if (!shouldCleanupBootstrapFields) {
-    return;
-  }
-
-  if (merchant.supportEmail || (merchant.supportedMarkets ?? []).length > 0) {
-    merchant.supportEmail = null;
-    merchant.supportedMarkets = [];
-    await merchant.save();
-  }
-
-  if (owner && (owner.name?.trim() || owner.markets.length > 0)) {
-    owner.name = null;
-    owner.markets = [];
-    await owner.save();
-  }
-}
-
-export async function signupWithPassword(input: SignupInput) {
-  await assertSupportedBillingMarkets({
-    markets: input.supportedMarkets,
-    environment: env.PAYMENT_ENV,
-  });
-
-  const existingMember = await TeamMemberModel.findOne({
-    email: input.email,
-  }).exec();
-
-  if (existingMember) {
-    throw new HttpError(409, "An account with this email already exists.");
-  }
-
-  const now = new Date();
-  const password = createPasswordHash(
-    input.password,
-    env.PLATFORM_AUTH_PASSWORD_ITERATIONS
-  );
-  const merchantAccount = `merchant:${randomBytes(16).toString("hex")}`;
-  const payoutWallet = createUnconfiguredAddress();
-
-  const merchant = await MerchantModel.create({
-    merchantAccount,
-    payoutWallet,
-    name: input.company,
-    supportEmail: input.email,
-    billingTimezone: input.billingTimezone,
-    supportedMarkets: input.supportedMarkets,
-    metadataHash: "0x0",
-    status: "active",
-    authProvider: "password",
-    authProviderUserId: null,
-    operatorWalletAddress: null,
-    onboardingStatus: "business",
-  });
-
-  try {
-    const permissions = getPermissionsForRole("owner");
-    const createdMember = await TeamMemberModel.create({
-      merchantId: merchant._id,
-      name: input.name,
-      email: input.email,
-      role: "owner",
-      status: "active",
-      markets: input.supportedMarkets,
-      permissions,
-      inviteToken: null,
-      inviteSentAt: null,
-      lastActiveAt: now,
-      passwordHash: password.hash,
-      passwordSalt: password.salt,
-      passwordUpdatedAt: now,
-      authProvider: "password",
-      authProviderUserId: null,
-    });
-
-    await appendAuditLog({
-      merchantId: merchant._id.toString(),
-      actor: input.name,
-      action: "Created workspace",
-      category: "workspace",
-      status: "ok",
-      target: input.email,
-      detail: `${input.name} created ${input.company}.`,
-      metadata: {
-        role: "owner",
-        supportedMarkets: input.supportedMarkets,
-      },
-      ipAddress: null,
-      userAgent: null,
-    }).catch(() => undefined);
-
-    const user = toAuthenticatedUser(createdMember, merchant);
-
-    return {
-      ...issueAccessToken({
-        teamMemberId: user.teamMemberId,
-        merchantId: user.merchantId,
-      }),
-      user,
-    };
-  } catch (error) {
-    await MerchantModel.deleteOne({ _id: merchant._id }).catch(() => undefined);
-    throw error;
-  }
-}
-
-export async function authenticateWithPassword(input: LoginInput) {
-  const member = input.merchantId
-    ? await TeamMemberModel.findOne({
-        merchantId: input.merchantId,
-        email: input.email,
-      }).exec()
-    : await resolveLoginMemberByEmail(input.email);
-
-  if (!member) {
-    throw new HttpError(401, "Invalid email or password.");
-  }
-
-  if (member.status !== "active") {
-    throw new HttpError(403, "Team member is not active.");
-  }
-
-  if (!member.passwordHash || !member.passwordSalt) {
-    throw new HttpError(403, "Password has not been set for this team member.");
-  }
-
-  const isPasswordValid = verifyPasswordHash({
-    password: input.password,
-    salt: member.passwordSalt,
-    expectedHash: member.passwordHash,
-    iterations: env.PLATFORM_AUTH_PASSWORD_ITERATIONS,
-  });
-
-  if (!isPasswordValid) {
-    throw new HttpError(401, "Invalid email or password.");
-  }
-
-  member.lastActiveAt = new Date();
-  await member.save();
-
-  const merchant = await resolveMerchantSessionMeta(member.merchantId.toString());
-  const user = toAuthenticatedUser(member, merchant);
-
-  return {
-    ...issueAccessToken({
-      teamMemberId: user.teamMemberId,
-      merchantId: user.merchantId,
-    }),
-    user,
-  };
-}
-
-async function resolveLoginMemberByEmail(email: string) {
-  const members = await TeamMemberModel.find({
-    email,
+async function findLinkableMerchant(email: string) {
+  return MerchantModel.findOne({
+    supportEmail: email,
+    $or: [{ authProviderUserId: null }, { authProviderUserId: "" }],
   })
     .sort({ createdAt: 1 })
     .exec();
-
-  if (members.length === 0) {
-    return null;
-  }
-
-  if (members.length > 1) {
-    throw new HttpError(
-      409,
-      "This email belongs to multiple workspaces. Use your invite link or ask your admin for the correct workspace."
-    );
-  }
-
-  return members[0] ?? null;
-}
-
-export async function activateInvite(input: ActivateInviteInput) {
-  const member = await TeamMemberModel.findOne({
-    merchantId: input.merchantId,
-    inviteToken: input.inviteToken,
-  }).exec();
-
-  if (!member) {
-    throw new HttpError(404, "Invite token was not found.");
-  }
-
-  if (member.status !== "invited") {
-    throw new HttpError(409, "Invite is no longer valid.");
-  }
-
-  const password = createPasswordHash(
-    input.password,
-    env.PLATFORM_AUTH_PASSWORD_ITERATIONS
-  );
-
-  member.passwordHash = password.hash;
-  member.passwordSalt = password.salt;
-  member.passwordUpdatedAt = new Date();
-  member.status = "active";
-  member.inviteToken = null;
-  member.lastActiveAt = new Date();
-  member.authProvider = member.authProvider ?? "password";
-  await member.save();
-
-  const merchant = await resolveMerchantSessionMeta(member.merchantId.toString());
-  const user = toAuthenticatedUser(member, merchant);
-
-  return {
-    ...issueAccessToken({
-      teamMemberId: user.teamMemberId,
-      merchantId: user.merchantId,
-    }),
-    user,
-  };
 }
 
 export async function getAuthenticatedUser(input: AuthTokenPayload) {
-  const member = await TeamMemberModel.findOne({
-    _id: input.sub,
-    merchantId: input.merchantId,
-  }).exec();
-
-  if (!member || member.status !== "active") {
-    throw new HttpError(401, "Authenticated team member is not active.");
+  if (input.sub !== input.merchantId) {
+    throw new HttpError(401, "Authenticated account is not valid.");
   }
 
-  const merchant = await resolveMerchantSessionMeta(member.merchantId.toString());
+  const merchant = await MerchantModel.findById(input.merchantId).exec();
 
-  return toAuthenticatedUser(member, merchant);
+  if (!merchant || merchant.status !== "active") {
+    throw new HttpError(401, "Authenticated account is not active.");
+  }
+
+  return toAuthenticatedUser(merchant);
 }
 
 export async function exchangePrivySession(input: PrivySessionInput) {
   const authClaims = await verifyPrivyJwt(input.authToken);
   const identityClaims = await verifyPrivyIdentityToken(input.identityToken);
   const providerUserId = authClaims.user_id?.trim() || null;
+  const operatorWalletAddress = input.operatorWalletAddress
+    ? normalizeSolanaAddress(input.operatorWalletAddress)
+    : null;
 
   if (!providerUserId) {
     throw new HttpError(401, "Privy session is missing a subject.");
   }
 
-  let member = await TeamMemberModel.findOne({
+  if (input.operatorWalletAddress && !operatorWalletAddress) {
+    throw new HttpError(400, "Operator wallet address is invalid.");
+  }
+
+  const resolvedProfile = await resolvePrivyProfile({
+    providerUserId,
+    identityClaims,
+    fallbackEmail: input.email ?? null,
+    fallbackName: null,
+  });
+  const resolvedEmail = resolvedProfile.email;
+
+  if (!resolvedEmail) {
+    throw new HttpError(409, "Privy session is missing an email address.");
+  }
+
+  const resolvedName = resolvedProfile.name?.trim() || resolvedEmail;
+  let merchant = await MerchantModel.findOne({
     authProvider: "privy",
     authProviderUserId: providerUserId,
   }).exec();
 
-  if (!member) {
-    const resolvedProfile = await resolvePrivyProfile({
-      providerUserId,
-      identityClaims,
-      fallbackEmail: input.email ?? null,
-      fallbackName: null,
-    });
-    const resolvedEmail = resolvedProfile.email;
+  if (!merchant) {
+    merchant = await findLinkableMerchant(resolvedEmail);
+  }
 
-    if (!resolvedEmail) {
-      throw new HttpError(409, "Privy session is missing an email address.");
-    }
+  let createdMerchant = false;
 
-    const resolvedName =
-      resolvedProfile.name?.trim() || resolvedEmail;
-
-    const existingMerchant = await MerchantModel.findOne({
+  if (!merchant) {
+    merchant = await MerchantModel.create({
+      merchantAccount:
+        operatorWalletAddress ?? `merchant:${randomBytes(16).toString("hex")}`,
+      payoutWallet: createUnconfiguredAddress(),
+      ownerName: resolvedName,
+      name: null,
+      supportEmail: resolvedEmail,
+      timezone: "UTC",
+      supportedMarkets: [],
+      metadataHash: "0x0",
+      status: "active",
       authProvider: "privy",
       authProviderUserId: providerUserId,
-    }).exec();
+      operatorWalletAddress,
+      onboardingStatus: "business",
+    });
+    createdMerchant = true;
+  } else {
+    merchant.authProvider = "privy";
+    merchant.authProviderUserId = providerUserId;
+    merchant.supportEmail = merchant.supportEmail ?? resolvedEmail;
+    merchant.ownerName = merchant.ownerName ?? resolvedName;
 
-    if (existingMerchant) {
-      member = await TeamMemberModel.findOne({
-        merchantId: existingMerchant._id,
-        role: "owner",
-      })
-        .sort({ createdAt: 1 })
-        .exec();
-
-      if (member) {
-        if (member.status === "invited") {
-          member.status = "active";
-          member.inviteToken = null;
-          member.inviteSentAt = null;
-        }
-        member.authProvider = "privy";
-        member.authProviderUserId = providerUserId;
-        member.lastActiveAt = new Date();
-        member.passwordHash = null;
-        member.passwordSalt = null;
-        member.passwordUpdatedAt = null;
-
-        await member.save();
-      }
+    if (operatorWalletAddress && !merchant.operatorWalletAddress) {
+      merchant.operatorWalletAddress = operatorWalletAddress;
     }
 
-    if (!member) {
-      const linkableMembers = await TeamMemberModel.find({
-        email: resolvedEmail,
-        status: { $in: ["active", "invited"] },
-        authProviderUserId: null,
-      })
-        .sort({ createdAt: 1 })
-        .exec();
-
-      if (linkableMembers.length > 1) {
-        throw new HttpError(
-          409,
-          "This email belongs to multiple workspaces. Complete the session exchange with a specific owner account."
-        );
-      }
-
-      if (linkableMembers.length === 1 && linkableMembers[0]) {
-        member = linkableMembers[0];
-        if (member.status === "invited") {
-          member.status = "active";
-          member.inviteToken = null;
-          member.inviteSentAt = null;
-        }
-        member.authProvider = "privy";
-        member.authProviderUserId = providerUserId;
-        member.lastActiveAt = new Date();
-        member.passwordHash = null;
-        member.passwordSalt = null;
-        member.passwordUpdatedAt = null;
-
-        await member.save();
-
-        if (member.role === "owner") {
-          await MerchantModel.findByIdAndUpdate(member.merchantId, {
-            authProvider: "privy",
-            authProviderUserId: providerUserId,
-          }).exec();
-        }
-      } else {
-        let merchant = existingMerchant;
-        let createdMerchant = false;
-
-        if (!merchant) {
-          merchant = await MerchantModel.create({
-            merchantAccount:
-              normalizeSolanaAddress(input.operatorWalletAddress) ??
-              `merchant:${randomBytes(16).toString("hex")}`,
-            payoutWallet: createUnconfiguredAddress(),
-            name: null,
-            metadataHash: "0x0",
-            status: "active",
-            authProvider: "privy",
-            authProviderUserId: providerUserId,
-            operatorWalletAddress:
-              normalizeSolanaAddress(input.operatorWalletAddress),
-            onboardingStatus: "business",
-          });
-          createdMerchant = true;
-        }
-
-        const permissions = getPermissionsForRole("owner");
-        member = await TeamMemberModel.create({
-          merchantId: merchant._id,
-          name: null,
-          email: resolvedEmail,
-          role: "owner",
-          status: "active",
-          markets: [],
-          permissions,
-          inviteToken: null,
-          inviteSentAt: null,
-          lastActiveAt: new Date(),
-          passwordHash: null,
-          passwordSalt: null,
-          passwordUpdatedAt: null,
-          authProvider: "privy",
-          authProviderUserId: providerUserId,
-        });
-
-        if (createdMerchant) {
-          await appendAuditLog({
-            merchantId: merchant._id.toString(),
-            actor: resolvedName,
-            action: "Started workspace onboarding",
-            category: "workspace",
-            status: "ok",
-            target: resolvedEmail,
-            detail: `${resolvedEmail} started workspace onboarding with Privy.`,
-            metadata: {
-              role: "owner",
-              authProvider: "privy",
-            },
-            ipAddress: null,
-            userAgent: null,
-          }).catch(() => undefined);
-        }
-      }
-    }
+    await merchant.save();
   }
 
-  if (!member) {
-    throw new HttpError(401, "Unable to resolve a team member for this Privy session.");
+  if (createdMerchant) {
+    await appendAuditLog({
+      merchantId: merchant._id.toString(),
+      actor: resolvedName,
+      action: "Started merchant onboarding",
+      category: "workspace",
+      status: "ok",
+      target: resolvedEmail,
+      detail: `${resolvedEmail} started merchant onboarding with Privy.`,
+      metadata: {
+        authProvider: "privy",
+      },
+      ipAddress: null,
+      userAgent: null,
+    }).catch(() => undefined);
   }
 
-  await cleanupLegacyPrivyBootstrapState({
-    merchantId: member.merchantId.toString(),
-    ownerTeamMemberId: member.role === "owner" ? member._id.toString() : null,
-  });
-
-  member =
-    (await TeamMemberModel.findById(member._id).exec()) ??
-    member;
-  member.lastActiveAt = new Date();
-  await member.save();
-
-  const merchant = await resolveMerchantSessionMeta(member.merchantId.toString());
-
-  if (input.operatorWalletAddress) {
-    const normalizedAddress = normalizeSolanaAddress(input.operatorWalletAddress);
-
-    if (!normalizedAddress) {
-      throw new HttpError(400, "Operator wallet address is invalid.");
-    }
-
-    if (!merchant.operatorWalletAddress) {
-      await MerchantModel.findByIdAndUpdate(member.merchantId, {
-        operatorWalletAddress: normalizedAddress,
-        merchantAccount: normalizedAddress,
-      }).exec();
-      merchant.operatorWalletAddress = normalizedAddress;
-    }
-  }
-
-  const user = toAuthenticatedUser(member, merchant);
+  const user = toAuthenticatedUser(merchant);
 
   return {
     ...issueAccessToken({
-      teamMemberId: user.teamMemberId,
+      accountId: user.accountId,
       merchantId: user.merchantId,
     }),
     user,

@@ -10,19 +10,18 @@ import type {
 } from "@/features/kyc/providers/sumsub/sumsub.types";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { queueVerificationNotification } from "@/features/notifications/notification.service";
-import { TeamMemberModel } from "@/features/teams/team.model";
 import type {
   StartMerchantKybInput,
-  StartTeamMemberKycInput,
+  StartOwnerKycInput,
   SumsubWebhookInput,
   SyncMerchantKybInput,
-  SyncTeamMemberKycInput,
+  SyncOwnerKycInput,
 } from "@/features/kyc/kyc.validation";
 import { liveOnboardingDisabledMessage, liveOnboardingEnabled } from "@/shared/constants/live-onboarding";
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 
-type KycSubjectType = "merchant" | "team_member";
+type KycSubjectType = "merchant" | "owner";
 type KycStatus = "not_started" | "pending" | "approved" | "rejected" | "on_hold";
 
 function toStringOrNull(value: unknown) {
@@ -47,11 +46,11 @@ function toStringArray(value: unknown) {
 
 function splitName(name: string) {
   const normalized = name.trim().replace(/\s+/g, " ");
-  const [firstName = "Team", ...rest] = normalized.split(" ");
+  const [firstName = "Account", ...rest] = normalized.split(" ");
 
   return {
     firstName: firstName.trim(),
-    lastName: rest.join(" ").trim() || "Member",
+    lastName: rest.join(" ").trim() || "Owner",
   };
 }
 
@@ -65,7 +64,7 @@ function buildExternalUserId(input: {
     return `renew:${input.mode}:merchant:${input.merchantId}`;
   }
 
-  return `renew:${input.mode}:team-member:${input.merchantId}:${input.subjectRef}`;
+  return `renew:${input.mode}:owner:${input.merchantId}:${input.subjectRef}`;
 }
 
 function deriveStatusFromReview(
@@ -163,20 +162,6 @@ async function getMerchantOrThrow(merchantId: string) {
   }
 
   return merchant;
-}
-
-async function getTeamMemberOrThrow(teamMemberId: string, merchantId: string) {
-  const teamMember = await TeamMemberModel.findById(teamMemberId).exec();
-
-  if (!teamMember) {
-    throw new HttpError(404, "Team member was not found.");
-  }
-
-  if (teamMember.merchantId.toString() !== merchantId) {
-    throw new HttpError(403, "Team member does not belong to this merchant.");
-  }
-
-  return teamMember;
 }
 
 async function getOrCreateKycRecord(input: {
@@ -371,24 +356,23 @@ export async function getMerchantKybStatusByMerchantId(
   };
 }
 
-export async function getTeamMemberKycStatusById(input: {
+export async function getOwnerKycStatusByMerchantId(input: {
   merchantId: string;
-  teamMemberId: string;
   environment?: RuntimeMode;
 }) {
-  await getTeamMemberOrThrow(input.teamMemberId, input.merchantId);
+  await getMerchantOrThrow(input.merchantId);
   const mode = input.environment ?? "test";
   const record = await KycCheckModel.findOne({
     merchantId: input.merchantId,
-    subjectType: "team_member",
-    subjectRef: input.teamMemberId,
+    subjectType: "owner",
+    subjectRef: input.merchantId,
     mode,
   }).exec();
 
   if (!record) {
     return createUnavailableKycResponse({
-      subjectType: "team_member",
-      subjectRef: input.teamMemberId,
+      subjectType: "owner",
+      subjectRef: input.merchantId,
       mode,
       levelName: getSumsubConfig(mode).levelNameKyc,
       required: true,
@@ -487,24 +471,24 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
   };
 }
 
-export async function startTeamMemberKycSession(input: StartTeamMemberKycInput) {
-  const member = await getTeamMemberOrThrow(input.teamMemberId, input.merchantId);
+export async function startOwnerKycSession(input: StartOwnerKycInput) {
+  const merchant = await getMerchantOrThrow(input.merchantId);
   const mode = input.environment;
   if (mode === "live") {
-    assertLiveOnboardingEnabled("starting team member KYC");
+    assertLiveOnboardingEnabled("starting owner KYC");
   }
-  if (!member.name?.trim()) {
-    throw new HttpError(409, "Save business details before starting team member verification.");
+  if (!merchant.ownerName?.trim()) {
+    throw new HttpError(409, "Save business details before starting owner verification.");
   }
   const config = getSumsubConfig(mode);
   const sumsubProvider = getSumsubProvider(mode);
   const levelName = input.levelName ?? config.levelNameKyc;
-  const names = splitName(member.name);
+  const names = splitName(merchant.ownerName);
 
   const record = await getOrCreateKycRecord({
     merchantId: input.merchantId,
-    subjectType: "team_member",
-    subjectRef: input.teamMemberId,
+    subjectType: "owner",
+    subjectRef: input.merchantId,
     levelName,
     actor: input.actor,
     mode,
@@ -519,7 +503,7 @@ export async function startTeamMemberKycSession(input: StartTeamMemberKycInput) 
         firstName: names.firstName,
         lastName: names.lastName,
         country: input.country,
-        email: member.email,
+        email: merchant.supportEmail ?? undefined,
       },
     });
 
@@ -546,13 +530,13 @@ export async function startTeamMemberKycSession(input: StartTeamMemberKycInput) 
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: "Started team member KYC verification",
+    action: "Started owner KYC verification",
     category: "security",
     status: "ok",
-    target: member.email,
-    detail: "Team member KYC verification was initiated via Sumsub.",
+    target: merchant.supportEmail ?? merchant.name ?? null,
+    detail: "Owner KYC verification was initiated via Sumsub.",
     metadata: {
-      teamMemberId: input.teamMemberId,
+      subjectType: record.subjectType,
       levelName: record.levelName,
       applicantId: record.applicantId,
     },
@@ -619,22 +603,22 @@ export async function syncMerchantKybStatus(input: SyncMerchantKybInput) {
   return toKycResponse(record);
 }
 
-export async function syncTeamMemberKycStatus(input: SyncTeamMemberKycInput) {
-  await getTeamMemberOrThrow(input.teamMemberId, input.merchantId);
+export async function syncOwnerKycStatus(input: SyncOwnerKycInput) {
+  await getMerchantOrThrow(input.merchantId);
   const mode = input.environment;
   if (mode === "live") {
-    assertLiveOnboardingEnabled("syncing team member KYC");
+    assertLiveOnboardingEnabled("syncing owner KYC");
   }
   const sumsubProvider = getSumsubProvider(mode);
   const record = await KycCheckModel.findOne({
     merchantId: input.merchantId,
-    subjectType: "team_member",
-    subjectRef: input.teamMemberId,
+    subjectType: "owner",
+    subjectRef: input.merchantId,
     mode,
   }).exec();
 
   if (!record || !record.applicantId) {
-    throw new HttpError(409, "Team member KYC has not been started yet.");
+    throw new HttpError(409, "Owner KYC has not been started yet.");
   }
 
   const review = await sumsubProvider.getApplicantReview(record.applicantId);
@@ -652,11 +636,11 @@ export async function syncTeamMemberKycStatus(input: SyncTeamMemberKycInput) {
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: "Synced team member KYC status",
+    action: "Synced owner KYC status",
     category: "security",
     status: "ok",
-    target: input.teamMemberId,
-    detail: "Team member KYC status was refreshed from Sumsub.",
+    target: input.merchantId,
+    detail: "Owner KYC status was refreshed from Sumsub.",
     metadata: {
       status: record.status,
       reviewStatus: record.reviewStatus,

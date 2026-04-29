@@ -129,7 +129,6 @@ const envSchema = z
       .int()
       .positive()
       .default(8 * 60 * 60),
-    PLATFORM_AUTH_PASSWORD_ITERATIONS: z.coerce.number().int().positive().default(310000),
     PRIVY_APP_ID: z.string().trim().default(""),
     PRIVY_APP_SECRET: z.string().trim().default(""),
     API_BASE_URL: z.string().trim().min(1).default("http://localhost:4000"),
