@@ -2,7 +2,7 @@ import { HttpError } from "@/shared/errors/http-error";
 
 import { env } from "@/config/env.config";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import { assertSupportedCollectionMarkets } from "@/features/payment-rails/payment-rails.service";
+import { assertSupportedCollectionMarkets } from "@/features/onramps/onramp.service";
 import type {
   CreateMerchantInput,
   ListMerchantsQuery,

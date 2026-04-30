@@ -6,7 +6,7 @@ import {
   startOwnerKycSession,
 } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import { assertSupportedCollectionMarkets } from "@/features/payment-rails/payment-rails.service";
+import { assertSupportedCollectionMarkets } from "@/features/onramps/onramp.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { SettingModel } from "@/features/settings/setting.model";
 import type {

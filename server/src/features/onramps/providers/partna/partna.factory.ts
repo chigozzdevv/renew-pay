@@ -1,5 +1,5 @@
-import { PartnaRemoteProvider } from "@/features/payment-rails/providers/partna/partna.remote";
-import type { PartnaProvider } from "@/features/payment-rails/providers/partna/partna.types";
+import { PartnaRemoteProvider } from "@/features/onramps/providers/partna/partna.remote";
+import type { PartnaProvider } from "@/features/onramps/providers/partna/partna.types";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 
 const providerInstances = new Map<RuntimeMode, PartnaProvider>();

@@ -3,13 +3,13 @@ import { createVerify, constants as cryptoConstants } from "crypto";
 import { HttpError } from "@/shared/errors/http-error";
 
 import { env } from "@/config/env.config";
-import { PaymentRailEventModel } from "@/features/payment-rails/payment-rail-event.model";
-import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
+import { OnrampEventModel } from "@/features/onramps/onramp-event.model";
+import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.factory";
 import type {
   PartnaBvnVerificationMethod,
   PartnaManagedBankAccount,
   PartnaVoucherRecord,
-} from "@/features/payment-rails/providers/partna/partna.types";
+} from "@/features/onramps/providers/partna/partna.types";
 import { CustomerModel } from "@/features/customers/customer.model";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { PaymentModel } from "@/features/payments/payment.model";
@@ -50,7 +50,7 @@ function normalizeEmail(value: string) {
 }
 
 function buildPartnaCallbackUrl(mode: RuntimeMode) {
-  const url = new URL("/v1/payment-rails/webhooks/partna", env.API_BASE_URL);
+  const url = new URL("/v1/onramps/webhooks/partna", env.API_BASE_URL);
   url.searchParams.set("environment", mode);
   return url.toString();
 }
@@ -686,7 +686,7 @@ export async function processPartnaWebhook(
   const eventKey = readPartnaWebhookEventKey(payload, environment);
   const state = normalizePartnaWebhookState(payload);
 
-  const existingEvent = await PaymentRailEventModel.findOne({
+  const existingEvent = await OnrampEventModel.findOne({
     provider: "partna",
     environment,
     eventKey,
@@ -705,7 +705,7 @@ export async function processPartnaWebhook(
   let webhookEvent = existingEvent;
 
   if (!webhookEvent) {
-    webhookEvent = await PaymentRailEventModel.create({
+    webhookEvent = await OnrampEventModel.create({
       provider: "partna",
       environment,
       eventKey,

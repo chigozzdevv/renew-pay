@@ -36,7 +36,7 @@ Current compliance config:
 |---------|-------|
 | Auth | Privy |
 | Onboarding | Owner, business, market, payout wallet, verification |
-| Payment rail | Partna |
+| Onramp | Partna |
 | Local billing markets | `GHS`, `KES`, `NGN` |
 | Settlement asset | `USDC` |
 | Settlement network | Solana |
@@ -55,7 +55,7 @@ Server defaults come from [server/.env.example](./server/.env.example):
 3. The merchant creates a subscription plan or invoice from the dashboard or API.
 4. Renew creates a checkout or invoice payment flow and provisions the customer’s local collection instructions through Partna.
 5. The customer pays in local fiat.
-6. Renew reconciles the payment rail event, normalizes the value into USDC, and records settlement state.
+6. Renew reconciles the onramp event, normalizes the value into USDC, and records settlement state.
 7. The protocol publishes route and settlement commitments on Solana where an auditable public anchor is useful.
 8. Stable settlement is paid to the merchant’s configured payout wallet.
 
@@ -63,7 +63,7 @@ Server defaults come from [server/.env.example](./server/.env.example):
 
 Renew uses a hybrid off-chain and on-chain architecture.
 
-Off-chain handles business logic, customer data, payment-rail orchestration, and operational workflows.
+Off-chain handles business logic, customer data, onramp orchestration, and operational workflows.
 
 On-chain records only the route and settlement commitments that benefit from transparency without moving merchant operations into contract-heavy workflows.
 
@@ -72,7 +72,7 @@ On-chain records only the route and settlement commitments that benefit from tra
 - Privy authentication and session exchange
 - Onboarding state and merchant workspace management
 - Hosted checkout, customer records, invoices, and subscriptions
-- Partna payment-rail orchestration, webhooks, and FX quotes
+- Partna onramp orchestration, webhooks, and FX quotes
 - Notification delivery, job queues, and dashboard aggregation
 - Sumsub KYC / KYB orchestration
 
@@ -114,7 +114,7 @@ The server is an Express + TypeScript API used for:
 - auth and workspace session management
 - onboarding and verification orchestration
 - customers, plans, subscriptions, charges, and invoices
-- Partna payment-rail integration and webhooks
+- Partna onramp integration and webhooks
 - Solana commitment publishing and settlement tracking
 - developer keys and webhook delivery
 

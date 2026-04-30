@@ -2,16 +2,16 @@ import { HttpError } from "@/shared/errors/http-error";
 import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
 import { queueNames } from "@/shared/workers/queue-names";
 
-import { ChannelModel } from "@/features/payment-rails/channel.model";
-import { NetworkModel } from "@/features/payment-rails/network.model";
-import { getPartnaProvider } from "@/features/payment-rails/providers/partna/partna.factory";
-import type { PartnaSupportedAsset } from "@/features/payment-rails/providers/partna/partna.types";
+import { ChannelModel } from "@/features/onramps/channel.model";
+import { NetworkModel } from "@/features/onramps/network.model";
+import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.factory";
+import type { PartnaSupportedAsset } from "@/features/onramps/providers/partna/partna.types";
 import type {
   CreateWidgetQuoteInput,
   ListChannelsQuery,
   ListNetworksQuery,
-  SyncPaymentRailInput,
-} from "@/features/payment-rails/payment-rails.validation";
+  SyncOnrampInput,
+} from "@/features/onramps/onramp.validation";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
@@ -306,12 +306,12 @@ async function createPartnaWidgetQuote(input: CreateWidgetQuoteInput) {
     expiresAt: null,
     rateKey: rateQuote.key,
     provider: "partna" as const,
-    paymentNetwork: marketAsset.network,
+    onrampNetwork: marketAsset.network,
     raw: rateQuote.raw,
   };
 }
 
-async function ensurePaymentRailsSeeded(environment: RuntimeMode) {
+async function ensureOnrampsSeeded(environment: RuntimeMode) {
   const activeChannelFilter = {
     ...createRuntimeModeCondition("environment", environment),
     status: "active",
@@ -497,7 +497,7 @@ function groupPartnaNetworks(assets: PartnaSupportedAsset[], environment: Runtim
 }
 
 export async function listChannels(query: ListChannelsQuery) {
-  await ensurePaymentRailsSeeded(query.environment);
+  await ensureOnrampsSeeded(query.environment);
   const mongoQuery: Record<string, unknown> = {};
 
   if (query.environment) {
@@ -534,7 +534,7 @@ export async function listChannels(query: ListChannelsQuery) {
 }
 
 export async function listNetworks(query: ListNetworksQuery) {
-  await ensurePaymentRailsSeeded(query.environment);
+  await ensureOnrampsSeeded(query.environment);
   const mongoQuery: Record<string, unknown> = {};
 
   if (query.environment) {
@@ -560,7 +560,7 @@ export async function listNetworks(query: ListNetworksQuery) {
   return networks.map(toNetworkResponse);
 }
 
-export async function syncChannels(input: SyncPaymentRailInput) {
+export async function syncChannels(input: SyncOnrampInput) {
   const requestedCountry = input.country?.trim().toUpperCase();
   const assets = (await listPartnaLocalAssets(input.environment)).filter((asset) => {
     if (!requestedCountry) {
@@ -593,7 +593,7 @@ export async function syncChannels(input: SyncPaymentRailInput) {
   return synced.map(toChannelResponse);
 }
 
-export async function syncNetworks(input: SyncPaymentRailInput) {
+export async function syncNetworks(input: SyncOnrampInput) {
   const requestedCountry = input.country?.trim().toUpperCase();
   const assets = (await listPartnaLocalAssets(input.environment)).filter((asset) => {
     if (!requestedCountry) {
@@ -640,20 +640,20 @@ export async function listCollectionMarketCatalog(environment: RuntimeMode = "te
   return listPartnaCollectionMarketCatalog(environment);
 }
 
-export async function enqueuePaymentRailSync(input: SyncPaymentRailInput) {
+export async function enqueueOnrampSync(input: SyncOnrampInput) {
   const queuedJob = await enqueueQueueJob(
-    queueNames.paymentRailSync,
-    "sync-payment-rails",
+    queueNames.onrampSync,
+    "sync-onramps",
     input,
     {
-      jobId: `payment-rail-sync-${input.environment}-${input.country ?? "all"}-${Math.floor(
+      jobId: `onramp-sync-${input.environment}-${input.country ?? "all"}-${Math.floor(
         Date.now() / 60000
       )}`,
     }
   );
 
   if (!queuedJob) {
-    const inlineResult = await runPaymentRailSyncJob(input);
+    const inlineResult = await runOnrampSyncJob(input);
 
     return {
       queued: false,
@@ -669,7 +669,7 @@ export async function enqueuePaymentRailSync(input: SyncPaymentRailInput) {
   };
 }
 
-export async function runPaymentRailSyncJob(input: SyncPaymentRailInput) {
+export async function runOnrampSyncJob(input: SyncOnrampInput) {
   const [channels, networks] = await Promise.all([
     syncChannels(input),
     syncNetworks(input),

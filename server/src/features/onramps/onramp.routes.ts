@@ -2,44 +2,44 @@ import { Router } from "express";
 
 import {
   createWidgetQuoteController,
-  enqueuePaymentRailSyncController,
+  enqueueOnrampSyncController,
   listChannelsController,
   listNetworksController,
   processPartnaWebhookController,
   syncChannelsController,
   syncNetworksController,
-} from "@/features/payment-rails/payment-rails.controller";
+} from "@/features/onramps/onramp.controller";
 import {
   requirePlatformAuth,
   requirePlatformPermissions,
 } from "@/shared/middleware/platform-auth";
 
-const paymentRailRouter = Router();
+const onrampRouter = Router();
 
-paymentRailRouter.post("/webhooks/partna", processPartnaWebhookController);
+onrampRouter.post("/webhooks/partna", processPartnaWebhookController);
 
-paymentRailRouter.use(requirePlatformAuth);
-paymentRailRouter.use(
+onrampRouter.use(requirePlatformAuth);
+onrampRouter.use(
   requirePlatformPermissions(["payments", "developers", "settings"])
 );
 
-paymentRailRouter.get("/channels", listChannelsController);
-paymentRailRouter.post(
+onrampRouter.get("/channels", listChannelsController);
+onrampRouter.post(
   "/channels/sync",
   requirePlatformPermissions(["developers", "settings"]),
   syncChannelsController
 );
-paymentRailRouter.get("/networks", listNetworksController);
-paymentRailRouter.post(
+onrampRouter.get("/networks", listNetworksController);
+onrampRouter.post(
   "/networks/sync",
   requirePlatformPermissions(["developers", "settings"]),
   syncNetworksController
 );
-paymentRailRouter.post(
+onrampRouter.post(
   "/sync",
   requirePlatformPermissions(["developers", "settings"]),
-  enqueuePaymentRailSyncController
+  enqueueOnrampSyncController
 );
-paymentRailRouter.post("/quotes", createWidgetQuoteController);
+onrampRouter.post("/quotes", createWidgetQuoteController);
 
-export { paymentRailRouter };
+export { onrampRouter };

@@ -3,23 +3,23 @@ import type { Request, Response } from "express";
 import { getPartnaConfig } from "@/config/partna.config";
 import {
   createWidgetQuote,
-  enqueuePaymentRailSync,
+  enqueueOnrampSync,
   listChannels,
   listNetworks,
   syncChannels,
   syncNetworks,
-} from "@/features/payment-rails/payment-rails.service";
+} from "@/features/onramps/onramp.service";
 import {
   processPartnaWebhook,
   verifyPartnaWebhookSignature,
-} from "@/features/payment-rails/partna.service";
+} from "@/features/onramps/partna.service";
 import {
   createWidgetQuoteSchema,
   listChannelsQuerySchema,
   listNetworksQuerySchema,
   partnaWebhookSchema,
-  syncPaymentRailSchema,
-} from "@/features/payment-rails/payment-rails.validation";
+  syncOnrampSchema,
+} from "@/features/onramps/onramp.validation";
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
@@ -50,7 +50,7 @@ export const listChannelsController = asyncHandler(
 
 export const syncChannelsController = asyncHandler(
   async (request: Request, response: Response) => {
-    const input = syncPaymentRailSchema.parse({
+    const input = syncOnrampSchema.parse({
       ...request.body,
       environment: resolveEnvironmentScope(request),
     });
@@ -58,7 +58,7 @@ export const syncChannelsController = asyncHandler(
 
     response.status(200).json({
       success: true,
-      message: "Payment channels synced.",
+      message: "Onramp channels synced.",
       data: channels,
     });
   }
@@ -81,7 +81,7 @@ export const listNetworksController = asyncHandler(
 
 export const syncNetworksController = asyncHandler(
   async (request: Request, response: Response) => {
-    const input = syncPaymentRailSchema.parse({
+    const input = syncOnrampSchema.parse({
       ...request.body,
       environment: resolveEnvironmentScope(request),
     });
@@ -89,23 +89,23 @@ export const syncNetworksController = asyncHandler(
 
     response.status(200).json({
       success: true,
-      message: "Payment networks synced.",
+      message: "Onramp networks synced.",
       data: networks,
     });
   }
 );
 
-export const enqueuePaymentRailSyncController = asyncHandler(
+export const enqueueOnrampSyncController = asyncHandler(
   async (request: Request, response: Response) => {
-    const input = syncPaymentRailSchema.parse({
+    const input = syncOnrampSchema.parse({
       ...request.body,
       environment: resolveEnvironmentScope(request),
     });
-    const job = await enqueuePaymentRailSync(input);
+    const job = await enqueueOnrampSync(input);
 
     response.status(202).json({
       success: true,
-      message: "Payment rail sync queued.",
+      message: "Onramp sync queued.",
       data: job,
     });
   }

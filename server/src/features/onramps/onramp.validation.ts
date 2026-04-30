@@ -31,7 +31,7 @@ export const listNetworksQuerySchema = z.object({
     .default(false),
 });
 
-export const syncPaymentRailSchema = z.object({
+export const syncOnrampSchema = z.object({
   environment: environmentInputSchema.default("test"),
   country: z.string().trim().min(2).max(3).toUpperCase().optional(),
 });
@@ -66,6 +66,6 @@ export const partnaWebhookSchema = z.object({
 
 export type ListChannelsQuery = z.infer<typeof listChannelsQuerySchema>;
 export type ListNetworksQuery = z.infer<typeof listNetworksQuerySchema>;
-export type SyncPaymentRailInput = z.infer<typeof syncPaymentRailSchema>;
+export type SyncOnrampInput = z.infer<typeof syncOnrampSchema>;
 export type CreateWidgetQuoteInput = z.infer<typeof createWidgetQuoteSchema>;
 export type PartnaWebhookInput = z.infer<typeof partnaWebhookSchema>;

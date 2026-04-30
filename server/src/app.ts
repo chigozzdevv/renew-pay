@@ -13,7 +13,7 @@ import { mediaRouter } from "@/features/media/media.routes";
 import { notificationRouter } from "@/features/notifications/notification.routes";
 import { onboardingRouter } from "@/features/onboarding/onboarding.routes";
 import { overviewRouter } from "@/features/overview/overview.routes";
-import { paymentRailRouter } from "@/features/payment-rails/payment-rails.routes";
+import { onrampRouter } from "@/features/onramps/onramp.routes";
 import { paymentRouter } from "@/features/payments/payment.routes";
 import { payoutRouter } from "@/features/payouts/payout.routes";
 import { settlementRouter } from "@/features/settlement/settlement.routes";
@@ -71,7 +71,7 @@ export function createApp() {
     app.use(`${apiBasePath}/auth`, authRouter);
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
-    app.use(`${apiBasePath}/payment-rails`, paymentRailRouter);
+    app.use(`${apiBasePath}/onramps`, onrampRouter);
     app.use(
       `${apiBasePath}/media`,
       requirePlatformAuth,

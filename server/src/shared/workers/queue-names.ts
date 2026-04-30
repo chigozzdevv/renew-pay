@@ -1,7 +1,7 @@
 export const queueNames = {
   developerWebhookDelivery: "developer-webhook-delivery",
   notificationDelivery: "notification-delivery",
-  paymentRailSync: "payment-rail-sync",
+  onrampSync: "onramp-sync",
   payoutProcessing: "payout-processing",
 } as const;
 

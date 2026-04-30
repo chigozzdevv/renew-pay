@@ -1,6 +1,6 @@
 import { runDeveloperWebhookDeliveryJob } from "@/features/developers/developer-webhook-delivery.service";
 import { runNotificationDeliveryJob } from "@/features/notifications/notification.service";
-import { runPaymentRailSyncJob } from "@/features/payment-rails/payment-rails.service";
+import { runOnrampSyncJob } from "@/features/onramps/onramp.service";
 import { runPayoutProcessingJob } from "@/features/payouts/payout.service";
 import { queueNames } from "@/shared/workers/queue-names";
 import { registerQueueProcessor } from "@/shared/workers/queue-runtime";
@@ -20,8 +20,8 @@ export function registerWorkerProcessors() {
     runNotificationDeliveryJob(payload as { notificationId: string })
   );
 
-  registerQueueProcessor(queueNames.paymentRailSync, async (payload) =>
-    runPaymentRailSyncJob(payload as { country?: string; environment: "test" | "live" })
+  registerQueueProcessor(queueNames.onrampSync, async (payload) =>
+    runOnrampSyncJob(payload as { country?: string; environment: "test" | "live" })
   );
 
   registerQueueProcessor(queueNames.payoutProcessing, async (payload) =>

@@ -22,7 +22,7 @@ import type {
   PartnaSupportedAsset,
   PartnaVoucherInput,
   PartnaVoucherRecord,
-} from "@/features/payment-rails/providers/partna/partna.types";
+} from "@/features/onramps/providers/partna/partna.types";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "PUT";
 

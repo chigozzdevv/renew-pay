@@ -1,6 +1,6 @@
 import { InferSchemaType, Model, Schema, model, models } from "mongoose";
 
-const paymentRailEventSchema = new Schema(
+const onrampEventSchema = new Schema(
   {
     provider: {
       type: String,
@@ -54,19 +54,19 @@ const paymentRailEventSchema = new Schema(
   }
 );
 
-paymentRailEventSchema.index(
+onrampEventSchema.index(
   { provider: 1, environment: 1, eventKey: 1 },
   { unique: true }
 );
-paymentRailEventSchema.index({ provider: 1, createdAt: -1 });
+onrampEventSchema.index({ provider: 1, createdAt: -1 });
 
-type PaymentRailEventEntry = InferSchemaType<typeof paymentRailEventSchema> & {
+type OnrampEventEntry = InferSchemaType<typeof onrampEventSchema> & {
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type PaymentRailEventDocument = PaymentRailEventEntry;
+export type OnrampEventDocument = OnrampEventEntry;
 
-export const PaymentRailEventModel =
-  (models.PaymentRailEvent as Model<PaymentRailEventDocument> | undefined) ??
-  model<PaymentRailEventDocument>("PaymentRailEvent", paymentRailEventSchema);
+export const OnrampEventModel =
+  (models.OnrampEvent as Model<OnrampEventDocument> | undefined) ??
+  model<OnrampEventDocument>("OnrampEvent", onrampEventSchema);

@@ -3,7 +3,7 @@ export type DeveloperWebhookDeliveryJob = {
   attempt: number;
 };
 
-export type PaymentRailSyncJob = {
+export type OnrampSyncJob = {
   country?: string;
 };
 
