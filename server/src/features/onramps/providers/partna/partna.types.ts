@@ -82,13 +82,6 @@ export type PartnaRedeemVoucherInput = {
   cryptoAddress: string;
 };
 
-export type PartnaMockPaymentInput = {
-  accountNumber: string;
-  paymentAmount: number;
-  currency: string;
-  reference: string;
-};
-
 export type PartnaRateInput = {
   fromCurrency: string;
   toCurrency: string;
@@ -168,5 +161,4 @@ export interface PartnaProvider {
   redeemVoucherAndWithdraw(
     input: PartnaRedeemVoucherInput
   ): Promise<Record<string, unknown>>;
-  makeMockPayment?(input: PartnaMockPaymentInput): Promise<Record<string, unknown>>;
 }

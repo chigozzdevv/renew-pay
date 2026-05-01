@@ -14,7 +14,6 @@ import type {
   PartnaHandleBvnOtpMethodInput,
   PartnaInitiateBvnKycInput,
   PartnaManagedBankAccount,
-  PartnaMockPaymentInput,
   PartnaProvider,
   PartnaRateInput,
   PartnaRateQuote,
@@ -623,22 +622,6 @@ export class PartnaRemoteProvider implements PartnaProvider {
         currency: input.currency,
         network: input.network,
         cryptoAddress: input.cryptoAddress,
-      }
-    );
-
-    return extractPayloadData(payload);
-  }
-
-  async makeMockPayment(input: PartnaMockPaymentInput) {
-    const payload = await this.requestJson(
-      this.config.vouchersBaseUrl,
-      "/mock-payment",
-      "POST",
-      {
-        accountNumber: input.accountNumber,
-        paymentAmount: input.paymentAmount,
-        currency: input.currency,
-        reference: input.reference,
       }
     );
 
