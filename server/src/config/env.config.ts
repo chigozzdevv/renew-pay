@@ -19,6 +19,34 @@ const envSchema = z
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
     SOLANA_COLLECTION_WALLET_TEST: z.string().trim().default(""),
     SOLANA_COLLECTION_WALLET_LIVE: z.string().trim().default(""),
+    UMBRA_NETWORK_TEST: z.enum(["mainnet", "devnet", "localnet"]).default("devnet"),
+    UMBRA_NETWORK_LIVE: z.enum(["mainnet", "devnet", "localnet"]).default("mainnet"),
+    SOLANA_RPC_URL_TEST: z
+      .string()
+      .trim()
+      .min(1)
+      .default("https://api.devnet.solana.com"),
+    SOLANA_RPC_URL_LIVE: z
+      .string()
+      .trim()
+      .min(1)
+      .default("https://api.mainnet-beta.solana.com"),
+    SOLANA_RPC_SUBSCRIPTIONS_URL_TEST: z
+      .string()
+      .trim()
+      .min(1)
+      .default("wss://api.devnet.solana.com"),
+    SOLANA_RPC_SUBSCRIPTIONS_URL_LIVE: z
+      .string()
+      .trim()
+      .min(1)
+      .default("wss://api.mainnet-beta.solana.com"),
+    SOLANA_SETTLEMENT_PRIVATE_KEY_TEST: z.string().trim().default(""),
+    SOLANA_SETTLEMENT_PRIVATE_KEY_LIVE: z.string().trim().default(""),
+    UMBRA_INDEXER_API_URL_TEST: z.string().trim().default(""),
+    UMBRA_INDEXER_API_URL_LIVE: z.string().trim().default(""),
+    UMBRA_SETTLEMENT_PRIVATE_KEY_TEST: z.string().trim().default(""),
+    UMBRA_SETTLEMENT_PRIVATE_KEY_LIVE: z.string().trim().default(""),
     ENABLE_WORKERS: booleanEnv.default(true),
     REDIS_URL: z.string().trim().min(1).default("redis://127.0.0.1:6379"),
     REDIS_QUEUE_PREFIX: z.string().trim().min(1).default("renew"),

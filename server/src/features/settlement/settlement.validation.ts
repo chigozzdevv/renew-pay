@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { getDirectSolanaSettlementAsset } from "@/features/settlement/providers/direct/direct.assets";
+import { isUmbraSettlementAsset } from "@/features/settlement/providers/umbra/umbra.assets";
 import { isSolanaAddress } from "@/shared/constants/solana";
 import { optionalPaginationQuerySchema } from "@/shared/utils/pagination";
 import { environmentInputSchema } from "@/shared/utils/runtime-environment";
@@ -9,22 +11,11 @@ const objectIdSchema = z
   .trim()
   .regex(/^[a-fA-F0-9]{24}$/, "Must be a valid Mongo ObjectId.");
 
-export const umbraSupportedMintBySymbol = {
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  WSOL: "So11111111111111111111111111111111111111112",
-  UMBRA: "PRVT6TB7uss3FrUd2D9xs2zqDBsa3GbMJMwCQsgmeta",
-} as const;
-
 const settlementModeSchema = z.enum(["standard", "private"]);
 const settlementProviderSchema = z.enum(["direct", "umbra"]);
 const settlementChainSchema = z.enum(["solana", "avalanche"]);
 const settlementStatusSchema = z.enum(["active", "disabled"]);
-const privacyStrategySchema = z.enum([
-  "receiver_claimable_utxo",
-  "self_claimable_utxo",
-  "encrypted_balance",
-]);
+const privacyStrategySchema = z.enum(["receiver_claimable_utxo"]);
 
 const routeBaseSchema = z.object({
   merchantId: objectIdSchema,
@@ -50,9 +41,7 @@ const routeBaseSchema = z.object({
   privacy: z
     .object({
       strategy: privacyStrategySchema.default("receiver_claimable_utxo"),
-      viewingKeyPolicy: z
-        .enum(["merchant_controlled", "scoped_disclosure"])
-        .default("merchant_controlled"),
+      viewingKeyPolicy: z.literal("merchant_controlled").default("merchant_controlled"),
     })
     .nullable()
     .optional(),
@@ -63,6 +52,10 @@ function validateRouteShape(
   input: z.infer<typeof routeBaseSchema>,
   ctx: z.RefinementCtx
 ) {
+  const knownDirectSolanaAsset = getDirectSolanaSettlementAsset(
+    input.assetSymbol
+  );
+
   if (input.provider === "umbra") {
     if (input.mode !== "private") {
       ctx.addIssue({
@@ -80,20 +73,60 @@ function validateRouteShape(
       });
     }
 
-    if (
-      !Object.prototype.hasOwnProperty.call(
-        umbraSupportedMintBySymbol,
-        input.assetSymbol
-      )
-    ) {
+    if (!isUmbraSettlementAsset(input.assetSymbol)) {
       ctx.addIssue({
         code: "custom",
         path: ["assetSymbol"],
-        message: "Umbra does not have an active pool for this asset.",
+        message: "Umbra settlement currently supports USDC on Solana.",
+      });
+    }
+
+    if (!input.destinationAddress) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["destinationAddress"],
+        message: "Umbra settlement routes require a recipient wallet address.",
+      });
+    }
+
+    if (
+      input.destinationAddress &&
+      !isSolanaAddress(input.destinationAddress)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["destinationAddress"],
+        message: "Destination must be a valid Solana address.",
       });
     }
 
     return;
+  }
+
+  if (input.provider === "direct" && input.chain === "solana") {
+    if (input.mode !== "standard") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["mode"],
+        message: "Direct Solana routes must use standard mode.",
+      });
+    }
+
+    if (!input.assetMint && !knownDirectSolanaAsset) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assetMint"],
+        message: "Direct Solana settlement routes require an SPL token mint.",
+      });
+    }
+
+    if (input.assetMint && !isSolanaAddress(input.assetMint)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assetMint"],
+        message: "Settlement asset mint must be a valid Solana address.",
+      });
+    }
   }
 
   if (input.mode === "private") {
@@ -144,6 +177,10 @@ export const updateSettlementRouteSchema = routeBaseSchema
   .omit({ merchantId: true, environment: true })
   .partial()
   .superRefine((input, ctx) => {
+    const knownDirectSolanaAsset = input.assetSymbol
+      ? getDirectSolanaSettlementAsset(input.assetSymbol)
+      : null;
+
     if (input.provider === "umbra") {
       if (input.mode && input.mode !== "private") {
         ctx.addIssue({
@@ -161,26 +198,66 @@ export const updateSettlementRouteSchema = routeBaseSchema
         });
       }
 
-      if (
-        input.assetSymbol &&
-        !Object.prototype.hasOwnProperty.call(
-          umbraSupportedMintBySymbol,
-          input.assetSymbol
-        )
-      ) {
+      if (input.assetSymbol && !isUmbraSettlementAsset(input.assetSymbol)) {
         ctx.addIssue({
           code: "custom",
           path: ["assetSymbol"],
-          message: "Umbra does not have an active pool for this asset.",
+          message: "Umbra settlement currently supports USDC on Solana.",
+        });
+      }
+
+      if (
+        input.destinationAddress &&
+        !isSolanaAddress(input.destinationAddress)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["destinationAddress"],
+          message: "Destination must be a valid Solana address.",
         });
       }
     }
 
-    if (input.provider === "direct" && input.mode === "private") {
+    if (input.mode === "private" && input.provider !== "umbra") {
       ctx.addIssue({
         code: "custom",
         path: ["provider"],
         message: "Private settlement requires a privacy provider.",
+      });
+    }
+
+    if (
+      input.provider === "direct" &&
+      input.chain === "solana" &&
+      input.mode &&
+      input.mode !== "standard"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["mode"],
+        message: "Direct Solana routes must use standard mode.",
+      });
+    }
+
+    if (
+      input.provider === "direct" &&
+      input.chain === "solana" &&
+      input.assetSymbol &&
+      !input.assetMint &&
+      !knownDirectSolanaAsset
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assetMint"],
+        message: "Direct Solana settlement routes require an SPL token mint.",
+      });
+    }
+
+    if (input.assetMint && !isSolanaAddress(input.assetMint)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assetMint"],
+        message: "Settlement asset mint must be a valid Solana address.",
       });
     }
 

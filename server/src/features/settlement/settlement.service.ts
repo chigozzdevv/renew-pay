@@ -1,10 +1,18 @@
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import {
+  assertDirectSolanaRouteConfig,
+  resolveDirectSolanaAsset,
+} from "@/features/settlement/providers/direct/direct-solana.service";
+import { getUmbraSettlementAsset } from "@/features/settlement/providers/umbra/umbra.assets";
+import {
+  assertUmbraRouteConfig,
+  buildUmbraRoutePrivacy,
+} from "@/features/settlement/providers/umbra/umbra.service";
+import {
   SettlementRouteModel,
   type SettlementRouteRecord,
 } from "@/features/settlement/settlement-route.model";
 import {
-  umbraSupportedMintBySymbol,
   type CreateSettlementRouteInput,
   type ListSettlementRoutesQuery,
   type UpdateSettlementRouteInput,
@@ -33,28 +41,38 @@ function deriveRouteCode(input: Pick<CreateSettlementRouteInput, "name" | "route
   return normalizeRouteCode(input.routeCode ?? input.name) || "settlement-route";
 }
 
-function getUmbraPoolMint(assetSymbol: string) {
-  return umbraSupportedMintBySymbol[
-    assetSymbol as keyof typeof umbraSupportedMintBySymbol
-  ];
-}
-
 function normalizeRouteInput<T extends CreateSettlementRouteInput | UpdateSettlementRouteInput>(
   input: T
 ) {
   if (input.provider !== "umbra") {
+    if (input.provider === "direct" && input.chain === "solana") {
+      const asset = resolveDirectSolanaAsset(input);
+
+      return {
+        ...input,
+        assetSymbol: asset.symbol,
+        assetMint: asset.mint ?? input.assetMint ?? null,
+        assetDecimals: asset.decimals,
+        mode: "standard" as const,
+        privacy: null,
+      };
+    }
+
     return input;
   }
 
   const assetSymbol = input.assetSymbol ?? "USDC";
-  const poolMint = getUmbraPoolMint(assetSymbol);
+  const asset = getUmbraSettlementAsset(assetSymbol);
 
   return {
     ...input,
-    assetMint: input.assetMint ?? poolMint,
+    assetMint: asset?.mint ?? input.assetMint ?? null,
+    assetDecimals: asset?.decimals ?? input.assetDecimals ?? 6,
+    mode: "private" as const,
+    chain: "solana" as const,
     privacy: {
-      strategy: input.privacy?.strategy ?? "receiver_claimable_utxo",
-      viewingKeyPolicy: input.privacy?.viewingKeyPolicy ?? "merchant_controlled",
+      strategy: "receiver_claimable_utxo" as const,
+      viewingKeyPolicy: "merchant_controlled" as const,
     },
   };
 }
@@ -142,6 +160,14 @@ async function ensureRouteScope(
 export async function createSettlementRoute(input: CreateSettlementRouteInput) {
   const normalized = normalizeRouteInput(input);
   await ensureMerchant(normalized.merchantId);
+  const umbraAsset =
+    normalized.provider === "umbra"
+      ? assertUmbraRouteConfig(normalized)
+      : null;
+  const directSolanaAsset =
+    normalized.provider === "direct" && normalized.chain === "solana"
+      ? assertDirectSolanaRouteConfig(normalized)
+      : null;
 
   if (normalized.isDefault) {
     await applyDefaultRoutePolicy({
@@ -159,21 +185,26 @@ export async function createSettlementRoute(input: CreateSettlementRouteInput) {
     provider: normalized.provider,
     chain: normalized.chain,
     assetSymbol: normalized.assetSymbol,
-    assetMint: normalized.assetMint ?? null,
-    assetDecimals: normalized.assetDecimals,
+    assetMint:
+      normalized.assetMint ??
+      umbraAsset?.mint ??
+      directSolanaAsset?.mint ??
+      null,
+    assetDecimals:
+      normalized.assetDecimals ??
+      umbraAsset?.decimals ??
+      directSolanaAsset?.decimals ??
+      6,
     destinationAddress: normalized.destinationAddress ?? null,
     feeBps: normalized.feeBps,
     isDefault: normalized.isDefault,
     status: normalized.status,
     privacy:
       normalized.provider === "umbra"
-        ? {
-            provider: "umbra",
-            strategy: normalized.privacy?.strategy ?? "receiver_claimable_utxo",
-            poolMint: normalized.assetMint ?? getUmbraPoolMint(normalized.assetSymbol),
-            viewingKeyPolicy:
-              normalized.privacy?.viewingKeyPolicy ?? "merchant_controlled",
-          }
+        ? buildUmbraRoutePrivacy({
+            assetSymbol: normalized.assetSymbol,
+            assetMint: normalized.assetMint ?? umbraAsset?.mint ?? null,
+          })
         : null,
     metadata: normalized.metadata ?? {},
   });
@@ -350,22 +381,24 @@ export async function updateSettlementRoute(
     route.status = normalized.status;
   }
 
-  if (normalized.provider === "umbra" || route.provider === "umbra") {
-    const poolMint =
-      normalized.assetMint ?? route.assetMint ?? getUmbraPoolMint(route.assetSymbol);
-    route.privacy = {
-      provider: "umbra",
-      strategy:
-        normalized.privacy?.strategy ??
-        route.privacy?.strategy ??
-        "receiver_claimable_utxo",
-      poolMint,
-      viewingKeyPolicy:
-        normalized.privacy?.viewingKeyPolicy ??
-        route.privacy?.viewingKeyPolicy ??
-        "merchant_controlled",
-    };
-  } else if (normalized.privacy !== undefined || normalized.provider === "direct") {
+  if (route.provider === "umbra") {
+    const asset = assertUmbraRouteConfig(route);
+    route.assetMint = asset.mint;
+    route.assetDecimals = asset.decimals;
+    route.privacy = buildUmbraRoutePrivacy({
+      assetSymbol: route.assetSymbol,
+      assetMint: route.assetMint,
+    });
+  } else if (route.provider === "direct" && route.chain === "solana") {
+    const asset = assertDirectSolanaRouteConfig(route);
+    route.mode = "standard";
+    route.assetSymbol = asset.symbol;
+    route.assetMint = asset.mint;
+    route.assetDecimals = asset.decimals;
+    route.privacy = null;
+  } else if (route.mode === "private") {
+    throw new HttpError(400, "Private settlement requires a privacy provider.");
+  } else {
     route.privacy = null;
   }
 

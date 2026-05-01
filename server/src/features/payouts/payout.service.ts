@@ -1,21 +1,29 @@
-import { HttpError } from "@/shared/errors/http-error";
-import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
-import { queueNames } from "@/shared/workers/queue-names";
-import { Types } from "mongoose";
+import { Types, type HydratedDocument } from "mongoose";
 
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { PaymentModel } from "@/features/payments/payment.model";
-import { PayoutModel } from "@/features/payouts/payout.model";
+import { PayoutModel, type PayoutDocument } from "@/features/payouts/payout.model";
 import type {
   CreatePayoutInput,
   ListPayoutsQuery,
   UpdatePayoutInput,
 } from "@/features/payouts/payout.validation";
-import type { RuntimeMode } from "@/shared/constants/runtime-mode";
-import { createRuntimeModeCondition, toStoredRuntimeMode } from "@/shared/utils/runtime-environment";
+import { executeDirectSolanaPayout } from "@/features/settlement/providers/direct/direct-solana.service";
+import { executeUmbraPayout } from "@/features/settlement/providers/umbra/umbra.service";
+import {
+  SettlementRouteModel,
+  type SettlementRouteRecord,
+} from "@/features/settlement/settlement-route.model";
 import { normalizeSolanaAddress } from "@/shared/constants/solana";
+import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { HttpError } from "@/shared/errors/http-error";
+import { createRuntimeModeCondition, toStoredRuntimeMode } from "@/shared/utils/runtime-environment";
+import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
+import { queueNames } from "@/shared/workers/queue-names";
+
+type PayoutRecord = HydratedDocument<PayoutDocument>;
 
 function toPayoutResponse(document: {
   _id: { toString(): string };
@@ -117,6 +125,137 @@ async function syncLinkedPaymentFromPayout(payout: {
   }).catch(() => undefined);
 }
 
+async function resolvePayoutSettlementRoute(payout: {
+  sourcePaymentId?: { toString(): string } | null;
+}) {
+  if (!payout.sourcePaymentId) {
+    return null;
+  }
+
+  const payment = await PaymentModel.findById(payout.sourcePaymentId)
+    .select({ settlementRouteId: 1 })
+    .exec();
+
+  if (!payment?.settlementRouteId) {
+    return null;
+  }
+
+  const route = await SettlementRouteModel.findById(payment.settlementRouteId).exec();
+
+  if (!route) {
+    throw new HttpError(404, "Settlement route was not found.");
+  }
+
+  return route;
+}
+
+function toPayoutProcessingResult(payout: PayoutRecord, payoutReady: boolean) {
+  return {
+    payoutId: payout._id.toString(),
+    status: payout.status,
+    bridgeSourceTxHash: payout.bridgeSourceTxHash ?? null,
+    bridgeReceiveTxHash: payout.bridgeReceiveTxHash ?? null,
+    creditTxHash: payout.creditTxHash ?? null,
+    payoutReady,
+  };
+}
+
+async function processUmbraPayout(input: {
+  payout: PayoutRecord;
+  route: SettlementRouteRecord;
+  runtimeEnvironment: RuntimeMode;
+}) {
+  const { payout, route, runtimeEnvironment } = input;
+  const routeDestinationAddress = normalizeSolanaAddress(route.destinationAddress);
+  const payoutDestinationAddress = normalizeSolanaAddress(payout.destinationWallet);
+
+  if (!route.assetMint || !routeDestinationAddress) {
+    throw new HttpError(409, "Umbra settlement route is not configured.");
+  }
+
+  if (payoutDestinationAddress !== routeDestinationAddress) {
+    throw new HttpError(
+      409,
+      "Payout destination must match the selected settlement route."
+    );
+  }
+
+  const execution = await executeUmbraPayout({
+    payoutId: payout._id.toString(),
+    merchantId: payout.merchantId.toString(),
+    environment: runtimeEnvironment,
+    routeId: route._id.toString(),
+    amount: payout.netUsdc,
+    assetSymbol: route.assetSymbol,
+    assetMint: route.assetMint,
+    assetDecimals: route.assetDecimals,
+    destinationAddress: routeDestinationAddress,
+  });
+
+  payout.status = execution.status;
+  payout.txHash = execution.txHash;
+  payout.bridgeSourceTxHash = execution.createProofAccountTxHash;
+  payout.bridgeReceiveTxHash = execution.closeProofAccountTxHash ?? null;
+  payout.creditTxHash = execution.txHash;
+  payout.bridgeAttestedAt = new Date();
+  payout.submittedAt = payout.submittedAt ?? new Date();
+  payout.settledAt = execution.settledAt;
+  payout.reversalReason = null;
+  await payout.save();
+
+  await syncLinkedPaymentFromPayout(payout);
+
+  return toPayoutProcessingResult(payout, true);
+}
+
+async function processDirectSolanaPayout(input: {
+  payout: PayoutRecord;
+  route: SettlementRouteRecord;
+  runtimeEnvironment: RuntimeMode;
+}) {
+  const { payout, route, runtimeEnvironment } = input;
+  const routeDestinationAddress = normalizeSolanaAddress(route.destinationAddress);
+  const payoutDestinationAddress = normalizeSolanaAddress(payout.destinationWallet);
+
+  if (!route.assetMint || !routeDestinationAddress) {
+    throw new HttpError(409, "Direct Solana settlement route is not configured.");
+  }
+
+  if (payoutDestinationAddress !== routeDestinationAddress) {
+    throw new HttpError(
+      409,
+      "Payout destination must match the selected settlement route."
+    );
+  }
+
+  const execution = await executeDirectSolanaPayout({
+    payoutId: payout._id.toString(),
+    merchantId: payout.merchantId.toString(),
+    environment: runtimeEnvironment,
+    routeId: route._id.toString(),
+    amount: payout.netUsdc,
+    assetSymbol: route.assetSymbol,
+    assetMint: route.assetMint,
+    assetDecimals: route.assetDecimals,
+    destinationAddress: routeDestinationAddress,
+  });
+
+  payout.status = execution.status;
+  payout.txHash = execution.txHash;
+  payout.bridgeSourceTxHash = null;
+  payout.bridgeReceiveTxHash = null;
+  payout.creditTxHash = execution.txHash;
+  payout.bridgeAttestedAt = new Date();
+  payout.submittedAt = payout.submittedAt ?? new Date();
+  payout.settledAt = execution.settledAt;
+  payout.reversalReason = null;
+  await payout.save();
+
+  await syncLinkedPaymentFromPayout(payout);
+
+  return toPayoutProcessingResult(payout, true);
+}
+
 async function ensurePayoutScope(
   payoutId: string,
   merchantId?: string,
@@ -151,14 +290,43 @@ export async function createPayout(input: CreatePayoutInput) {
   }
 
   if (input.sourcePaymentId) {
-    const sourcePaymentExists = await PaymentModel.exists({
+    const sourcePayment = await PaymentModel.findOne({
       _id: input.sourcePaymentId,
       merchantId: input.merchantId,
       ...createRuntimeModeCondition("environment", input.environment),
-    });
+    })
+      .select({ settlementRouteId: 1 })
+      .exec();
 
-    if (!sourcePaymentExists) {
+    if (!sourcePayment) {
       throw new HttpError(404, "Source payment was not found.");
+    }
+
+    if (sourcePayment.settlementRouteId) {
+      const route = await SettlementRouteModel.findById(
+        sourcePayment.settlementRouteId
+      ).exec();
+
+      if (!route) {
+        throw new HttpError(404, "Settlement route was not found.");
+      }
+
+      const routeDestinationAddress = normalizeSolanaAddress(
+        route.destinationAddress
+      );
+      const payoutDestinationAddress = normalizeSolanaAddress(
+        input.destinationWallet
+      );
+
+      if (
+        routeDestinationAddress &&
+        payoutDestinationAddress !== routeDestinationAddress
+      ) {
+        throw new HttpError(
+          409,
+          "Payout destination must match the selected settlement route."
+        );
+      }
     }
   }
 
@@ -480,35 +648,48 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
   }
 
   const runtimeEnvironment = toStoredRuntimeMode(payout.environment);
-  const postExecutionStatus = runtimeEnvironment === "test" ? "settled" : "confirming";
+  const settlementRoute = await resolvePayoutSettlementRoute(payout);
 
-  payout.status = postExecutionStatus;
+  if (settlementRoute?.provider === "umbra") {
+    return processUmbraPayout({
+      payout,
+      route: settlementRoute,
+      runtimeEnvironment,
+    });
+  }
+
+  if (
+    settlementRoute?.provider === "direct" &&
+    settlementRoute.chain === "solana"
+  ) {
+    return processDirectSolanaPayout({
+      payout,
+      route: settlementRoute,
+      runtimeEnvironment,
+    });
+  }
+
+  payout.status = "failed";
   payout.bridgeSourceTxHash = null;
   payout.bridgeReceiveTxHash = null;
   payout.creditTxHash = null;
-  payout.bridgeAttestedAt = new Date();
+  payout.bridgeAttestedAt = null;
   payout.submittedAt = payout.submittedAt ?? new Date();
-  payout.settledAt = postExecutionStatus === "settled" ? new Date() : null;
+  payout.settledAt = null;
+  payout.reversalReason = "Unsupported settlement route for automated payout.";
   await payout.save();
 
   await syncLinkedPaymentFromPayout(payout);
 
   console.log(
-    `[payout-processing] run-complete ${JSON.stringify({
+    `[payout-processing] unsupported-route ${JSON.stringify({
       payoutId: input.payoutId,
       status: payout.status,
-      bridgeSourceTxHash: payout.bridgeSourceTxHash,
-      bridgeReceiveTxHash: payout.bridgeReceiveTxHash,
-      creditTxHash: payout.creditTxHash,
+      routeId: settlementRoute?._id.toString() ?? null,
+      provider: settlementRoute?.provider ?? null,
+      chain: settlementRoute?.chain ?? null,
     })}`
   );
 
-  return {
-    payoutId: input.payoutId,
-    status: payout.status,
-    bridgeSourceTxHash: payout.bridgeSourceTxHash,
-    bridgeReceiveTxHash: payout.bridgeReceiveTxHash,
-    creditTxHash: payout.creditTxHash,
-    payoutReady: true,
-  };
+  return toPayoutProcessingResult(payout, false);
 }

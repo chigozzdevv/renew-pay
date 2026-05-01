@@ -114,6 +114,35 @@ async function ensureSettlementRouteScope(input: {
   }
 }
 
+async function resolvePaymentSettlementRouteId(input: {
+  settlementRouteId?: string | null;
+  merchantId: string;
+  environment: RuntimeMode;
+}) {
+  if (input.settlementRouteId) {
+    await ensureSettlementRouteScope(input);
+    return new Types.ObjectId(input.settlementRouteId);
+  }
+
+  const defaultRoute = await SettlementRouteModel.findOne({
+    merchantId: input.merchantId,
+    ...createRuntimeModeCondition("environment", input.environment),
+    isDefault: true,
+    status: "active",
+  })
+    .select({ _id: 1 })
+    .exec();
+
+  if (!defaultRoute) {
+    throw new HttpError(
+      409,
+      "Create an active default settlement route before creating payments."
+    );
+  }
+
+  return defaultRoute._id;
+}
+
 async function ensurePaymentScope(
   paymentId: string,
   merchantId?: string,
@@ -144,13 +173,13 @@ async function ensurePaymentScope(
 
 export async function createPayment(input: CreatePaymentInput) {
   await ensureMerchant(input.merchantId);
-  await Promise.all([
+  const [, settlementRouteId] = await Promise.all([
     ensureCustomerScope({
       customerId: input.customerId,
       merchantId: input.merchantId,
       environment: input.environment,
     }),
-    ensureSettlementRouteScope({
+    resolvePaymentSettlementRouteId({
       settlementRouteId: input.settlementRouteId,
       merchantId: input.merchantId,
       environment: input.environment,
@@ -163,7 +192,7 @@ export async function createPayment(input: CreatePaymentInput) {
     environment: input.environment,
     payId,
     customerId: input.customerId ?? null,
-    settlementRouteId: input.settlementRouteId ?? null,
+    settlementRouteId,
     amount: input.amount,
     currency: input.currency,
     description: input.description,
