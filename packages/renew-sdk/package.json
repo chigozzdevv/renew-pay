@@ -1,7 +1,7 @@
 {
   "name": "@renew.sh/sdk",
   "version": "0.1.11",
-  "description": "Renew SDK for checkout sessions, server integrations, and React checkout flows.",
+  "description": "Renew SDK for payment creation, public payment links, and webhook verification.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,9 +21,8 @@
   },
   "keywords": [
     "renew",
-    "checkout",
-    "billing",
-    "subscriptions",
+    "payments",
+    "stablecoins",
     "solana",
     "usdc"
   ],

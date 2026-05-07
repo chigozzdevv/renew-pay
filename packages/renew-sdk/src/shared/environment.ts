@@ -1,4 +1,4 @@
-import type { RenewEnvironment } from "../types/checkout.js";
+import type { RenewEnvironment } from "../types/payment.js";
 
 type RenewApiConfig = {
   readonly apiOrigin?: string;

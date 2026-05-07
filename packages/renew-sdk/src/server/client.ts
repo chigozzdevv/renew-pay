@@ -1,20 +1,24 @@
 import {
-  createRenewCheckoutClient,
-  type RenewCheckoutClient,
-} from "../clients/checkout-client.js";
+  createRenewPaymentClient,
+  type RenewPaymentClient,
+} from "../clients/payment-client.js";
 import {
   inferRenewEnvironmentFromSecretKey,
   resolveRenewApiOrigin,
   validateRenewApiEnvironment,
 } from "../shared/environment.js";
 import type {
-  CreateCheckoutSessionInput,
-  CreateCheckoutSessionResult,
+  CreateRenewCollectionInput,
+  CreateRenewPaymentInput,
+  ListRenewCollectionsQuery,
+  ListRenewPaymentsQuery,
+  RenewCollectionRecord,
   RenewEnvironment,
-  RenewCheckoutPlan,
-  RenewCheckoutSession,
-  SubmitCheckoutCustomerInput,
-} from "../types/checkout.js";
+  RenewPaymentRecord,
+  RenewPublicPaymentRecord,
+  StartRenewPublicPaymentInput,
+  UpdateRenewPaymentInput,
+} from "../types/payment.js";
 
 type FetchImplementation = typeof fetch;
 
@@ -26,24 +30,25 @@ type RenewServerClientConfig = {
 };
 
 export type RenewServerClient = {
-  listCheckoutPlans(): Promise<readonly RenewCheckoutPlan[]>;
-  createCheckoutSession(
-    input: CreateCheckoutSessionInput
-  ): Promise<CreateCheckoutSessionResult>;
-  getCheckoutSession(
-    sessionId: string,
-    clientSecret: string
-  ): Promise<RenewCheckoutSession>;
-  submitCheckoutCustomer(
-    sessionId: string,
-    clientSecret: string,
-    input: SubmitCheckoutCustomerInput
-  ): Promise<RenewCheckoutSession>;
-  completeTestCheckoutPayment(
-    sessionId: string,
-    clientSecret: string
-  ): Promise<RenewCheckoutSession>;
-  raw: RenewCheckoutClient;
+  collections: {
+    create(input: CreateRenewCollectionInput): Promise<RenewCollectionRecord>;
+    list(query?: ListRenewCollectionsQuery): Promise<readonly RenewCollectionRecord[]>;
+    get(collectionId: string): Promise<RenewCollectionRecord>;
+    cancel(collectionId: string): Promise<RenewCollectionRecord>;
+  };
+  createPayment(input: CreateRenewPaymentInput): Promise<RenewPaymentRecord>;
+  listPayments(query?: ListRenewPaymentsQuery): Promise<readonly RenewPaymentRecord[]>;
+  getPayment(paymentId: string): Promise<RenewPaymentRecord>;
+  updatePayment(
+    paymentId: string,
+    input: UpdateRenewPaymentInput
+  ): Promise<RenewPaymentRecord>;
+  getPublicPayment(payId: string): Promise<RenewPublicPaymentRecord>;
+  startPublicPayment(
+    payId: string,
+    input: StartRenewPublicPaymentInput
+  ): Promise<RenewPublicPaymentRecord>;
+  raw: RenewPaymentClient;
 };
 
 export function createRenewServerClient(
@@ -62,28 +67,55 @@ export function createRenewServerClient(
     secretKey: config.secretKey,
   });
 
-  const checkoutClient = createRenewCheckoutClient({
+  const paymentClient = createRenewPaymentClient({
     apiOrigin,
     environment: inferredEnvironment,
     fetch: config.fetch,
   });
 
   return {
-    raw: checkoutClient,
-    listCheckoutPlans() {
-      return checkoutClient.listPlans({ secretKey: config.secretKey });
+    raw: paymentClient,
+    collections: {
+      create(input) {
+        return paymentClient.createCollection(input, {
+          secretKey: config.secretKey,
+        });
+      },
+      list(query) {
+        return paymentClient.listCollections(query, {
+          secretKey: config.secretKey,
+        });
+      },
+      get(collectionId) {
+        return paymentClient.getCollection(collectionId, {
+          secretKey: config.secretKey,
+        });
+      },
+      cancel(collectionId) {
+        return paymentClient.cancelCollection(collectionId, {
+          secretKey: config.secretKey,
+        });
+      },
     },
-    createCheckoutSession(input) {
-      return checkoutClient.createSession(input, { secretKey: config.secretKey });
+    createPayment(input) {
+      return paymentClient.createPayment(input, { secretKey: config.secretKey });
     },
-    getCheckoutSession(sessionId, clientSecret) {
-      return checkoutClient.getSession(sessionId, { clientSecret });
+    listPayments(query) {
+      return paymentClient.listPayments(query, { secretKey: config.secretKey });
     },
-    submitCheckoutCustomer(sessionId, clientSecret, input) {
-      return checkoutClient.submitCustomer(sessionId, input, { clientSecret });
+    getPayment(paymentId) {
+      return paymentClient.getPayment(paymentId, { secretKey: config.secretKey });
     },
-    completeTestCheckoutPayment(sessionId, clientSecret) {
-      return checkoutClient.completeTestPayment(sessionId, { clientSecret });
+    updatePayment(paymentId, input) {
+      return paymentClient.updatePayment(paymentId, input, {
+        secretKey: config.secretKey,
+      });
+    },
+    getPublicPayment(payId) {
+      return paymentClient.getPublicPayment(payId);
+    },
+    startPublicPayment(payId, input) {
+      return paymentClient.startPublicPayment(payId, input);
     },
   };
 }

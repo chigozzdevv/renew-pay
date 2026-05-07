@@ -1,10 +1,12 @@
 "use client";
 
 export {
-  RenewCheckoutModal,
-  type RenewCheckoutModalProps,
-} from "./modal.js";
+  RenewCheckout,
+  RenewCheckoutButton,
+  type RenewCheckoutProps,
+  type RenewCheckoutButtonProps,
+} from "./checkout.js";
 export {
-  useRenewCheckoutSession,
-  type UseRenewCheckoutSessionOptions,
-} from "./use-session.js";
+  useRenewPublicPayment,
+  type UseRenewPublicPaymentOptions,
+} from "./use-payment.js";

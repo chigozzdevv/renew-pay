@@ -1,11 +1,7 @@
 export {
-  createRenewCheckoutClient,
-  type RenewCheckoutClient,
-} from "../clients/checkout-client.js";
-export {
-  createRenewInvoiceClient,
-  type RenewInvoiceClient,
-} from "../clients/invoice-client.js";
+  createRenewPaymentClient,
+  type RenewPaymentClient,
+} from "../clients/payment-client.js";
 export {
   getRenewApiOrigin,
   inferRenewEnvironmentFromSecretKey,
@@ -13,29 +9,20 @@ export {
   validateRenewApiEnvironment,
 } from "../shared/environment.js";
 export type {
-  CreateCheckoutSessionInput,
-  CreateCheckoutSessionResult,
-  RenewCheckoutMarketQuote,
-  RenewCheckoutPlan,
-  RenewCheckoutNextAction,
-  RenewCheckoutPaymentInstructions,
-  RenewCheckoutSession,
-  RenewCheckoutSessionCharge,
-  RenewCheckoutSessionCustomer,
-  RenewCheckoutSessionPlan,
-  RenewCheckoutSessionSettlement,
-  RenewCheckoutVerification,
-  RenewCheckoutStatus,
+  CreateRenewCollectionInput,
+  CreateRenewPaymentInput,
+  ListRenewCollectionsQuery,
+  ListRenewPaymentsQuery,
+  RenewCollectionRecord,
+  RenewCollectionStatus,
   RenewEnvironment,
-  SubmitCheckoutCustomerInput,
-  SubmitCheckoutVerificationInput,
-} from "../types/checkout.js";
-export type {
-  RenewInvoiceLineItem,
-  RenewInvoicePaymentInstructions,
-  RenewInvoiceStatus,
-  RenewInvoiceVerification,
-  RenewPublicInvoiceNextAction,
-  RenewPublicInvoiceRecord,
-  SubmitPublicInvoiceVerificationInput,
-} from "../types/invoice.js";
+  RenewPaymentCollection,
+  RenewPaymentRecord,
+  RenewPaymentRecurring,
+  RenewPaymentStatus,
+  RenewPublicPaymentRecord,
+  RenewRecurringInterval,
+  RenewRuntimeMode,
+  StartRenewPublicPaymentInput,
+  UpdateRenewPaymentInput,
+} from "../types/payment.js";

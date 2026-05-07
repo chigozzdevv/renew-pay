@@ -2,11 +2,10 @@
 
 Renew SDK for:
 
-- headless checkout session creation and lifecycle
-- server-side checkout helpers
-- React checkout modal and session polling
+- collection creation
+- checkout links
+- browser checkout
 - webhook signing and verification helpers
-- invoice helpers for hosted billing flows
 
 ## Install
 
@@ -34,56 +33,44 @@ Server keys must use:
 ## Server Usage
 
 ```ts
-import { createRenewServerClient } from "@renew.sh/sdk/server";
+import { renew } from "@renew.sh/sdk";
 
-const renew = createRenewServerClient({
+const client = renew({
   environment: "sandbox",
   secretKey: process.env.RENEW_SECRET_KEY!,
 });
 
-const plans = await renew.listCheckoutPlans();
-
-const { session, clientSecret } = await renew.createCheckoutSession({
-  planId: plans[0].id,
+const collection = await client.collections.create({
+  amount: 25000,
+  currency: "NGN",
+  reference: "order_1042",
+  description: "Order #1042",
 });
+
+console.log(collection.id, collection.checkoutUrl);
 ```
 
-## React Checkout
+## Browser Usage
+
+```ts
+"use client";
+
+import { checkout } from "@renew.sh/sdk";
+
+checkout.open(collection.checkoutUrl);
+```
+
+## React Usage
 
 ```tsx
 "use client";
 
-import { useState } from "react";
-import {
-  RenewCheckoutModal,
-  createRenewCheckoutClient,
-} from "@renew.sh/sdk";
+import { RenewCheckout } from "@renew.sh/sdk/react";
 
-const client = createRenewCheckoutClient({
-  environment: "sandbox",
-});
-
-export function CheckoutExample() {
-  const [session, setSession] = useState(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <RenewCheckoutModal
-      isOpen={isOpen}
-      client={client}
-      session={session}
-      clientSecret={clientSecret}
-      onClose={() => setIsOpen(false)}
-      onSettled={(nextSession) => {
-        console.log("Settled", nextSession.id);
-      }}
-    />
-  );
+export function PayButton({ checkoutUrl }: { checkoutUrl: string }) {
+  return <RenewCheckout checkoutUrl={checkoutUrl}>Pay</RenewCheckout>;
 }
 ```
-
-The modal is self-contained. It does not require Tailwind or Renew app theme tokens.
 
 ## Webhook Verification
 
@@ -105,17 +92,17 @@ const isValid = verifyRenewWebhookSignature({
 
 - `@renew.sh/sdk`
   - core exports
-  - checkout client
-  - invoice client
+  - `renew(...)`
+  - `checkout.open(...)`
+  - collection client
 - `@renew.sh/sdk/server`
   - server integration helpers
   - webhook signing and verification
 - `@renew.sh/sdk/react`
-  - React checkout modal
-  - checkout session hook
+  - React checkout helpers
 
 ## Notes
 
 - Use server keys only on trusted backend infrastructure.
-- Use checkout sessions and client secrets for browser flows.
+- Use checkout URLs in browser flows.
 - Sandbox mode is for demo and test integrations. Live mode should only be used with production credentials and endpoints.
