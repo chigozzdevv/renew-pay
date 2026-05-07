@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
 
 import { RenewPrivyProvider } from "@/components/shared/privy-provider";
 
 import "./globals.css";
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist",
-});
-
 export const metadata: Metadata = {
-  title: "Renew | Stablecoin Billing for Fiat-First Markets",
+  title: "Renew | Local Payments with Stable Settlement",
   description:
-    "Renew is a stablecoin billing and settlement platform for modern merchants collecting local fiat across fiat-first markets.",
+    "Renew helps merchants collect local fiat payments and settle in stable assets.",
 };
 
 export default function RootLayout({
@@ -23,7 +17,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={geist.variable}>
+      <body>
         <RenewPrivyProvider>{children}</RenewPrivyProvider>
       </body>
     </html>

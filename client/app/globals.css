@@ -7,12 +7,14 @@
 
 :root {
   color-scheme: light;
-  --page-bg: #ffffff;
+  --font-geist: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --page-bg: #fbfbfa;
   --ink: #111111;
-  --muted: #6b7280;
+  --muted: #66706a;
   --brand: #111111;
-  --accent: #e8563f;
+  --accent: #2f6f4e;
   --line: rgba(0, 0, 0, 0.08);
+  --soft: #f4f5f2;
 }
 
 * {
@@ -55,6 +57,16 @@ a {
 .page-shell {
   position: relative;
   isolation: isolate;
+}
+
+.hero-image-text {
+  color: transparent;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 260'%3E%3Crect width='900' height='260' fill='%23111111'/%3E%3Cpath d='M0 178C120 118 220 122 334 162C454 204 558 196 676 122C768 64 840 56 900 78V260H0Z' fill='%2322c55e'/%3E%3Cpath d='M0 72C104 34 214 42 330 86C468 138 596 132 730 66C806 28 866 22 900 34V0H0Z' fill='%2386efac' fill-opacity='.8'/%3E%3Cg fill='%23ffffff' fill-opacity='.14'%3E%3Ccircle cx='112' cy='92' r='24'/%3E%3Ccircle cx='284' cy='184' r='34'/%3E%3Ccircle cx='486' cy='94' r='28'/%3E%3Ccircle cx='650' cy='180' r='40'/%3E%3Ccircle cx='806' cy='102' r='30'/%3E%3C/g%3E%3Cg stroke='%23ffffff' stroke-opacity='.2' stroke-width='3' fill='none'%3E%3Cpath d='M80 182C182 94 290 226 420 124C546 26 648 218 820 88'/%3E%3Cpath d='M24 92C164 18 294 140 438 70C582 0 700 120 884 46'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: cover;
+  background-position: 50% 48%;
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .docs-dark {

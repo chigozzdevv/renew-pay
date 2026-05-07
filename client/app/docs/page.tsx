@@ -4,9 +4,9 @@ import { Suspense } from "react";
 import { DocsPageClient } from "@/components/docs/docs-page-client";
 
 export const metadata: Metadata = {
-  title: "Renew Docs | Checkout, Billing, and Webhooks",
+  title: "Renew Docs | Collections, Settlement, and Webhooks",
   description:
-    "Public docs for Renew checkout, workspace billing APIs, webhooks, and SDKs.",
+    "Public docs for Renew collections, settlement routes, payouts, webhooks, and customer APIs.",
 };
 
 export default function DocsPage() {

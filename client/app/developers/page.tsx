@@ -7,27 +7,29 @@ import { Header } from "@/components/shared/header";
 import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
-const sdkSnippet = `import { createRenewServerClient } from "@renew.sh/sdk/server";
-
-const renew = createRenewServerClient({
-  apiKey: process.env.RENEW_SECRET_KEY!,
-  environment: "sandbox",
+const sdkSnippet = `const response = await fetch("https://staging-pay.renew.sh/v1/collections", {
+  method: "POST",
+  headers: {
+    "x-renew-secret-key": process.env.RENEW_SECRET_KEY!,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    amount: 25000,
+    currency: "NGN",
+    reference: "order_1042",
+    description: "Order #1042",
+    recurring: { enabled: false },
+  }),
 });
 
-const session = await renew.checkout.sessions.create({
-  planId: "plan_basic_ngn",
-  customer: {
-    email: "ada@example.com",
-    fullName: "Ada Lovelace",
-  },
-  successUrl: "https://app.renew.sh/payments/success",
-  cancelUrl: "https://app.renew.sh/payments/cancelled",
-});`;
+const { data: collection } = await response.json();
+
+console.log(collection.id, collection.checkoutUrl);`;
 
 export const metadata: Metadata = {
-  title: "Renew Developers | SDKs, APIs, and Checkout Flows",
+  title: "Renew Developers | APIs",
   description:
-    "Build with Renew using SDKs, direct APIs, hosted checkout, and public docs for sandbox and live billing flows.",
+    "Build with Renew using collection APIs, checkout links, and stable settlement.",
 };
 
 export default function DevelopersPage() {
@@ -45,10 +47,10 @@ export default function DevelopersPage() {
                 <div className="px-7 py-9 sm:px-10 sm:py-12 lg:flex lg:items-center lg:px-14 lg:py-16">
                   <div className="mx-auto w-full max-w-[32rem]">
                     <span className="inline-flex h-11 items-center rounded-full bg-[#111111] px-5 text-[0.74rem] font-semibold uppercase tracking-[0.18em] text-white">
-                      SDK + API
+                      API
                     </span>
                     <h1 className="mt-8 max-w-[11ch] font-display text-[clamp(2.8rem,5.8vw,4.9rem)] leading-[0.92] tracking-[-0.06em] text-[#111111]">
-                      Build billing flows without rebuilding the stack.
+                      Build collection flows without rebuilding the stack.
                     </h1>
 
                     <div className="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -56,11 +58,11 @@ export default function DevelopersPage() {
                         Read docs
                       </ButtonLink>
                       <ButtonLink
-                        href="/playground"
+                        href="/signup"
                         variant="secondary"
                         className="h-12 border-black/8 bg-white/58 px-6 text-[0.95rem] hover:bg-white/76"
                       >
-                        Open playground
+                        Start testing
                       </ButtonLink>
                     </div>
                   </div>

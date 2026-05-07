@@ -4,7 +4,7 @@ import { FiatTicker } from "@/components/landing/fiat-ticker";
 import { GetStartedButton } from "@/components/shared/get-started";
 import { ButtonLink } from "@/components/ui/button";
 import { CurrencyNetwork } from "@/components/landing/currency-network";
-import { supportedBillingCurrencies } from "@/lib/content";
+import { supportedCollectionCurrencies } from "@/lib/content";
 
 export function Hero() {
   return (
@@ -15,11 +15,11 @@ export function Hero() {
             <Reveal delay={0.05}>
               <h1 className="font-display leading-[0.92] tracking-[-0.04em] text-[#111111]">
                 <FiatTicker
-                  currencies={supportedBillingCurrencies}
+                  currencies={supportedCollectionCurrencies}
                   className="block text-[clamp(2.55rem,6vw,4.5rem)]"
                 />
-                <span className="block text-[clamp(2.35rem,5.4vw,4.1rem)]">
-                  Settle in USDC.
+                <span className="hero-image-text block text-[clamp(2.35rem,5.4vw,4.1rem)]">
+                  Settle in stable.
                 </span>
               </h1>
             </Reveal>

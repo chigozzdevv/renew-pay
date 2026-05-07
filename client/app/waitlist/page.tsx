@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function LegacyAccessPage() {
+export default function WaitlistPage() {
   redirect("/login");
 }

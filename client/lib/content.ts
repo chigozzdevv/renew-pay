@@ -4,22 +4,18 @@ export const landingPrimaryNav: NavItem[] = [
   { label: "Documentation", href: "/docs" },
   { label: "Developers", href: "/developers" },
   { label: "Enterprise", href: "/enterprise" },
-  { label: "Playground", href: "/playground" },
 ];
 
-export const landingProductNav: NavItem[] = [
-  { label: "Subscription", href: "/products?type=subscription" },
-  { label: "Invoice", href: "/products?type=invoice" },
-];
+export const landingProductNav: NavItem[] = [];
 
 export const proofItems: ProofItem[] = [
   { value: "24/7", label: "always-on settlement" },
   { value: "Solana", label: "native Solana execution" },
-  { value: "USDC+", label: "stablecoin-ready invoice rails" },
+  { value: "USDC+", label: "stable settlement" },
   { value: "<60s", label: "operator confirmation loop" }
 ];
 
-export const supportedBillingCurrencies = [
+export const supportedCollectionCurrencies = [
   { code: "NGN", symbol: "\u20A6" },
   { code: "KES", symbol: "KSh" },
   { code: "UGX", symbol: "USh" },

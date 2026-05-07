@@ -84,13 +84,13 @@ export function FiatTicker({
   return (
     <span className={`grid ${className ?? ""}`}>
       <span className="invisible col-start-1 row-start-1 inline-flex items-baseline">
-        <span className="shrink-0">Bill in&nbsp;{longestCode}</span>
+        <span className="shrink-0">Collect&nbsp;{longestCode}</span>
         <span className="ml-[0.18em] inline-block text-[0.28em] font-semibold tracking-[0.08em] opacity-65">
           {longestSymbol}
         </span>
       </span>
       <span className="col-start-1 row-start-1 inline-flex items-baseline">
-        <span className="shrink-0">Bill in&nbsp;</span>
+        <span className="shrink-0">Collect&nbsp;</span>
         <span>{visibleText}</span>
         <AnimatePresence initial={false} mode="wait">
           {isSymbolVisible ? (

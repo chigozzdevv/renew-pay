@@ -10,11 +10,11 @@ import { cn } from "@/lib/utils";
 const enterpriseOffers = [
   {
     title: "Custom pricing at volume",
-    body: "Get commercial terms aligned to sustained billing volume.",
+    body: "Get commercial terms aligned to sustained payment volume.",
   },
   {
     title: "Market expansion planning",
-    body: "Prioritize the countries, corridors, and products that matter most to your billing team.",
+    body: "Prioritize the countries, corridors, and products that matter most to your payment team.",
   },
   {
     title: "Flexible settlement controls",
@@ -26,14 +26,14 @@ const enterpriseOffers = [
   },
   {
     title: "Performance visibility",
-    body: "Monitor billing exceptions, settlement timing, and operational risk more closely.",
+    body: "Monitor payment exceptions, settlement timing, and operational risk more closely.",
   },
 ] as const;
 
 export const metadata: Metadata = {
-  title: "Renew Enterprise | High-Volume Billing Infrastructure",
+  title: "Renew Enterprise | High-Volume Payment Infrastructure",
   description:
-    "Renew Enterprise is built for high-volume billing teams that need custom fees, market expansion support, and tighter settlement controls.",
+    "Renew Enterprise is built for high-volume payment teams that need custom fees, market expansion support, and tighter settlement controls.",
 };
 
 export default function EnterprisePage() {
@@ -50,10 +50,10 @@ export default function EnterprisePage() {
               <div className="grid lg:grid-cols-[minmax(0,0.94fr)_1px_minmax(0,1.06fr)]">
                 <div className="px-7 py-9 sm:px-10 sm:py-12 lg:px-14 lg:py-16">
                   <span className="inline-flex h-12 items-center rounded-full bg-[#111111] px-6 text-sm font-medium uppercase tracking-[0.16em] text-white">
-                    Coming soon
+                    Enterprise
                   </span>
                   <h2 className="mt-8 max-w-[10ch] font-display text-[clamp(2.8rem,5.8vw,4.9rem)] leading-[0.92] tracking-[-0.06em] text-[#111111]">
-                    Built for high-volume billing teams.
+                    Built for high-volume payment teams.
                   </h2>
                 </div>
 

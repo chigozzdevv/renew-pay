@@ -1,4 +1,4 @@
-export type DocsCategoryId = "api" | "sdk";
+export type DocsCategoryId = "api";
 
 export type CodeLanguage = "bash" | "ts" | "tsx" | "json" | "sol";
 
@@ -42,25 +42,17 @@ export type DocsCategory = {
   label: string;
 };
 
-export const docsCategories: DocsCategory[] = [
-  { id: "api", label: "API" },
-  { id: "sdk", label: "SDK" },
-];
+export const docsCategories: DocsCategory[] = [{ id: "api", label: "API" }];
 
 const docsPageOrder: Record<DocsCategoryId, string[]> = {
   api: [
     "guide-quickstart",
-    "guide-auth",
-    "guide-checkout",
-    "guide-plans",
+    "guide-collections",
+    "guide-settlement",
     "guide-customers",
-    "guide-subscriptions",
-    "guide-renewals",
+    "guide-payouts",
     "guide-webhooks",
-    "guide-errors",
-    "guide-markets",
   ],
-  sdk: ["sdk-overview", "sdk-server", "sdk-react", "sdk-core"],
 };
 
 function createJsonSample(
@@ -83,100 +75,127 @@ export const docsPages: DocsPage[] = [
     group: "Start here",
     navTitle: "Quickstart",
     title: "Quickstart",
-    description:
-      "Create a sandbox checkout session and complete a test payment end to end.",
+    description: "Create a collection and open checkout.",
     sections: [
       {
-        id: "guide-quickstart-modes",
-        title: "Integration modes",
-        paragraphs: [
-          "Renew has two public environments. Start in sandbox, then move to live when your integration is ready.",
+        id: "guide-quickstart-flow",
+        title: "Flow",
+        paragraphs: ["Collections are the money-in object merchants create for orders, invoices, subscriptions, and payment links."],
+        steps: [
+          "Configure checkout, developers, and settlement in the dashboard.",
+          "Create a collection with amount, currency, and reference.",
+          "Open the returned `checkoutUrl` with the checkout SDK or redirect the payer to it.",
+          "Listen for `collection.paid` before fulfilling the order.",
+          "Track collection and settlement status from the dashboard or API.",
         ],
+      },
+      {
+        id: "guide-quickstart-create",
+        title: "Create collection",
+        paragraphs: ["A collection can be one-time or recurring."],
         sample: {
-          label: "Sandbox and live",
+          label: "Create collection",
           language: "bash",
-          filename: "integration-modes.sh",
-          code: `# Sandbox
-API_ORIGIN=https://staging-pay.renew.sh
-SERVER_KEY_PREFIX=rw_test_
-
-# Live
-API_ORIGIN=https://pay.renew.sh
-SERVER_KEY_PREFIX=rw_live_`,
+          filename: "create-collection.sh",
+          code: `curl https://staging-pay.renew.sh/v1/collections \\
+  -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "amount": 25000,
+    "currency": "NGN",
+    "reference": "order_1042",
+    "description": "Order #1042",
+    "recurring": { "enabled": false }
+  }'`,
         },
       },
       {
-        id: "guide-quickstart-flow",
-        title: "Starting with sandbox",
-        paragraphs: [
-          "The shortest path is:",
-        ],
-        steps: [
-          "Create an account.",
-          "Add your payout wallet.",
-          "Create a plan in the workspace.",
-          "Create an `rw_test_` key in the Developers page.",
-          "Use the key to list plans and create a session.",
-          "Optionally quote a market.",
-          "Submit the customer payload.",
-          "Complete the sandbox payment.",
-        ],
-        references: [
-          {
-            label: "GET",
-            value: "/v1/checkout/plans",
-            detail: "List active checkout-ready plans for the current server key.",
-          },
-          {
-            label: "POST",
-            value: "/v1/checkout/sessions",
-            detail: "Create a checkout session from a plan.",
-          },
-          {
-            label: "GET",
-            value: "/v1/checkout/sessions/:sessionId/quote?market=NGN",
-            detail: "Quote one supported billing market before submission.",
-          },
-          {
-            label: "POST",
-            value: "/v1/checkout/sessions/:sessionId/customer",
-            detail: "Submit customer identity and payment routing.",
-          },
-          {
-            label: "POST",
-            value: "/v1/checkout/sessions/:sessionId/test-complete",
-            detail: "Complete a pending sandbox payment.",
-          },
-        ],
+        id: "guide-quickstart-open",
+        title: "Open checkout",
+        paragraphs: ["Use the browser SDK to open the Renew checkout modal. The hosted URL also works directly for emails, invoices, and no-JS sites."],
         samples: [
-          createJsonSample("Create session request", "create-session.request.json", {
-            method: "POST",
-            url: "https://staging-pay.renew.sh/v1/checkout/sessions",
-            headers: {
-              "x-renew-secret-key": "rw_test_xxxxxxxxxxxxxxxxxxxxxxxx",
-              "content-type": "application/json",
+          {
+            label: "Browser",
+            language: "ts",
+            filename: "checkout.ts",
+            code: `import { checkout } from "@renew.sh/sdk";
+
+await checkout.open(collection.checkoutUrl);`,
+          },
+          {
+            label: "Redirect",
+            language: "ts",
+            filename: "redirect.ts",
+            code: `window.location.href = collection.checkoutUrl;`,
+          },
+        ],
+      },
+      {
+        id: "guide-quickstart-webhook",
+        title: "Fulfill from webhooks",
+        paragraphs: ["Browser callbacks are optional UI helpers. Server-side webhook events are the source of truth for fulfillment."],
+        sample: {
+          label: "Handler",
+          language: "ts",
+          filename: "webhook.ts",
+          code: `if (event.type === "collection.paid") {
+  await orders.markPaid(event.data.reference);
+}`,
+        },
+      },
+    ],
+  },
+  {
+    id: "guide-collections",
+    category: "api",
+    group: "Core",
+    navTitle: "Collections",
+    title: "Collections",
+    description: "Create and manage money-in collections.",
+    sections: [
+      {
+        id: "guide-collections-endpoints",
+        title: "Endpoints",
+        paragraphs: ["Use `reference` to map Renew collections back to your orders."],
+        references: [
+          { label: "GET", value: "/v1/collections", detail: "List collections." },
+          { label: "POST", value: "/v1/collections", detail: "Create a collection." },
+          { label: "GET", value: "/v1/collections/:collectionId", detail: "Fetch one collection." },
+          { label: "POST", value: "/v1/collections/:collectionId/cancel", detail: "Cancel a collection." },
+        ],
+      },
+      {
+        id: "guide-collections-payload",
+        title: "Payload",
+        paragraphs: ["The server returns a hosted `checkoutUrl`."],
+        samples: [
+          createJsonSample("Create request", "create-collection.request.json", {
+            amount: 25000,
+            currency: "NGN",
+            reference: "order_1042",
+            description: "Order #1042",
+            settlement: "default",
+            customer: {
+              reference: "user_123",
+              email: "ada@example.com",
+              name: "Ada Okafor",
             },
-            body: {
-              planId: "64f8c8a8f1d2c11d0e63b6a3",
-              expiresInMinutes: 30,
+            recurring: {
+              enabled: false,
             },
           }),
-          createJsonSample("Create session response", "create-session.response.json", {
-            success: true,
-            message: "Checkout session created.",
-            data: {
-              clientSecret: "rcs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-              session: {
-                id: "64f8d430f1d2c11d0e63ba13",
-                environment: "sandbox",
-                status: "open",
-                nextAction: "submit_customer",
-                expiresAt: "2026-03-09T12:30:00.000Z",
-                testMode: {
-                  enabled: true,
-                  canCompletePayment: false,
-                },
-              },
+          createJsonSample("Create response", "create-collection.response.json", {
+            id: "pay_7de830caf3cc49df9f18d8a1",
+            reference: "order_1042",
+            amount: 25000,
+            currency: "NGN",
+            description: "Order #1042",
+            status: "created",
+            checkoutUrl: "https://app.renew.sh/pay/pay_7de830caf3cc49df9f18d8a1",
+            customer: {
+              reference: "user_123",
+              email: "ada@example.com",
+              name: "Ada Okafor",
             },
           }),
         ],
@@ -184,737 +203,71 @@ SERVER_KEY_PREFIX=rw_live_`,
     ],
   },
   {
-    id: "guide-auth",
+    id: "guide-settlement",
     category: "api",
-    group: "Start here",
-    navTitle: "Authentication",
-    title: "Authentication",
-    description:
-      "Use the right credential for the right surface and keep sandbox and live traffic separate.",
+    group: "Core",
+    navTitle: "Settlement",
+    title: "Settlement",
+    description: "Configure where stable settlement is delivered.",
     sections: [
       {
-        id: "guide-auth-types",
-        title: "Credential types",
-        paragraphs: [
-          "Most auth errors come from sending the right token to the wrong endpoint.",
-        ],
-        bullets: [
-          "Workspace APIs use `Authorization: Bearer <jwt>`.",
-          "Backend checkout calls use a Renew server key: `rw_test_...` for sandbox or `rw_live_...` for live.",
-          "Customer checkout calls use a checkout client secret that starts with `rcs_`.",
-        ],
-      },
-      {
-        id: "guide-auth-environments",
-        title: "Origins and headers",
-        paragraphs: [
-          "Server keys and client secrets can be sent in explicit Renew headers or as bearer tokens.",
-        ],
+        id: "guide-settlement-routes",
+        title: "Routes",
+        paragraphs: ["A collection uses settlement. If none is passed, Renew uses the active default settlement."],
         references: [
-          {
-            label: "Sandbox",
-            value: "https://staging-pay.renew.sh",
-            detail: "Use with `rw_test_` keys and sandbox checkout traffic.",
-          },
-          {
-            label: "Live",
-            value: "https://pay.renew.sh",
-            detail: "Use with `rw_live_` keys and live traffic.",
-          },
-          {
-            label: "Header",
-            value: "x-renew-secret-key",
-            detail: "Preferred header for backend checkout calls.",
-          },
-          {
-            label: "Header",
-            value: "x-renew-client-secret",
-            detail: "Preferred header for customer session calls.",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "guide-checkout",
-    category: "api",
-    group: "Start here",
-    navTitle: "Checkout flow",
-    title: "Checkout flow",
-    description:
-      "Move a customer from plan selection to a billed subscription record.",
-    sections: [
-      {
-        id: "guide-checkout-flow",
-        title: "Flow",
-        paragraphs: [
-          "The checkout flow is shown below. Adapt it to your use case.",
-        ],
-        steps: [
-          "Your application backend calls `GET /v1/checkout/plans` with `x-renew-secret-key`.",
-          "Your application backend calls `POST /v1/checkout/sessions` with the selected `planId`.",
-          "The frontend or hosted customer step calls `GET /v1/checkout/sessions/:sessionId` with `x-renew-client-secret`.",
-          "Optionally call `GET /v1/checkout/sessions/:sessionId/quote?market=NGN` before customer submission.",
-          "Call `POST /v1/checkout/sessions/:sessionId/customer` to submit customer and payment routing fields.",
-          "Read the session again and wait for the next action or charge progress.",
-          "In sandbox, call `POST /v1/checkout/sessions/:sessionId/test-complete` when the session is ready for test completion.",
-        ],
-        references: [
-          {
-            label: "GET",
-            value: "/v1/checkout/plans",
-            detail: "List active checkout-ready plans.",
-          },
-          {
-            label: "POST",
-            value: "/v1/checkout/sessions",
-            detail: "Create a checkout session with `planId`.",
-          },
-          {
-            label: "GET",
-            value: "/v1/checkout/sessions/:sessionId",
-            detail: "Read the latest session state.",
-          },
-          {
-            label: "GET",
-            value: "/v1/checkout/sessions/:sessionId/quote?market=NGN",
-            detail: "Quote a supported market for that session.",
-          },
-          {
-            label: "POST",
-            value: "/v1/checkout/sessions/:sessionId/customer",
-            detail: "Submit customer and payment routing fields.",
-          },
-          {
-            label: "POST",
-            value: "/v1/checkout/sessions/:sessionId/test-complete",
-            detail: "Available only in sandbox mode.",
-          },
-        ],
-        samples: [
-          {
-            label: "List plans request",
-            language: "bash",
-            code: `curl https://staging-pay.renew.sh/v1/checkout/plans \\
-  -H "x-renew-secret-key: rw_test_xxxxxxxxxxxxxxxxxxxxxxxx"`,
-          },
-          createJsonSample("List plans response", "list-plans.response.json", {
-            success: true,
-            data: [
-              {
-                id: "64f8c8a8f1d2c11d0e63b6a3",
-                planCode: "PRO_MONTHLY",
-                name: "Pro Monthly",
-                usdAmount: 99,
-                usageRate: null,
-                billingIntervalDays: 30,
-                trialDays: 7,
-                retryWindowHours: 24,
-                billingMode: "fixed",
-                supportedMarkets: ["NGN", "KES"],
-              },
-            ],
-          }),
-          createJsonSample("Create session request", "create-session.request.json", {
-            method: "POST",
-            path: "/v1/checkout/sessions",
-            headers: {
-              "x-renew-secret-key": "rw_test_xxxxxxxxxxxxxxxxxxxxxxxx",
-              "content-type": "application/json",
-            },
-            body: {
-              planId: "64f8c8a8f1d2c11d0e63b6a3",
-              expiresInMinutes: 30,
-            },
-          }),
-          createJsonSample("Create session response", "create-session.response.json", {
-            success: true,
-            message: "Checkout session created.",
-            data: {
-              clientSecret: "rcs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-              session: {
-                id: "64f8d430f1d2c11d0e63ba13",
-                environment: "sandbox",
-                status: "open",
-                nextAction: "submit_customer",
-                expiresAt: "2026-03-09T12:30:00.000Z",
-              },
-            },
-          }),
-          createJsonSample("Submit customer request", "submit-customer.request.json", {
-            method: "POST",
-            path: "/v1/checkout/sessions/64f8d430f1d2c11d0e63ba13/customer",
-            headers: {
-              "x-renew-client-secret":
-                "rcs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-              "content-type": "application/json",
-            },
-            body: {
-              name: "Ngozi Okafor",
-              email: "ngozi@example.com",
-              market: "NGN",
-              paymentAccountType: "bank",
-              paymentAccountNumber: "0123456789",
-              paymentNetworkId: "nibss-ngn",
-            },
-          }),
-          createJsonSample("Submit customer response", "submit-customer.response.json", {
-            success: true,
-            message: "Checkout customer submitted.",
-            data: {
-              id: "64f8d430f1d2c11d0e63ba13",
-              environment: "sandbox",
-              status: "scheduled",
-              nextAction: "wait_for_charge",
-              customer: {
-                name: "Ngozi Okafor",
-                email: "ngozi@example.com",
-                market: "NGN",
-                paymentAccountType: "bank",
-                paymentAccountNumber: "0123456789",
-                paymentNetworkId: "nibss-ngn",
-              },
-              testMode: {
-                enabled: true,
-                canCompletePayment: false,
-              },
-            },
-          }),
+          { label: "GET", value: "/v1/settlement/routes", detail: "List routes." },
+          { label: "POST", value: "/v1/settlement/routes", detail: "Create a route." },
+          { label: "GET", value: "/v1/settlement/routes/default", detail: "Fetch the default route." },
+          { label: "PATCH", value: "/v1/settlement/routes/:routeId", detail: "Update a route." },
         ],
       },
       {
-        id: "guide-checkout-lifecycle",
-        title: "Session states",
-        paragraphs: [
-          "These are the public statuses your UI should handle.",
-        ],
-        bullets: [
-          "`open`: waiting for customer details.",
-          "`scheduled`: customer submitted and a subscription exists.",
-          "`pending_payment`: a provider payment is waiting to complete.",
-          "`processing`: settlement is still in progress.",
-          "`settled`: the checkout payment completed.",
-          "`failed` or `expired`: start a fresh session.",
-        ],
-        note:
-          "For sandbox sessions, `nextAction` becomes `complete_test_payment` when the session is ready for test completion.",
+        id: "guide-settlement-providers",
+        title: "Providers",
+        paragraphs: ["Use `direct` for standard SPL settlement and `umbra` for private USDC settlement."],
       },
     ],
   },
   {
     id: "guide-customers",
     category: "api",
-    group: "Billing operations",
+    group: "Core",
     navTitle: "Customers",
     title: "Customers",
-    description:
-      "Track billing identities and control customer status from the workspace API.",
+    description: "Store payer profiles when a merchant wants reusable customer records.",
     sections: [
-      {
-        id: "guide-customers-overview",
-        title: "Customer flow",
-        paragraphs: [
-          "Customer records hold the billing identity behind plans, subscriptions, and charges.",
-        ],
-        steps: [
-          "List the customer directory.",
-          "Create the customer record.",
-          "Update billing or payment method state when it changes.",
-          "Use the explicit action endpoints to pause, resume, or blacklist the customer.",
-        ],
-      },
       {
         id: "guide-customers-endpoints",
         title: "Endpoints",
-        paragraphs: [
-          "In signed-in workspace calls, `merchantId` is resolved from the JWT session. Use the `environment` field or query parameter when you need sandbox or live data explicitly.",
-        ],
+        paragraphs: ["Renew creates or updates customers from checkout details."],
         references: [
-          {
-            label: "GET",
-            value: "/v1/customers",
-            detail: "List customers by status, market, or search.",
-          },
-          {
-            label: "POST",
-            value: "/v1/customers",
-            detail: "Create a customer record.",
-          },
-          {
-            label: "GET",
-            value: "/v1/customers/:customerId",
-            detail: "Fetch one customer.",
-          },
-          {
-            label: "PATCH",
-            value: "/v1/customers/:customerId",
-            detail: "Update editable customer fields.",
-          },
-          {
-            label: "POST",
-            value: "/v1/customers/:customerId/pause",
-            detail: "Pause billing.",
-          },
-          {
-            label: "POST",
-            value: "/v1/customers/:customerId/resume",
-            detail: "Resume billing.",
-          },
-          {
-            label: "POST",
-            value: "/v1/customers/:customerId/blacklist",
-            detail: "Block future billing activity.",
-          },
-        ],
-        samples: [
-          createJsonSample("Create customer request", "create-customer.request.json", {
-            method: "POST",
-            path: "/v1/customers",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-              "content-type": "application/json",
-            },
-            body: {
-              environment: "sandbox",
-              customerRef: "cust_ngozi_001",
-              name: "Ngozi Foods",
-              email: "billing@ngozi.example",
-              market: "NGN",
-              metadata: {
-                segment: "growth",
-              },
-            },
-          }),
-          createJsonSample("Create customer response", "create-customer.response.json", {
-            success: true,
-            message: "Customer created.",
-            data: {
-              id: "64f8c9d0f1d2c11d0e63b754",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              customerRef: "cust_ngozi_001",
-              name: "Ngozi Foods",
-              email: "billing@ngozi.example",
-              market: "NGN",
-              status: "active",
-              billingState: "healthy",
-              paymentMethodState: "ok",
-              subscriptionCount: 0,
-              monthlyVolumeUsdc: 0,
-              nextRenewalAt: null,
-              lastChargeAt: null,
-              autoReminderEnabled: true,
-              blacklistedAt: null,
-              blacklistReason: null,
-              metadata: {
-                segment: "growth",
-              },
-              createdAt: "2026-03-09T10:00:00.000Z",
-              updatedAt: "2026-03-09T10:00:00.000Z",
-            },
-          }),
-          createJsonSample("Update customer request", "update-customer.request.json", {
-            method: "PATCH",
-            path: "/v1/customers/64f8c9d0f1d2c11d0e63b754",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-              "content-type": "application/json",
-            },
-            body: {
-              billingState: "at_risk",
-              paymentMethodState: "update_needed",
-            },
-          }),
-          createJsonSample("Update customer response", "update-customer.response.json", {
-            success: true,
-            message: "Customer updated.",
-            data: {
-              id: "64f8c9d0f1d2c11d0e63b754",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              customerRef: "cust_ngozi_001",
-              name: "Ngozi Foods",
-              email: "billing@ngozi.example",
-              market: "NGN",
-              status: "active",
-              billingState: "at_risk",
-              paymentMethodState: "update_needed",
-              subscriptionCount: 0,
-              monthlyVolumeUsdc: 0,
-              nextRenewalAt: null,
-              lastChargeAt: null,
-              autoReminderEnabled: true,
-              blacklistedAt: null,
-              blacklistReason: null,
-              metadata: {
-                segment: "growth",
-              },
-              createdAt: "2026-03-09T10:00:00.000Z",
-              updatedAt: "2026-03-09T10:10:00.000Z",
-            },
-          }),
+          { label: "GET", value: "/v1/customers", detail: "List customers." },
+          { label: "POST", value: "/v1/customers", detail: "Create a customer." },
+          { label: "GET", value: "/v1/customers/:customerId", detail: "Fetch one customer." },
+          { label: "PATCH", value: "/v1/customers/:customerId", detail: "Update a customer." },
+          { label: "POST", value: "/v1/customers/:customerId/blacklist", detail: "Block a customer." },
         ],
       },
     ],
   },
   {
-    id: "guide-plans",
+    id: "guide-payouts",
     category: "api",
-    group: "Billing operations",
-    navTitle: "Plans",
-    title: "Plans",
-    description:
-      "Define the catalog checkout can sell.",
+    group: "Core",
+    navTitle: "Payouts",
+    title: "Payouts",
+    description: "Track and process merchant payouts.",
     sections: [
       {
-        id: "guide-plans-rules",
-        title: "Plan flow",
-        paragraphs: [
-          "Plans define price, interval, billing mode, trial period, retry window, and supported markets.",
-        ],
-        steps: [
-          "Create the plan in `draft`.",
-          "Review pricing, interval, and `supportedMarkets`.",
-          "Update the plan when pricing or availability changes.",
-          "Move the plan to `active` when you want checkout to surface it.",
-          "Use checkout only after the plan is active.",
-        ],
-      },
-      {
-        id: "guide-plans-endpoints",
+        id: "guide-payouts-endpoints",
         title: "Endpoints",
-        paragraphs: [
-          "Create and manage plans through the workspace API.",
-        ],
+        paragraphs: ["Payouts settle merchant balances through the selected settlement provider."],
         references: [
-          {
-            label: "GET",
-            value: "/v1/plans",
-            detail: "List plans.",
-          },
-          {
-            label: "POST",
-            value: "/v1/plans",
-            detail: "Create a plan.",
-          },
-          {
-            label: "GET",
-            value: "/v1/plans/:planId",
-            detail: "Fetch one plan.",
-          },
-          {
-            label: "PATCH",
-            value: "/v1/plans/:planId",
-            detail: "Update pricing, status, or markets.",
-          },
-        ],
-        samples: [
-          createJsonSample("Create plan request", "create-plan.request.json", {
-            method: "POST",
-            path: "/v1/plans",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-              "content-type": "application/json",
-            },
-            body: {
-              environment: "sandbox",
-              planCode: "PRO_MONTHLY",
-              name: "Pro Monthly",
-              usdAmount: 99,
-              billingIntervalDays: 30,
-              trialDays: 7,
-              retryWindowHours: 24,
-              billingMode: "fixed",
-              supportedMarkets: ["NGN", "KES"],
-              status: "draft",
-            },
-          }),
-          createJsonSample("Create plan response", "create-plan.response.json", {
-            success: true,
-            message: "Plan created.",
-            data: {
-              id: "64f8c8a8f1d2c11d0e63b6a3",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              planCode: "PRO_MONTHLY",
-              name: "Pro Monthly",
-              usdAmount: 99,
-              usageRate: null,
-              billingIntervalDays: 30,
-              trialDays: 7,
-              retryWindowHours: 24,
-              billingMode: "fixed",
-              supportedMarkets: ["NGN", "KES"],
-              status: "draft",
-              pendingStatus: null,
-              createdAt: "2026-03-09T10:00:00.000Z",
-              updatedAt: "2026-03-09T10:00:00.000Z",
-            },
-          }),
-          createJsonSample("Activate plan request", "activate-plan.request.json", {
-            method: "PATCH",
-            path: "/v1/plans/64f8c8a8f1d2c11d0e63b6a3",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-              "content-type": "application/json",
-            },
-            body: {
-              status: "active",
-            },
-          }),
-          createJsonSample("Activate plan response", "activate-plan.response.json", {
-            success: true,
-            message: "Plan updated.",
-            data: {
-              id: "64f8c8a8f1d2c11d0e63b6a3",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              planCode: "PRO_MONTHLY",
-              name: "Pro Monthly",
-              usdAmount: 99,
-              usageRate: null,
-              billingIntervalDays: 30,
-              trialDays: 7,
-              retryWindowHours: 24,
-              billingMode: "fixed",
-              supportedMarkets: ["NGN", "KES"],
-              status: "draft",
-              pendingStatus: "active",
-              createdAt: "2026-03-09T10:00:00.000Z",
-              updatedAt: "2026-03-09T10:12:00.000Z",
-            },
-          }),
-        ],
-      },
-    ],
-  },
-  {
-    id: "guide-subscriptions",
-    category: "api",
-    group: "Billing operations",
-    navTitle: "Subscriptions",
-    title: "Subscriptions",
-    description:
-      "Manage the billing snapshot Renew uses for future charges.",
-    sections: [
-      {
-        id: "guide-subscriptions-overview",
-        title: "Subscription flow",
-        paragraphs: [
-          "A subscription connects one customer to one plan and stores the billing snapshot Renew uses for future charges.",
-        ],
-        steps: [
-          "Make sure the plan is active.",
-          "Create the subscription from the workspace API or during checkout.",
-          "Read or update the subscription when timing or payment routing changes.",
-          "Queue the next charge when you want Renew to run billing.",
-        ],
-      },
-      {
-        id: "guide-subscriptions-endpoints",
-        title: "Endpoints",
-        paragraphs: [
-          "Direct subscription creation is useful for imports, migrations, or operator-led billing flows. Checkout-created subscriptions can exist before settlement fully completes, so read the latest status instead of assuming they are already active.",
-        ],
-        references: [
-          {
-            label: "GET",
-            value: "/v1/subscriptions",
-            detail: "List subscriptions.",
-          },
-          {
-            label: "POST",
-            value: "/v1/subscriptions",
-            detail: "Create a subscription directly.",
-          },
-          {
-            label: "GET",
-            value: "/v1/subscriptions/:subscriptionId",
-            detail: "Fetch one subscription.",
-          },
-          {
-            label: "PATCH",
-            value: "/v1/subscriptions/:subscriptionId",
-            detail: "Update status, timing, amount, or payment routing.",
-          },
-          {
-            label: "POST",
-            value: "/v1/subscriptions/:subscriptionId/queue-charge",
-            detail: "Trigger the next charge attempt.",
-          },
-        ],
-        samples: [
-          createJsonSample("Create subscription request", "create-subscription.request.json", {
-            method: "POST",
-            path: "/v1/subscriptions",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-              "content-type": "application/json",
-            },
-            body: {
-              environment: "sandbox",
-              planId: "64f8c8a8f1d2c11d0e63b6a3",
-              customerRef: "cust_ngozi_001",
-              customerName: "Ngozi Foods",
-              billingCurrency: "NGN",
-              paymentAccountType: "bank",
-              paymentAccountNumber: "0123456789",
-              paymentNetworkId: "nibss-ngn",
-              status: "active",
-              nextChargeAt: "2026-03-16T08:00:00.000Z",
-            },
-          }),
-          createJsonSample("Create subscription response", "create-subscription.response.json", {
-            success: true,
-            message: "Subscription created.",
-            data: {
-              id: "64f8c9a0f1d2c11d0e63b741",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              planId: "64f8c8a8f1d2c11d0e63b6a3",
-              customerRef: "cust_ngozi_001",
-              customerName: "Ngozi Foods",
-              billingCurrency: "NGN",
-              localAmount: 154000,
-              paymentAccountType: "bank",
-              paymentAccountNumber: "0123456789",
-              paymentNetworkId: "nibss-ngn",
-              status: "pending_activation",
-              pendingStatus: "active",
-              nextChargeAt: "2026-03-16T08:00:00.000Z",
-              lastChargeAt: null,
-              retryAvailableAt: null,
-              createdAt: "2026-03-09T10:20:00.000Z",
-              updatedAt: "2026-03-09T10:20:00.000Z",
-            },
-          }),
-          createJsonSample("Update subscription request", "update-subscription.request.json", {
-            method: "PATCH",
-            path: "/v1/subscriptions/64f8c9a0f1d2c11d0e63b741",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-              "content-type": "application/json",
-            },
-            body: {
-              nextChargeAt: "2026-03-18T08:00:00.000Z",
-            },
-          }),
-          createJsonSample("Update subscription response", "update-subscription.response.json", {
-            success: true,
-            message: "Subscription updated.",
-            data: {
-              id: "64f8c9a0f1d2c11d0e63b741",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              planId: "64f8c8a8f1d2c11d0e63b6a3",
-              customerRef: "cust_ngozi_001",
-              customerName: "Ngozi Foods",
-              billingCurrency: "NGN",
-              localAmount: 154000,
-              paymentAccountType: "bank",
-              paymentAccountNumber: "0123456789",
-              paymentNetworkId: "nibss-ngn",
-              status: "active",
-              pendingStatus: null,
-              nextChargeAt: "2026-03-18T08:00:00.000Z",
-              lastChargeAt: null,
-              retryAvailableAt: null,
-              createdAt: "2026-03-09T10:20:00.000Z",
-              updatedAt: "2026-03-09T10:30:00.000Z",
-            },
-          }),
-        ],
-      },
-    ],
-  },
-  {
-    id: "guide-renewals",
-    category: "api",
-    group: "Billing operations",
-    navTitle: "Charges & renewals",
-    title: "Charges & renewals",
-    description:
-      "Queue renewals, inspect charges, and retry failed billing attempts.",
-    sections: [
-      {
-        id: "guide-renewals-overview",
-        title: "Renewal flow",
-        paragraphs: [
-          "Use the subscription queue endpoint when you want Renew to drive the next billing attempt from an existing subscription.",
-        ],
-        steps: [
-          "Queue the next charge from the subscription.",
-          "Read the charge record to inspect amount, FX, fees, and status.",
-          "Retry a failed charge when you are ready to run billing again.",
-        ],
-      },
-      {
-        id: "guide-renewals-endpoints",
-        title: "Endpoints",
-        paragraphs: [
-          "Charge endpoints are mainly operational tools once a billing attempt exists. In live mode, direct charge creation and retry are gated by KYB approval.",
-        ],
-        references: [
-          {
-            label: "POST",
-            value: "/v1/subscriptions/:subscriptionId/queue-charge",
-            detail: "Queue the next subscription charge.",
-          },
-          {
-            label: "GET",
-            value: "/v1/charges",
-            detail: "List charges.",
-          },
-          {
-            label: "POST",
-            value: "/v1/charges",
-            detail: "Record a charge directly.",
-          },
-          {
-            label: "GET",
-            value: "/v1/charges/:chargeId",
-            detail: "Fetch one charge.",
-          },
-          {
-            label: "PATCH",
-            value: "/v1/charges/:chargeId",
-            detail: "Update a charge status or failure code.",
-          },
-          {
-            label: "POST",
-            value: "/v1/charges/:chargeId/retry",
-            detail: "Retry a failed charge.",
-          },
-        ],
-        samples: [
-          createJsonSample("Queue charge request", "queue-charge.request.json", {
-            method: "POST",
-            path: "/v1/subscriptions/64f8c9a0f1d2c11d0e63b741/queue-charge",
-            headers: {
-              Authorization: "Bearer {{RENEW_JWT}}",
-            },
-          }),
-          createJsonSample("Queue charge response", "queue-charge.response.json", {
-            success: true,
-            message: "Subscription charge queued.",
-            data: {
-              queued: true,
-              subscriptionId: "64f8c9a0f1d2c11d0e63b741",
-            },
-          }),
-          createJsonSample("Charge response", "charge.response.json", {
-            success: true,
-            data: {
-              id: "64f8cae4f1d2c11d0e63b8a1",
-              merchantId: "64f8c60af1d2c11d0e63b531",
-              subscriptionId: "64f8c9a0f1d2c11d0e63b741",
-              externalChargeId: "yc_seq_1741512000",
-              settlementSource: null,
-              localAmount: 154000,
-              fxRate: 1555.55,
-              usdcAmount: 99,
-              feeAmount: 1.5,
-              status: "pending",
-              failureCode: null,
-              processedAt: "2026-03-09T10:40:00.000Z",
-              createdAt: "2026-03-09T10:40:00.000Z",
-              updatedAt: "2026-03-09T10:40:00.000Z",
-            },
-          }),
+          { label: "GET", value: "/v1/payouts", detail: "List payouts." },
+          { label: "POST", value: "/v1/payouts", detail: "Create a payout." },
+          { label: "GET", value: "/v1/payouts/:payoutId", detail: "Fetch one payout." },
+          { label: "PATCH", value: "/v1/payouts/:payoutId", detail: "Update a payout." },
+          { label: "POST", value: "/v1/payouts/:payoutId/process", detail: "Process a payout." },
         ],
       },
     ],
@@ -922,537 +275,35 @@ SERVER_KEY_PREFIX=rw_live_`,
   {
     id: "guide-webhooks",
     category: "api",
-    group: "Integrations",
+    group: "Core",
     navTitle: "Webhooks",
     title: "Webhooks",
-    description:
-      "Receive charge outcomes in your systems and inspect delivery attempts.",
+    description: "Receive collection, settlement, payout, and customer events.",
     sections: [
       {
-        id: "guide-webhooks-overview",
-        title: "Webhook flow",
-        paragraphs: [
-          "Renew sends webhook events for charge outcomes. Verify every delivery before you trust the payload.",
-        ],
-        steps: [
-          "Create the webhook endpoint from the workspace.",
-          "Store the returned secret immediately.",
-          "Verify `x-renew-signature` and `x-renew-timestamp` on every delivery.",
-          "Send a test delivery before you rely on production events.",
-          "Inspect delivery logs if your consumer looks out of sync.",
-        ],
-        bullets: [
-          "Current event types: `charge.settled` and `charge.failed`.",
-        ],
-        sample: {
-          label: "Verify a webhook",
-          language: "ts",
-          filename: "verify-renew-webhook.ts",
-          code: `import {
-  renewWebhookHeaderNames,
-  verifyRenewWebhookSignature,
-} from "@renew.sh/sdk/server";
-
-const isValid = verifyRenewWebhookSignature({
-  payload: rawBody,
-  signingSecret: process.env.RENEW_WEBHOOK_SECRET!,
-  signatureHeader: request.headers.get(renewWebhookHeaderNames.signature),
-  timestampHeader: request.headers.get(renewWebhookHeaderNames.timestamp),
-});`,
-        },
-      },
-      {
-        id: "guide-webhooks-management",
-        title: "Webhook management",
-        paragraphs: [
-          "Create and manage webhook endpoints from the workspace API. Each endpoint receives a signing secret on creation — store it immediately as it will not be shown again.",
-        ],
+        id: "guide-webhooks-endpoints",
+        title: "Endpoints",
+        paragraphs: ["Configure webhook endpoints from Settings > Developers or API."],
         references: [
-          {
-            label: "GET",
-            value: "/v1/developers/webhooks",
-            detail: "List webhook endpoints.",
-          },
-          {
-            label: "POST",
-            value: "/v1/developers/webhooks",
-            detail: "Create a webhook endpoint.",
-          },
-          {
-            label: "PATCH",
-            value: "/v1/developers/webhooks/:webhookId",
-            detail: "Update a webhook endpoint.",
-          },
-          {
-            label: "POST",
-            value: "/v1/developers/webhooks/:webhookId/rotate-secret",
-            detail: "Rotate the signing secret.",
-          },
-          {
-            label: "POST",
-            value: "/v1/developers/webhooks/:webhookId/test",
-            detail: "Send a test delivery to this endpoint.",
-          },
-          {
-            label: "GET",
-            value: "/v1/developers/deliveries",
-            detail: "List webhook delivery attempts.",
-          },
+          { label: "GET", value: "/v1/developers/webhooks", detail: "List webhooks." },
+          { label: "POST", value: "/v1/developers/webhooks", detail: "Create a webhook." },
+          { label: "PATCH", value: "/v1/developers/webhooks/:webhookId", detail: "Update a webhook." },
+          { label: "POST", value: "/v1/developers/webhooks/:webhookId/test", detail: "Send a test delivery." },
         ],
       },
       {
-        id: "guide-webhooks-payloads",
-        title: "Event payloads",
-        paragraphs: [
-          "Every webhook delivery has the same envelope. The `data` object contains `charge`, `subscription`, and `settlement` snapshots when available.",
-        ],
-        samples: [
-          createJsonSample("charge.settled payload", "webhook-charge-settled.json", {
-            id: "evt_a1b2c3d4e5f6",
-            eventType: "charge.settled",
-            createdAt: "2026-03-09T12:00:00.000Z",
-            environment: "sandbox",
-            livemode: false,
-            data: {
-              charge: {
-                id: "64f8cae4f1d2c11d0e63b8a1",
-                subscriptionId: "64f8c9a0f1d2c11d0e63b741",
-                externalChargeId: "yc_seq_1741512000",
-                settlementSource: null,
-                localAmount: 154000,
-                fxRate: 1555.55,
-                usdcAmount: 99,
-                feeAmount: 1.5,
-                status: "settled",
-                failureCode: null,
-                processedAt: "2026-03-09T10:40:00.000Z",
-                createdAt: "2026-03-09T10:40:00.000Z",
-                updatedAt: "2026-03-09T12:00:00.000Z",
-              },
-              subscription: {
-                id: "64f8c9a0f1d2c11d0e63b741",
-                planId: "64f8c8a8f1d2c11d0e63b6a3",
-                customerRef: "cust_ngozi_001",
-                customerName: "Ngozi Foods",
-                billingCurrency: "NGN",
-                localAmount: 154000,
-                paymentAccountType: "bank",
-                paymentAccountNumber: "0123456789",
-                paymentNetworkId: "nibss-ngn",
-                status: "active",
-                nextChargeAt: "2026-04-08T08:00:00.000Z",
-                lastChargeAt: "2026-03-09T12:00:00.000Z",
-                retryAvailableAt: null,
-              },
-              settlement: {
-                id: "64f8cb20f1d2c11d0e63b8f0",
-                batchRef: "batch_20260309",
-                grossUsdc: 99,
-                feeUsdc: 1.5,
-                netUsdc: 97.5,
-                destinationWallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-                status: "settled",
-                txHash: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp...",
-                settledAt: "2026-03-09T12:00:00.000Z",
-              },
-            },
-          }),
-          createJsonSample("charge.failed payload", "webhook-charge-failed.json", {
-            id: "evt_f6e5d4c3b2a1",
-            eventType: "charge.failed",
-            createdAt: "2026-03-09T12:05:00.000Z",
-            environment: "sandbox",
-            livemode: false,
-            data: {
-              charge: {
-                id: "64f8cae4f1d2c11d0e63b8a2",
-                subscriptionId: "64f8c9a0f1d2c11d0e63b741",
-                externalChargeId: "yc_seq_1741512100",
-                settlementSource: null,
-                localAmount: 154000,
-                fxRate: 1555.55,
-                usdcAmount: 99,
-                feeAmount: 1.5,
-                status: "failed",
-                failureCode: "collection_failed",
-                processedAt: "2026-03-09T12:05:00.000Z",
-                createdAt: "2026-03-09T12:00:00.000Z",
-                updatedAt: "2026-03-09T12:05:00.000Z",
-              },
-              subscription: {
-                id: "64f8c9a0f1d2c11d0e63b741",
-                planId: "64f8c8a8f1d2c11d0e63b6a3",
-                customerRef: "cust_ngozi_001",
-                customerName: "Ngozi Foods",
-                billingCurrency: "NGN",
-                localAmount: 154000,
-                paymentAccountType: "bank",
-                paymentAccountNumber: "0123456789",
-                paymentNetworkId: "nibss-ngn",
-                status: "active",
-                nextChargeAt: "2026-04-08T08:00:00.000Z",
-                lastChargeAt: "2026-03-09T10:40:00.000Z",
-                retryAvailableAt: "2026-03-10T12:05:00.000Z",
-              },
-              settlement: null,
-            },
-          }),
-        ],
-      },
-    ],
-  },
-  {
-    id: "guide-errors",
-    category: "api",
-    group: "Reference",
-    navTitle: "Error handling",
-    title: "Error handling",
-    description:
-      "Handle API errors gracefully with structured error responses.",
-    sections: [
-      {
-        id: "guide-errors-format",
-        title: "Error response format",
-        paragraphs: [
-          "All error responses follow a consistent shape. The `success` field is always `false` and `message` describes the error.",
-        ],
-        samples: [
-          createJsonSample("HTTP error (e.g. 404, 403)", "error-http.json", {
-            success: false,
-            message: "Route GET /v1/unknown was not found.",
-          }),
-          createJsonSample("Validation error (400)", "error-validation.json", {
-            success: false,
-            message: "Validation failed.",
-            errors: [
-              { path: "planId", message: "Required" },
-              { path: "billingCurrency", message: "String must contain at least 2 character(s)" },
-            ],
-          }),
-          createJsonSample("Server error (500)", "error-server.json", {
-            success: false,
-            message: "An unexpected error occurred.",
-          }),
-        ],
-      },
-      {
-        id: "guide-errors-codes",
-        title: "HTTP status codes",
-        paragraphs: [
-          "Use the HTTP status code to determine the error category.",
-        ],
+        id: "guide-webhooks-events",
+        title: "Events",
+        paragraphs: ["Use collection events for order state and settlement events for payout tracking."],
         bullets: [
-          "`400` — Validation failed. Check the `errors` array for field-level details.",
-          "`401` — Missing or invalid credentials. Verify your API key or JWT.",
-          "`403` — Forbidden. The credential lacks the required permission or KYB approval.",
-          "`404` — Resource or route not found.",
-          "`500` — Unexpected server error. Retry with exponential backoff.",
-        ],
-      },
-      {
-        id: "guide-errors-tips",
-        title: "Best practices",
-        paragraphs: [
-          "Follow these patterns to build resilient integrations.",
-        ],
-        bullets: [
-          "Always check `success` before reading the `data` field.",
-          "Log the full error response for debugging — `message` and `errors` together give you enough context.",
-          "Use idempotent retries for 5xx errors. Most write endpoints are safe to retry.",
-          "Validation errors (`400`) should not be retried without fixing the request.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "guide-markets",
-    category: "api",
-    group: "Reference",
-    navTitle: "Supported markets",
-    title: "Supported markets",
-    description:
-      "The currencies and regions Renew supports for local-fiat billing.",
-    sections: [
-      {
-        id: "guide-markets-list",
-        title: "Billing currencies",
-        paragraphs: [
-          "Renew supports billing in the following local currencies through Partna. Settlement is always in USDC regardless of billing currency.",
-        ],
-        references: [
-          { label: "NGN", value: "Nigerian Naira (₦)", detail: "Nigeria" },
-          { label: "KES", value: "Kenyan Shilling (KSh)", detail: "Kenya" },
-          { label: "GHS", value: "Ghanaian Cedi (GH₵)", detail: "Ghana" },
-        ],
-      },
-      {
-        id: "guide-markets-usage",
-        title: "Using markets in the API",
-        paragraphs: [
-          "Markets appear in plans, subscriptions, customers, and checkout sessions. Only markets enabled on the merchant account can be used.",
-        ],
-        bullets: [
-          "Set `supportedMarkets` on a plan to control which currencies it supports.",
-          "The `billingCurrency` on a subscription must match one of the plan's supported markets.",
-          "The `market` field on a customer record tracks their billing region.",
-          "In checkout, `GET /v1/checkout/sessions/:id/quote?market=NGN` returns a real-time FX quote.",
-        ],
-      },
-    ],
-  },
-
-  {
-    id: "sdk-overview",
-    category: "sdk",
-    group: "Getting started",
-    navTitle: "Overview",
-    title: "SDK overview",
-    description:
-      "Checkout, invoice, webhook, and React helpers for payment apps.",
-    sections: [
-      {
-        id: "sdk-overview-packages",
-        title: "Package surfaces",
-        paragraphs: [
-          "The SDK is split by use case.",
-        ],
-        references: [
-          {
-            label: "Package",
-            value: "@renew.sh/sdk",
-            detail: "Checkout client, invoice client, events, and shared types.",
-          },
-          {
-            label: "Package",
-            value: "@renew.sh/sdk/server",
-            detail: "Server checkout helpers and webhook utilities.",
-          },
-          {
-            label: "Package",
-            value: "@renew.sh/sdk/react",
-            detail: "React checkout modal and session hook.",
-          },
-        ],
-      },
-      {
-        id: "sdk-overview-environments",
-        title: "Environment model",
-        paragraphs: [
-          "The SDK uses the same public environment names as the docs: `sandbox` and `live`.",
-        ],
-        bullets: [
-          "`sandbox` resolves to `https://staging-pay.renew.sh`.",
-          "`live` resolves to `https://pay.renew.sh`.",
-          "`rw_test_` keys map to sandbox and `rw_live_` keys map to live.",
-        ],
-      },
-      {
-        id: "sdk-overview-example",
-        title: "Server client example",
-        paragraphs: [
-          "Use the server client when your backend already has the server key.",
-        ],
-        sample: {
-          label: "Server checkout helper",
-          language: "ts",
-          filename: "renew-server.ts",
-          code: `import { createRenewServerClient } from "@renew.sh/sdk/server";
-
-const renew = createRenewServerClient({
-  environment: "sandbox",
-  secretKey: process.env.RENEW_SECRET_KEY!,
-});
-
-const plans = await renew.listCheckoutPlans();
-
-const { clientSecret, session } = await renew.createCheckoutSession({
-  planId: plans[0].id,
-});`,
-        },
-      },
-    ],
-  },
-  {
-    id: "sdk-server",
-    category: "sdk",
-    group: "Getting started",
-    navTitle: "Server SDK",
-    title: "Server checkout & webhooks",
-    description: "Backend helpers for session creation and signature verification.",
-    sections: [
-      {
-        id: "sdk-server-install",
-        title: "Installation",
-        paragraphs: [
-          "Install the main package, then import from the `/server` subpath.",
-        ],
-        sample: {
-          label: "Install",
-          language: "bash",
-          filename: "Terminal",
-          code: "npm install @renew.sh/sdk",
-        },
-      },
-      {
-        id: "sdk-server-checkout",
-        title: "Creating checkout sessions",
-        paragraphs: [
-          "Use the server client to fetch plans and spawn checkout sessions securely with your secret key.",
-        ],
-        sample: {
-          label: "Server checkout",
-          language: "ts",
-          filename: "renew.ts",
-          code: `import { createRenewServerClient } from "@renew.sh/sdk/server";
-
-const renew = createRenewServerClient({
-  environment: "sandbox", // or "live"
-  secretKey: process.env.RENEW_SECRET_KEY!,
-});
-
-// 1. Fetch available plans
-const plans = await renew.listCheckoutPlans();
-
-// 2. Create a session for the user
-const { session, clientSecret } = await renew.createCheckoutSession({
-  planId: plans[0].id,
-  metadata: { userId: "user_123" }
-});`,
-        },
-      },
-      {
-        id: "sdk-server-webhooks",
-        title: "Verifying webhooks",
-        paragraphs: [
-          "The server SDK includes helpers to validate incoming webhook payload signatures.",
-        ],
-        sample: {
-          label: "Webhook signature verification",
-          language: "ts",
-          filename: "webhook.ts",
-          code: `import {
-  renewWebhookHeaderNames,
-  verifyRenewWebhookSignature,
-} from "@renew.sh/sdk/server";
-
-const isValid = verifyRenewWebhookSignature({
-  payload: rawBody, // The unparsed string body
-  signingSecret: process.env.RENEW_WEBHOOK_SECRET!,
-  signatureHeader: request.headers.get(renewWebhookHeaderNames.signature),
-  timestampHeader: request.headers.get(renewWebhookHeaderNames.timestamp),
-});
-
-if (!isValid) {
-  throw new Error("Invalid signature");
-}`,
-        },
-      },
-    ],
-  },
-  {
-    id: "sdk-react",
-    category: "sdk",
-    group: "Getting started",
-    navTitle: "React SDK",
-    title: "React components & hooks",
-    description: "Drop-in UI components and React tracking hooks.",
-    sections: [
-      {
-        id: "sdk-react-modal",
-        title: "Checkout Modal",
-        paragraphs: [
-          "The `RenewCheckoutModal` provides a full, unbranded checkout flow. Simply pass the `clientSecret` from your backend.",
-        ],
-        sample: {
-          label: "Checkout Modal Example",
-          language: "tsx",
-          filename: "CheckoutButton.tsx",
-          code: `import { useState } from "react";
-import { RenewCheckoutModal } from "@renew.sh/sdk/react";
-
-export function CheckoutButton({ clientSecret }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <button onClick={() => setOpen(true)}>Subscribe</button>
-
-      {open && (
-        <RenewCheckoutModal
-          clientSecret={clientSecret}
-          environment="sandbox" // or "live"
-          onClose={() => setOpen(false)}
-          onSuccess={() => console.log("Payment completed!")}
-        />
-      )}
-    </>
-  );
-}`,
-        },
-      },
-      {
-        id: "sdk-react-hooks",
-        title: "Client-side tracking",
-        paragraphs: [
-          "Use the `useRenewCheckoutSession` hook if you need to build a custom UI but still want to poll for session status updates.",
-        ],
-        sample: {
-          label: "Session hook",
-          language: "tsx",
-          filename: "CustomCheckout.tsx",
-          code: `import { useRenewCheckoutSession } from "@renew.sh/sdk/react";
-
-export function CustomCheckout({ clientSecret }) {
-  const { session, quote, submitCustomerData } = useRenewCheckoutSession({
-    environment: "sandbox",
-    clientSecret,
-    onSettled: () => alert("Payment successful!"),
-  });
-
-  if (!session) return <p>Loading...</p>;
-
-  return <div>Status: {session.status}</div>;
-}`,
-        },
-      },
-    ],
-  },
-  {
-    id: "sdk-core",
-    category: "sdk",
-    group: "Getting started",
-    navTitle: "Clients, events, and types",
-    title: "SDK exports",
-    description:
-      "What the SDK exports today.",
-    sections: [
-      {
-        id: "sdk-clients-checkout",
-        title: "Checkout and webhook helpers",
-        paragraphs: [
-          "These are the most common SDK entry points for application code.",
-        ],
-        references: [
-          {
-            label: "Client",
-            value: "createRenewCheckoutClient(config)",
-            detail: "Low-level checkout client for browser or server use.",
-          },
-          {
-            label: "Client",
-            value: "createRenewServerClient(config)",
-            detail: "Server wrapper around the checkout client.",
-          },
-          {
-            label: "Helper",
-            value: "verifyRenewWebhookSignature(input)",
-            detail: "Validate webhook signatures.",
-          },
-          {
-            label: "React",
-            value: "RenewCheckoutModal | useRenewCheckoutSession",
-            detail: "React checkout UI helpers.",
-          },
+          "`collection.created`",
+          "`collection.collecting`",
+          "`collection.paid`",
+          "`collection.failed`",
+          "`collection.cancelled`",
+          "`settlement.processing`",
+          "`settlement.settled`",
+          "`settlement.failed`",
         ],
       },
     ],

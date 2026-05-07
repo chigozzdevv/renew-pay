@@ -1,31 +1,21 @@
 # Renew
 
-**Fiat-in billing infrastructure with USDC settlement on Solana.**
+**Local fiat collection with stable settlement.**
 
-Renew lets merchants charge customers in local fiat, reconcile billing off-chain, and settle completed payments in USDC on Solana. It is built to solve the friction, low success rates, and poor reliability of card-based billing across many African markets by letting customers pay with the methods and currencies they already use and trust.
+Renew helps merchants collect local payments and settle in stable assets. Merchants create a collection, open Renew checkout, and Renew handles local collection, reconciliation, fees, payout tracking, and settlement.
 
-Renew uses Partna for local collection, Privy for authentication and wallet management, and Sumsub for KYC and KYB.
+Renew uses Partna for local collection, Privy for authentication, Sumsub for KYC/KYB, direct Solana settlement for standard payouts, and Umbra for private USDC settlement routes.
 
 ## Runtime Status
 
-Renew currently runs in test mode on Solana devnet with Partna test rails and Sumsub test KYC during onboarding.
+Renew runs in test mode on Solana devnet with Partna test collection and Sumsub test verification during onboarding.
 
-Live mode is not active yet. It will follow the Solana mainnet deployment and the production compliance rollout. The live stack will include KYC, KYB, AML, KYT, and Travel Rule controls for real-money activity, through our existing Sumsub integration.
-
-Current compliance config:
-
-- Test KYC: `SUMSUB_LEVEL_NAME_KYC_TEST`
-- Test KYB: `SUMSUB_LEVEL_NAME_KYB_TEST`
-- Live KYC: `SUMSUB_LEVEL_NAME_KYC_LIVE`
-- Live KYB: `SUMSUB_LEVEL_NAME_KYB_LIVE`
-
-- Live AML / KYT / Travel Rule: added with the Sumsub production compliance stack
+Live mode follows mainnet settlement configuration and production compliance controls.
 
 ## Quick Links
 
 - App: [app.renew.sh](https://app.renew.sh)
 - Docs: [app.renew.sh/docs](https://app.renew.sh/docs)
-- Playground: [app.renew.sh/playground](https://app.renew.sh/playground)
 - Sandbox API: [staging-pay.renew.sh](https://staging-pay.renew.sh)
 - Live API: [pay.renew.sh](https://pay.renew.sh)
 - SDK: [@renew.sh/sdk on npm](https://www.npmjs.com/package/@renew.sh/sdk)
@@ -35,164 +25,77 @@ Current compliance config:
 | Surface | Value |
 |---------|-------|
 | Auth | Privy |
-| Onboarding | Owner, business, market, payout wallet, verification |
-| Onramp | Partna |
-| Local billing markets | `GHS`, `KES`, `NGN` |
-| Settlement asset | `USDC` |
-| Settlement network | Solana |
+| Onboarding | Owner, business, markets, payout wallet, verification |
+| Collection | Partna |
+| Local markets | `GHS`, `KES`, `NGN` |
+| Standard settlement | Direct Solana SPL transfer |
+| Private settlement | Umbra USDC |
 | Verification | Sumsub |
-| Protocol program | Anchor program: `renew_protocol` |
-
-Server defaults come from [server/.env.example](./server/.env.example):
-
-- `SOLANA_CLUSTER_TEST=devnet`
-- `SOLANA_CLUSTER_LIVE=mainnet-beta`
 
 ## How Renew Works
 
 1. The merchant signs in with Privy.
-2. Onboarding completes the actual workspace setup: owner details, business details, supported billing markets, payout wallet, and verification.
-3. The merchant creates a subscription plan or invoice from the dashboard or API.
-4. Renew creates a checkout or invoice payment flow and provisions the customer’s local collection instructions through Partna.
-5. The customer pays in local fiat.
-6. Renew reconciles the onramp event, normalizes the value into USDC, and records settlement state.
-7. The protocol publishes route and settlement commitments on Solana where an auditable public anchor is useful.
-8. Stable settlement is paid to the merchant’s configured payout wallet.
+2. The merchant completes workspace setup and verification.
+3. The merchant creates a collection from the dashboard or API.
+4. Renew returns a hosted checkout URL.
+5. The customer pays through Renew checkout.
+6. Renew reconciles the collection, fees, and stable amount.
+7. Renew queues a payout against the collection’s settlement route.
+8. Settlement executes through direct Solana or Umbra private settlement.
 
 ## Architecture
 
-Renew uses a hybrid off-chain and on-chain architecture.
+Off-chain handles product logic, customer data, collection orchestration, payout state, notifications, webhooks, and dashboard aggregation.
 
-Off-chain handles business logic, customer data, onramp orchestration, and operational workflows.
+On-chain activity is limited to stable settlement transactions and privacy-provider transactions where the selected route uses Umbra.
 
-On-chain records only the route and settlement commitments that benefit from transparency without moving merchant operations into contract-heavy workflows.
+### Server
 
-### Off-chain
+- Auth and workspace sessions
+- Onboarding and verification
+- Collections, customers, settlement routes, payouts, and history
+- Partna collection, quotes, and webhooks
+- Direct Solana and Umbra payout execution
+- Developer keys and webhook delivery
 
-- Privy authentication and session exchange
-- Onboarding state and merchant workspace management
-- Hosted checkout, customer records, invoices, and subscriptions
-- Partna onramp orchestration, webhooks, and FX quotes
-- Notification delivery, job queues, and dashboard aggregation
-- Sumsub KYC / KYB orchestration
+### Client
 
-### On-chain
+- Marketing site
+- Privy sign-in
+- Onboarding
+- Dashboard: overview, collections, customers, settlement, payouts, history, settings
+- Hosted public checkout page at `/pay/{payId}`
 
-- Route configuration commitments
-- Settlement batch commitments
-- Public audit anchors for payment-route and settlement integrity
+### SDK
+
+[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides collection creation, checkout, and webhook verification.
+
+```ts
+import { checkout, renew } from "@renew.sh/sdk";
+
+const client = renew({
+  secretKey: process.env.RENEW_SECRET_KEY!,
+});
+
+const collection = await client.collections.create({
+  amount: 25000,
+  currency: "NGN",
+  reference: "order_1042",
+  description: "Order #1042",
+});
+
+await checkout.open(collection.checkoutUrl);
+```
 
 ## Project Structure
 
 ```text
 renew-pay/
-├── client/                # Next.js app: marketing site, auth, onboarding, dashboard
-├── server/                # Express API, billing engine, workers, webhooks
-├── contracts/             # Anchor / Rust Solana program: renew_protocol
-│   ├── programs/
-│   │   └── renew_protocol/
-│   ├── target/
-│   └── Anchor.toml
-├── packages/
-│   └── renew-sdk/         # Published SDK (@renew.sh/sdk)
-```
-
-### Client
-
-The client is a Next.js 16 app used for:
-
-- marketing pages
-- Privy sign-in
-- onboarding
-- dashboard surfaces for customers, plans, subscriptions, invoices, payments, developers, and settings
-- playground checkout testing
-
-### Server
-
-The server is an Express + TypeScript API used for:
-
-- auth and workspace session management
-- onboarding and verification orchestration
-- customers, plans, subscriptions, charges, and invoices
-- Partna onramp integration and webhooks
-- Solana commitment publishing and settlement tracking
-- developer keys and webhook delivery
-
-### Contracts
-
-The `contracts/` workspace contains the `renew_protocol` Solana program.
-
-- Program: `renew_protocol`
-- Test program address: `fScJ66UUXwsb4ogdFgYSZfEG7piyhTi4z9gZZe931oh`
-- Language: Rust
-- Framework: Anchor
-- Test config: Solana devnet
-
-### SDK
-
-[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides headless checkout clients, invoice helpers, server-side helpers, React checkout components, and webhook verification helpers.
-
-Install:
-
-```bash
-npm install @renew.sh/sdk
-```
-
-Environments:
-
-- `sandbox`
-- `live`
-
-Server usage:
-
-```ts
-import { createRenewServerClient } from "@renew.sh/sdk/server";
-
-const renew = createRenewServerClient({
-  environment: "sandbox",
-  secretKey: process.env.RENEW_SECRET_KEY!,
-});
-
-const plans = await renew.listCheckoutPlans();
-
-const { session, clientSecret } = await renew.createCheckoutSession({
-  planId: plans[0].id,
-});
-```
-
-React usage:
-
-```tsx
-"use client";
-
-import { useState } from "react";
-import {
-  RenewCheckoutModal,
-  createRenewCheckoutClient,
-} from "@renew.sh/sdk";
-
-const client = createRenewCheckoutClient({
-  environment: "sandbox",
-});
-
-export function CheckoutExample() {
-  const [session, setSession] = useState(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <RenewCheckoutModal
-      isOpen={isOpen}
-      client={client}
-      session={session}
-      clientSecret={clientSecret}
-      onClose={() => setIsOpen(false)}
-      onSettled={(nextSession) => {
-        console.log("Settled", nextSession.id);
-      }}
-    />
-  );
-}
+├── client/                # Next.js app
+├── server/                # Express API, workers, webhooks
+├── contracts/             # Solana commitment program workspace
+└── packages/
+    └── renew-sdk/         # Published SDK (@renew.sh/sdk)
 ```
 
 ## Tech Stack
@@ -203,8 +106,8 @@ export function CheckoutExample() {
 | Backend | Node.js, Express, MongoDB, Mongoose, BullMQ, Zod |
 | Auth | Privy |
 | Verification | Sumsub |
-| Payments | Partna |
-| Protocol | Solana, Anchor, SPL Token |
+| Collection | Partna |
+| Settlement | Solana, SPL Token, Umbra |
 | SDK | TypeScript, npm |
 
 ## Getting Started
@@ -214,8 +117,7 @@ export function CheckoutExample() {
 - Node.js `20.x`
 - MongoDB
 - Redis
-- Rust toolchain if you are working on the Solana program
-- Solana CLI and Anchor if you are building or deploying the program
+- Rust, Solana CLI, and Anchor if working in `contracts/`
 
 ### Client
 
@@ -238,89 +140,3 @@ npm run dev
 ```
 
 Default local URL: `http://localhost:4000`
-
-### Solana Program
-
-```bash
-cd contracts
-cargo test --workspace
-anchor build
-```
-
-The default local Anchor config is in [contracts/Anchor.toml](./contracts/Anchor.toml).
-
-### SDK
-
-```bash
-cd packages/renew-sdk
-npm install
-npm run build
-npm test
-```
-
-## Environment Highlights
-
-The full list lives in [server/.env.example](./server/.env.example). The most important groups are:
-
-### Core app
-
-- `APP_BASE_URL`
-- `API_BASE_URL`
-- `MONGODB_URI`
-- `MONGODB_DB_NAME`
-- `REDIS_URL`
-- `PAYMENT_ENV`
-
-### Solana / protocol
-
-- `SOLANA_CLUSTER_TEST`
-- `SOLANA_CLUSTER_LIVE`
-- `SOLANA_RPC_URL_TEST`
-- `SOLANA_RPC_URL_LIVE`
-- `SOLANA_WS_URL_TEST`
-- `SOLANA_WS_URL_LIVE`
-- `RENEW_PROGRAM_ID_TEST`
-- `RENEW_PROGRAM_ID_LIVE`
-- `RENEW_SETTLEMENT_MINT_TEST`
-- `RENEW_SETTLEMENT_MINT_LIVE`
-- `SOLANA_ADMIN_SECRET_KEY_TEST`
-- `SOLANA_ADMIN_SECRET_KEY_LIVE`
-- `SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_TEST`
-- `SOLANA_SETTLEMENT_AUTHORITY_SECRET_KEY_LIVE`
-
-### Partna
-
-- `PARTNA_V4_BASE_URL_TEST`
-- `PARTNA_V4_BASE_URL_LIVE`
-- `PARTNA_VOUCHERS_BASE_URL_TEST`
-- `PARTNA_VOUCHERS_BASE_URL_LIVE`
-- `PARTNA_API_KEY_TEST`
-- `PARTNA_API_KEY_LIVE`
-- `PARTNA_API_USER_TEST`
-- `PARTNA_API_USER_LIVE`
-- `PARTNA_WEBHOOK_PUBLIC_KEY_TEST`
-- `PARTNA_WEBHOOK_PUBLIC_KEY_LIVE`
-
-### Auth and verification
-
-- `PRIVY_APP_ID`
-- `PRIVY_APP_SECRET`
-- `SUMSUB_BASE_URL_TEST`
-- `SUMSUB_APP_TOKEN_TEST`
-- `SUMSUB_SECRET_KEY_TEST`
-- `SUMSUB_LEVEL_NAME_KYC_TEST`
-- `SUMSUB_LEVEL_NAME_KYB_TEST`
-- `SUMSUB_WEBHOOK_SECRET_TEST`
-- `SUMSUB_BASE_URL_LIVE`
-- `SUMSUB_APP_TOKEN_LIVE`
-- `SUMSUB_SECRET_KEY_LIVE`
-- `SUMSUB_LEVEL_NAME_KYC_LIVE`
-- `SUMSUB_LEVEL_NAME_KYB_LIVE`
-- `SUMSUB_WEBHOOK_SECRET_LIVE`
-
-### Platform auth
-
-- `PLATFORM_AUTH_ENABLED`
-- `PLATFORM_AUTH_JWT_SECRET`
-
-*`renew_protocol` has not yet undergone an external security audit. Treat this repository and its deployed program configuration as a test-environment system, not a production-ready deployment.*
