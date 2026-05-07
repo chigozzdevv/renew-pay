@@ -92,7 +92,7 @@ export const webhookActionSchema = z.object({
 export const createTestDeliverySchema = z.object({
   merchantId: objectIdSchema,
   environment: environmentInputSchema.default("test"),
-  eventType: eventTypeSchema.default("payment.settled"),
+  eventType: eventTypeSchema.default("collection.paid"),
   actor: z.string().trim().min(2).max(120).default("system"),
 });
 

@@ -604,6 +604,7 @@ export class PartnaRemoteProvider implements PartnaProvider {
         email: input.email,
         fullname: input.fullName,
         amount: input.amount,
+        currency: input.currency.trim().toUpperCase(),
         merchant: input.merchant,
       }
     );

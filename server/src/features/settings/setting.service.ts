@@ -32,6 +32,11 @@ function toSettingResponse(document: SettingDocument) {
       primaryWallet: document.wallets.primaryWallet ?? "",
       walletAlerts: document.wallets.walletAlerts,
     },
+    checkout: {
+      mode: document.checkout?.mode ?? "modal",
+      returnPage: document.checkout?.returnPage ?? null,
+      allowedDomains: document.checkout?.allowedDomains ?? [],
+    },
     notifications: {
       verificationAlerts: document.notifications.verificationAlerts,
       developerAlerts: document.notifications.developerAlerts,
@@ -155,6 +160,20 @@ export async function updateSettingsByMerchantId(
     }
   }
 
+  if (input.checkout) {
+    if (input.checkout.mode !== undefined) {
+      setting.checkout.mode = input.checkout.mode;
+    }
+
+    if (input.checkout.returnPage !== undefined) {
+      setting.checkout.returnPage = input.checkout.returnPage;
+    }
+
+    if (input.checkout.allowedDomains !== undefined) {
+      setting.checkout.allowedDomains = input.checkout.allowedDomains;
+    }
+  }
+
   if (input.notifications) {
     if (input.notifications.verificationAlerts !== undefined) {
       setting.notifications.verificationAlerts =
@@ -193,6 +212,7 @@ export async function updateSettingsByMerchantId(
     metadata: {
       business: Boolean(input.business),
       wallets: Boolean(input.wallets),
+      checkout: Boolean(input.checkout),
       notifications: Boolean(input.notifications),
       security: Boolean(input.security),
     },

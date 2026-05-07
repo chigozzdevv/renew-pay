@@ -112,10 +112,12 @@ async function syncLinkedPaymentFromPayout(payout: {
   const previousStatus = payment.status;
   const nextStatus = resolvePaymentStatusFromPayout(payout.status);
   payment.status = nextStatus;
-  payment.collection.status = nextStatus;
-  payment.collection.paidAt = nextStatus === "settled"
-    ? payment.collection.paidAt ?? new Date()
-    : payment.collection.paidAt;
+  if (nextStatus === "settled") {
+    payment.collection.paidAt = payment.collection.paidAt ?? new Date();
+  }
+  if (nextStatus === "failed" && payment.collection.status !== "paid") {
+    payment.collection.status = "failed";
+  }
   await payment.save();
 
   await emitPaymentWebhookEventForStatusChange({

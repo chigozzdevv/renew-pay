@@ -6,6 +6,29 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import { HttpError } from "@/shared/errors/http-error";
 import { getPublicApiHostForRuntimeMode, resolveRequestPublicApiRuntimeMode } from "@/shared/utils/public-api-host";
 
+export function hasDeveloperKeyCredentials(request: Request) {
+  const explicitHeader = request.header("x-renew-secret-key");
+
+  if (explicitHeader?.trim()) {
+    return true;
+  }
+
+  const authorization = request.header("authorization");
+
+  if (!authorization) {
+    return false;
+  }
+
+  const [scheme, token] = authorization.split(" ");
+
+  if (!scheme || !token || scheme.toLowerCase() !== "bearer") {
+    return false;
+  }
+
+  const normalized = token.trim();
+  return normalized.startsWith("rw_") || normalized.startsWith("rk_");
+}
+
 function getDeveloperKeyToken(request: Request) {
   const explicitHeader = request.header("x-renew-secret-key");
 

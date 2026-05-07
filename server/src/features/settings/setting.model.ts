@@ -86,6 +86,30 @@ const walletSettingsSchema = new Schema(
   }
 );
 
+const checkoutSettingsSchema = new Schema(
+  {
+    mode: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "modal",
+    },
+    returnPage: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    allowedDomains: {
+      type: [String],
+      required: true,
+      default: [],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const notificationSettingsSchema = new Schema(
   {
     developerAlerts: {
@@ -143,6 +167,11 @@ const settingSchema = new Schema(
     },
     wallets: {
       type: walletSettingsSchema,
+      required: true,
+      default: () => ({}),
+    },
+    checkout: {
+      type: checkoutSettingsSchema,
       required: true,
       default: () => ({}),
     },

@@ -14,7 +14,11 @@ import { notificationRouter } from "@/features/notifications/notification.routes
 import { onboardingRouter } from "@/features/onboarding/onboarding.routes";
 import { overviewRouter } from "@/features/overview/overview.routes";
 import { onrampRouter } from "@/features/onramps/onramp.routes";
-import { paymentRouter } from "@/features/payments/payment.routes";
+import {
+  collectionRouter,
+  paymentRouter,
+  publicPaymentRouter,
+} from "@/features/payments/payment.routes";
 import { payoutRouter } from "@/features/payouts/payout.routes";
 import { settlementRouter } from "@/features/settlement/settlement.routes";
 import { settingRouter } from "@/features/settings/setting.routes";
@@ -24,6 +28,7 @@ import {
   requirePlatformAuth,
   requirePlatformPermissions,
 } from "@/shared/middleware/platform-auth";
+import { requireWorkspaceApiAuth } from "@/shared/middleware/workspace-api-auth";
 
 export function createApp() {
   const app = express();
@@ -72,6 +77,7 @@ export function createApp() {
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
     app.use(`${apiBasePath}/onramps`, onrampRouter);
+    app.use(`${apiBasePath}/pay`, publicPaymentRouter);
     app.use(
       `${apiBasePath}/media`,
       requirePlatformAuth,
@@ -107,10 +113,15 @@ export function createApp() {
     );
     app.use(
       `${apiBasePath}/payments`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["payments", "settings"]),
+      requireWorkspaceApiAuth(["payments", "settings"]),
       blockLiveModeUntilLaunch(),
       paymentRouter
+    );
+    app.use(
+      `${apiBasePath}/collections`,
+      requireWorkspaceApiAuth(["payments", "settings"]),
+      blockLiveModeUntilLaunch(),
+      collectionRouter
     );
     app.use(
       `${apiBasePath}/settlement`,

@@ -24,7 +24,7 @@ import { HttpError } from "@/shared/errors/http-error";
 
 function assertTestOnboardingOnly(environment: RuntimeMode) {
   if (environment === "live") {
-    throw new HttpError(409, "Live onboarding is coming soon. Use test onboarding for now.");
+    throw new HttpError(409, "Live onboarding is not enabled.");
   }
 }
 

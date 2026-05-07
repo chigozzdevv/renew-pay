@@ -746,3 +746,65 @@ export async function quoteUsdAmountInCollectionCurrency(input: {
     raw: quote,
   };
 }
+
+export async function quoteLocalAmountInSettlementAsset(input: {
+  environment: RuntimeMode;
+  currency: string;
+  localAmount: number;
+}) {
+  const marketAsset = await getPreferredPartnaMarketAsset(
+    input.currency,
+    input.environment
+  );
+  const quote = (await createWidgetQuote({
+    environment: input.environment,
+    currency: input.currency,
+    localAmount: input.localAmount,
+    channelId: buildPartnaChannelId(input.currency, marketAsset.network),
+    coin: "USDC",
+    network: "SOLANA",
+    transactionType: "Buy",
+  })) as Record<string, unknown>;
+  const localAmount = toSafeNumber(
+    quote.convertedAmount,
+    Number(input.localAmount.toFixed(2))
+  );
+  const usdcAmount = Number(
+    Math.max(0.01, toSafeNumber(quote.cryptoAmount, input.localAmount)).toFixed(4)
+  );
+  const fxRate = Number(
+    Math.max(0.0001, localAmount > 0 ? localAmount / usdcAmount : 0).toFixed(4)
+  );
+  const feeAmount = Number(
+    (
+      toSafeNumber(quote.serviceFeeUSD) + toSafeNumber(quote.partnerFeeUSD)
+    ).toFixed(2)
+  );
+  const marketMetadata = getPartnaMarketMetadata(input.currency, marketAsset.symbol);
+
+  return {
+    currency: input.currency,
+    localAmount,
+    usdcAmount,
+    fxRate,
+    feeAmount,
+    expiresAt: null,
+    settlementAsset: "USDC" as const,
+    settlementNetwork: "SOLANA" as const,
+    channel: {
+      externalId: buildPartnaChannelId(input.currency, marketAsset.network),
+      country: marketMetadata.countryCodes[0] ?? input.currency,
+      channelType: getPartnaChannelType(marketAsset.network),
+      estimatedSettlementTime: 0,
+      min: marketAsset.minimumWithdrawal ?? 0,
+      max: Number.MAX_SAFE_INTEGER,
+    },
+    network: {
+      externalId: buildPartnaNetworkId(marketAsset.network),
+      name: getPartnaNetworkName(marketAsset.network),
+      country: marketMetadata.countryCodes[0] ?? input.currency,
+      accountNumberType: getPartnaAccountNumberType(marketAsset.network),
+    },
+    raw: quote,
+  };
+}

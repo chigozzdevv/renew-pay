@@ -9,9 +9,10 @@ import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environme
 
 function resolveEnvironment(request: Request) {
   return optionalEnvironmentInputSchema.parse(
-    typeof request.query.environment === "string"
+    request.developerAuth?.environment ??
+    (typeof request.query.environment === "string"
       ? request.query.environment
-      : request.body?.environment
+      : request.body?.environment)
   );
 }
 

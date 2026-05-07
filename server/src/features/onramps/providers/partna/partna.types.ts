@@ -54,6 +54,7 @@ export type PartnaVoucherInput = {
   email: string;
   fullName: string;
   amount: number;
+  currency: string;
   merchant: string;
 };
 

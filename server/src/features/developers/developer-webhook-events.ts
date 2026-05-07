@@ -1,6 +1,8 @@
 export const developerWebhookEventNames = [
-  "payment.failed",
-  "payment.settled",
+  "collection.paid",
+  "collection.failed",
+  "settlement.settled",
+  "settlement.failed",
 ] as const;
 
 export type DeveloperWebhookEventName =

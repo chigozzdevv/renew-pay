@@ -77,7 +77,7 @@ export function assertUmbraConfigured(mode: RuntimeMode) {
   if (!config.rpcUrl || !config.rpcSubscriptionsUrl) {
     throw new HttpError(
       409,
-      "Umbra RPC and subscription URLs are required for this environment."
+      "Solana RPC and WebSocket URLs are required for this environment."
     );
   }
 

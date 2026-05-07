@@ -61,6 +61,21 @@ function createEventId(prefix: string) {
   return `evt_${prefix}_${randomBytes(8).toString("hex")}`;
 }
 
+function asRecord(value: unknown) {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readString(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 async function createDelivery(input: CreateDeliveryInput) {
   try {
     return await DeveloperDeliveryModel.create({
@@ -181,6 +196,8 @@ async function buildPaymentWebhookPayload(input: {
     .exec();
   const environment: RuntimeMode =
     payment.environment === "live" ? "live" : "test";
+  const metadata = asRecord(payment.metadata);
+  const reference = readString(metadata.reference) ?? payment.payId;
 
   return {
     merchantId: payment.merchantId.toString(),
@@ -192,6 +209,26 @@ async function buildPaymentWebhookPayload(input: {
       environment: toPublicEnvironment(environment),
       livemode: environment === "live",
       data: {
+        collection: {
+          id: payment.payId,
+          paymentId: payment._id.toString(),
+          reference,
+          amount: payment.amount,
+          currency: payment.currency,
+          description: payment.description,
+          recurring: payment.recurring?.enabled ?? false,
+          status:
+            payment.status === "open"
+              ? "created"
+              : payment.status === "pending"
+                ? "collecting"
+                : payment.status === "failed" || payment.status === "cancelled"
+                  ? payment.status
+                  : "paid",
+          checkoutUrl: payment.paymentUrl,
+          paidAt: payment.collection.paidAt ?? null,
+          metadata,
+        },
         payment: {
           id: payment._id.toString(),
           payId: payment.payId,
@@ -257,14 +294,15 @@ function createTestWebhookPayload(input: {
       data: {
         mode: "test_delivery",
         merchantId: input.merchantId,
-        payment: {
-          id: `test_payment_${randomBytes(6).toString("hex")}`,
-          payId: `pay_${randomBytes(6).toString("hex")}`,
+        collection: {
+          id: `col_${randomBytes(6).toString("hex")}`,
+          paymentId: `test_payment_${randomBytes(6).toString("hex")}`,
+          reference: "order_test",
           externalId: `partna_${randomBytes(4).toString("hex")}`,
-          status: input.eventType === "payment.failed" ? "failed" : "settled",
+          status: input.eventType === "collection.failed" ? "failed" : "paid",
           amount: 120000,
           currency: "NGN",
-          description: "Test payment",
+          description: "Test collection",
           recurring: false,
           localAmount: 120000,
           fxRate: 1600,
@@ -273,7 +311,7 @@ function createTestWebhookPayload(input: {
           paidAt: now.toISOString(),
         },
         settlement:
-          input.eventType === "payment.settled"
+          input.eventType === "settlement.settled"
             ? {
                 id: `test_settlement_${randomBytes(6).toString("hex")}`,
                 status: "settled",
@@ -358,16 +396,31 @@ export async function emitPaymentWebhookEventForStatusChange(input: {
   if (input.nextStatus === "failed") {
     return emitPaymentWebhookEvent({
       paymentId: input.paymentId,
-      eventType: "payment.failed",
-      eventId: `evt_payment_${input.paymentId}_failed`,
+      eventType: ["paid", "settling", "settled"].includes(input.previousStatus ?? "")
+        ? "settlement.failed"
+        : "collection.failed",
+      eventId: ["paid", "settling", "settled"].includes(input.previousStatus ?? "")
+        ? `evt_settlement_${input.paymentId}_failed`
+        : `evt_collection_${input.paymentId}_failed`,
+    });
+  }
+
+  if (
+    ["paid", "settling", "settled"].includes(input.nextStatus) &&
+    !["paid", "settling", "settled"].includes(input.previousStatus ?? "")
+  ) {
+    return emitPaymentWebhookEvent({
+      paymentId: input.paymentId,
+      eventType: "collection.paid",
+      eventId: `evt_collection_${input.paymentId}_paid`,
     });
   }
 
   if (input.nextStatus === "settled") {
     return emitPaymentWebhookEvent({
       paymentId: input.paymentId,
-      eventType: "payment.settled",
-      eventId: `evt_payment_${input.paymentId}_settled`,
+      eventType: "settlement.settled",
+      eventId: `evt_settlement_${input.paymentId}_settled`,
     });
   }
 

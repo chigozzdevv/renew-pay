@@ -46,6 +46,12 @@ const walletSettingsSchema = z.object({
   walletAlerts: z.boolean().optional(),
 });
 
+const checkoutSettingsSchema = z.object({
+  mode: z.enum(["modal", "redirect"]).optional(),
+  returnPage: nullableUrlSchema.optional(),
+  allowedDomains: z.array(z.string().trim().min(2).max(160)).max(25).optional(),
+});
+
 const notificationSettingsSchema = z.object({
   verificationAlerts: z.boolean().optional(),
   developerAlerts: z.boolean().optional(),
@@ -63,6 +69,7 @@ export const updateSettingsSchema = z
     environment: environmentInputSchema.default("test"),
     business: businessSettingsSchema.optional(),
     wallets: walletSettingsSchema.optional(),
+    checkout: checkoutSettingsSchema.optional(),
     notifications: notificationSettingsSchema.optional(),
     security: securitySettingsSchema.optional(),
   })
@@ -70,6 +77,7 @@ export const updateSettingsSchema = z
     (value) =>
       value.business !== undefined ||
       value.wallets !== undefined ||
+      value.checkout !== undefined ||
       value.notifications !== undefined ||
       value.security !== undefined,
     {

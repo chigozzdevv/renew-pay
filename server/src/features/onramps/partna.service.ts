@@ -12,9 +12,10 @@ import type {
 } from "@/features/onramps/providers/partna/partna.types";
 import { CustomerModel } from "@/features/customers/customer.model";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
-import { PaymentModel } from "@/features/payments/payment.model";
+import { PaymentModel, type PaymentRecord } from "@/features/payments/payment.model";
 import { queuePayoutProcessing } from "@/features/payouts/payout.service";
 import { PayoutModel } from "@/features/payouts/payout.model";
+import { SettlementRouteModel } from "@/features/settlement/settlement-route.model";
 import { isSolanaAddress } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
@@ -197,6 +198,8 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
   environment: RuntimeMode;
   verification: {
     bvn: string;
+    kesMobileNetwork?: string | null;
+    kesShortcode?: string | null;
   };
 }) {
   const customer = await CustomerModel.findById(input.customerId).exec();
@@ -230,6 +233,8 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
   const methods = await provider.initiateBvnKyc({
     accountName,
     bvn: input.verification.bvn,
+    kesMobileNetwork: input.verification.kesMobileNetwork,
+    kesShortcode: input.verification.kesShortcode,
   });
   if (methods.length === 0) {
     throw new HttpError(
@@ -279,6 +284,8 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterMetho
   environment: RuntimeMode;
   verification: {
     verificationMethod: string;
+    accountNumber?: string | null;
+    bankCode?: string | null;
   };
   accountName?: string | null;
 }) {
@@ -344,6 +351,8 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterMetho
     otpDispatchResult = await provider.handleBvnOtpMethod({
       accountName,
       verificationMethod: selectedMethod,
+      accountNumber: input.verification.accountNumber,
+      bankCode: input.verification.bankCode,
     });
     phoneConfirmationRequired = responseRequiresPartnaPhoneConfirmation(otpDispatchResult);
     phoneConfirmationMessage = phoneConfirmationRequired
@@ -376,6 +385,8 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterMetho
         verificationMethods: storedMethods,
         selectedVerificationMethod: selectedMethod,
         selectedVerificationHint: selectedMethodRecord?.hint ?? null,
+        selectedAccountNumber: input.verification.accountNumber?.trim() ?? null,
+        selectedBankCode: input.verification.bankCode?.trim() ?? null,
         otpDispatchMessage: phoneConfirmationMessage,
       },
     },
@@ -444,6 +455,8 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterPhone
   const otpDispatchResult = await provider.handleBvnOtpMethod({
     accountName,
     verificationMethod: selectedVerificationMethod,
+    accountNumber: readString(existingRaw.selectedAccountNumber),
+    bankCode: readString(existingRaw.selectedBankCode),
   });
 
   customer.paymentProvider = "partna";
@@ -638,6 +651,62 @@ async function applyPartnaFeeState(input: {
   };
 }
 
+async function createPayoutForPartnaPayment(
+  payment: PaymentRecord,
+  environment: RuntimeMode
+) {
+  const existingPayout = await PayoutModel.findOne({
+    sourcePaymentId: payment._id,
+    ...createRuntimeModeCondition("environment", environment),
+  })
+    .sort({ createdAt: -1 })
+    .exec();
+
+  if (existingPayout) {
+    return existingPayout;
+  }
+
+  if (!payment.settlementRouteId) {
+    throw new HttpError(409, "Payment does not have a settlement route.");
+  }
+
+  const route = await SettlementRouteModel.findById(payment.settlementRouteId).exec();
+
+  if (!route?.destinationAddress) {
+    throw new HttpError(409, "Payment settlement route is not configured.");
+  }
+
+  const grossUsdc = Number((payment.collection.stableAmount ?? 0).toFixed(6));
+
+  if (grossUsdc <= 0) {
+    throw new HttpError(409, "Payment is missing settlement amount.");
+  }
+
+  const feeUsdc = Number((payment.collection.feeAmount ?? 0).toFixed(6));
+  const netUsdc = Number(Math.max(0, grossUsdc - feeUsdc).toFixed(6));
+
+  if (netUsdc <= 0) {
+    throw new HttpError(409, "Payment settlement amount is fully consumed by fees.");
+  }
+
+  return PayoutModel.create({
+    merchantId: payment.merchantId,
+    environment,
+    sourcePaymentId: payment._id,
+    batchRef: `pay:${payment.payId}`,
+    sourceKind: "payment",
+    commercialRef: payment.payId,
+    localAmount: payment.collection.localAmount ?? payment.amount,
+    fxRate: payment.collection.fxRate ?? null,
+    grossUsdc,
+    feeUsdc,
+    netUsdc,
+    destinationWallet: route.destinationAddress,
+    status: "queued",
+    scheduledFor: new Date(),
+  });
+}
+
 function eventIsVoucherSuccess(payload: PartnaWebhookPayload) {
   const event = readString(payload.event)?.toLowerCase() ?? "";
   const status = readString(asRecord(payload.data)?.status)?.toLowerCase() ?? "";
@@ -750,7 +819,7 @@ export async function processPartnaWebhook(
     return webhookEvent.result as Record<string, unknown>;
   }
 
-  const linkedSettlement = await PayoutModel.findOne({
+  let linkedSettlement = await PayoutModel.findOne({
     sourcePaymentId: payment._id,
     ...createRuntimeModeCondition("environment", environment),
   })
@@ -777,6 +846,7 @@ export async function processPartnaWebhook(
       email:
         readString(payloadData?.email) ??
         readString(asRecord(payment.metadata)?.email) ??
+        readString(asRecord(payment.metadata)?.payerEmail) ??
         "",
       voucherCode,
       currency: "USDC",
@@ -784,7 +854,6 @@ export async function processPartnaWebhook(
       cryptoAddress: collectionWallet,
     });
 
-    payment.status = linkedSettlement ? "settling" : "paid";
     payment.collection.status = "paid";
     payment.collection.paidAt = payment.collection.paidAt ?? new Date();
     payment.metadata = {
@@ -794,6 +863,7 @@ export async function processPartnaWebhook(
       email:
         readString(payloadData?.email) ??
         readString(asRecord(payment.metadata)?.email) ??
+        readString(asRecord(payment.metadata)?.payerEmail) ??
         null,
     };
     await applyPartnaFeeState({
@@ -802,6 +872,12 @@ export async function processPartnaWebhook(
       payloadData,
       redeemResult: asRecord(redeemResult) ?? null,
     });
+
+    if (!linkedSettlement) {
+      linkedSettlement = await createPayoutForPartnaPayment(payment, environment);
+    }
+
+    payment.status = linkedSettlement ? "settling" : "paid";
     await payment.save();
 
     if (

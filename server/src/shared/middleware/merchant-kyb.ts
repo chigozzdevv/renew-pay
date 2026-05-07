@@ -8,6 +8,10 @@ function resolveMerchantScope(request: Request) {
     return request.platformAuthUser.merchantId;
   }
 
+  if (request.developerAuth?.merchantId) {
+    return request.developerAuth.merchantId;
+  }
+
   if (typeof request.params.merchantId === "string") {
     return request.params.merchantId.trim();
   }
@@ -35,9 +39,10 @@ export function requireMerchantKybApproved(
     try {
       const merchantId = resolveMerchantScope(request);
       const environment = optionalEnvironmentInputSchema.parse(
-        typeof request.query.environment === "string"
+        request.developerAuth?.environment ??
+        (typeof request.query.environment === "string"
           ? request.query.environment
-          : request.body?.environment
+          : request.body?.environment)
       );
 
       if (!merchantId || !environment) {
