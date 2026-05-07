@@ -9,43 +9,31 @@ export type WorkspaceSettings = {
     name: string;
     supportEmail: string;
     defaultMarket: string;
-    invoicePrefix: string;
-    billingTimezone: string;
-    billingDisplay: string;
+    timezone: string;
+    displayMode: string;
     fallbackCurrency: string;
     statementDescriptor: string;
     brandAccent: string;
     logoUrl: string | null;
     customerDomain: string;
-    invoiceFooter: string;
-  };
-  billing: {
-    retryPolicy: string;
-    invoiceGraceDays: number;
-    autoRetries: boolean;
-    meterApproval: boolean;
   };
   wallets: {
     primaryWallet: string;
     walletAlerts: boolean;
   };
+  checkout: {
+    mode: "modal" | "redirect";
+    returnPage: string | null;
+    allowedDomains: string[];
+  };
   notifications: {
-    customerSubscriptionEmails: boolean;
-    customerReceiptEmails: boolean;
-    customerPaymentFollowUps: boolean;
-    merchantSubscriptionAlerts: boolean;
-    merchantPaymentDigestFrequency: "off" | "daily" | "weekly" | "monthly";
-    merchantPaymentDigestMode: "counts" | "detailed";
-    teamInviteEmails: boolean;
     verificationAlerts: boolean;
     developerAlerts: boolean;
     securityAlerts: boolean;
   };
   security: {
     sessionTimeout: string;
-    inviteDomainPolicy: string;
     enforceTwoFactor: boolean;
-    restrictInviteDomains: boolean;
   };
   createdAt: string;
   updatedAt: string;
@@ -73,7 +61,7 @@ export async function updateWorkspaceSettings(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  payload: Partial<Pick<WorkspaceSettings, "business" | "billing" | "wallets" | "notifications" | "security">>;
+  payload: Partial<Pick<WorkspaceSettings, "business" | "wallets" | "checkout" | "notifications" | "security">>;
 }) {
   const response = await fetchApi<WorkspaceSettings>(
     `/settings/${input.merchantId}`,

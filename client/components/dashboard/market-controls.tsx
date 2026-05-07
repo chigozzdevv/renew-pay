@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { BillingMarketCatalogEntry } from "@/lib/markets";
+import type { CollectionMarketCatalogEntry } from "@/lib/markets";
 
-export function formatMarketOptionLabel(option: BillingMarketCatalogEntry) {
+export function formatMarketOptionLabel(option: CollectionMarketCatalogEntry) {
   const countrySummary =
     option.countries.length > 2
       ? `${option.countries.slice(0, 2).join(", ")} +${option.countries.length - 2}`
@@ -24,7 +24,7 @@ export function MarketMultiSelect({
   placeholder = "Select markets",
   disabled = false,
 }: {
-  options: BillingMarketCatalogEntry[];
+  options: CollectionMarketCatalogEntry[];
   value: string[];
   onChange: (value: string[]) => void;
   allLabel?: string;

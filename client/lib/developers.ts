@@ -3,8 +3,10 @@
 import { fetchApi, type ApiPagination } from "@/lib/api";
 
 export const supportedWebhookEvents = [
-  "charge.failed",
-  "charge.settled",
+  "collection.paid",
+  "collection.failed",
+  "settlement.settled",
+  "settlement.failed",
 ] as const;
 
 export type SupportedWebhookEvent = (typeof supportedWebhookEvents)[number];

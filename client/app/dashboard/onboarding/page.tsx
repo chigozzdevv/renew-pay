@@ -9,7 +9,7 @@ import { useResource } from "@/components/dashboard/use-resource";
 import { Badge, Button, InlineLoading, Input, LoadingState } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
 import { ApiError } from "@/lib/api";
-import { loadBillingMarketCatalog } from "@/lib/markets";
+import { loadCollectionMarketCatalog } from "@/lib/markets";
 import {
   registerOnboardingMerchant,
   loadOnboardingState,
@@ -195,7 +195,7 @@ function useOnboardingWorkspace() {
     error: marketCatalogError,
   } = useResource(
     ({ token, merchantId }) =>
-      loadBillingMarketCatalog({
+      loadCollectionMarketCatalog({
         token,
         merchantId,
         environment: mode,
@@ -344,7 +344,7 @@ function BusinessStep({
   token: string;
   businessDraft: OnboardingState["business"];
   setBusinessDraft: (updater: (current: OnboardingState["business"] | null) => OnboardingState["business"] | null) => void;
-  marketOptions: Awaited<ReturnType<typeof loadBillingMarketCatalog>>["markets"];
+  marketOptions: Awaited<ReturnType<typeof loadCollectionMarketCatalog>>["markets"];
   isMarketCatalogLoading: boolean;
   marketCatalogError: string | null;
   busyAction: string | null;
@@ -547,9 +547,6 @@ function PayoutStep({
           placeholder="Solana wallet address"
         />
       </label>
-      <div className="rounded-2xl border border-[color:var(--line)] bg-[#f5f4ef] px-4 py-3 text-sm text-[color:var(--muted)]">
-        Bank transfer payout is coming soon.
-      </div>
       <Button
         type="button"
         tone="brand"

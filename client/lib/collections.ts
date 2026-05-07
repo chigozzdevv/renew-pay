@@ -2,18 +2,15 @@
 
 import { fetchApi, type ApiPagination } from "@/lib/api";
 
-export type PaymentRecord = {
+export type CollectionRecord = {
   id: string;
-  merchantId: string;
-  environment: "test" | "live";
-  payId: string;
-  customerId: string | null;
-  settlementRouteId: string | null;
+  paymentId: string;
+  reference: string;
   amount: number;
   currency: string;
   description: string;
-  status: "open" | "pending" | "paid" | "settling" | "settled" | "failed" | "cancelled";
-  paymentUrl: string;
+  status: "created" | "collecting" | "paid" | "failed" | "cancelled";
+  checkoutUrl: string;
   recurring: {
     enabled: boolean;
     interval: "day" | "week" | "month" | "year" | null;
@@ -21,23 +18,19 @@ export type PaymentRecord = {
     startsAt: string | null;
     endsAt: string | null;
   };
-  collection: {
-    provider: "partna";
-    status: string;
-    externalId: string | null;
-    localAmount: number | null;
-    fxRate: number | null;
-    stableAmount: number | null;
-    feeAmount: number | null;
-    paidAt: string | null;
-  };
+  settlement: { id: string } | null;
+  customer: {
+    reference: string | null;
+    email: string | null;
+    name: string | null;
+  } | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PaymentPage = {
-  payments: PaymentRecord[];
+export type CollectionPage = {
+  collections: CollectionRecord[];
   pagination: ApiPagination;
 };
 
@@ -57,18 +50,18 @@ function resolvePagination(
   );
 }
 
-export async function loadPaymentPage(input: {
+export async function loadCollectionPage(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  status?: PaymentRecord["status"] | "all";
+  status?: CollectionRecord["status"] | "all";
   recurring?: boolean | "all";
   search?: string;
   page: number;
   limit?: number;
 }) {
   const limit = input.limit ?? 20;
-  const response = await fetchApi<PaymentRecord[]>("/payments", {
+  const response = await fetchApi<CollectionRecord[]>("/collections", {
     token: input.token,
     query: {
       merchantId: input.merchantId,
@@ -82,20 +75,20 @@ export async function loadPaymentPage(input: {
   });
 
   return {
-    payments: response.data,
+    collections: response.data,
     pagination: resolvePagination(response.pagination, input.page, limit, response.data.length),
-  } satisfies PaymentPage;
+  } satisfies CollectionPage;
 }
 
-export async function createPayment(input: {
+export async function createCollection(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  customerId?: string | null;
-  settlementRouteId?: string | null;
+  reference: string;
+  settlement?: string | null;
   amount: number;
   currency: string;
-  description: string;
+  description?: string;
   recurring: {
     enabled: boolean;
     interval?: "day" | "week" | "month" | "year" | null;
@@ -104,17 +97,17 @@ export async function createPayment(input: {
     endsAt?: string | null;
   };
 }) {
-  const response = await fetchApi<PaymentRecord>("/payments", {
+  const response = await fetchApi<CollectionRecord>("/collections", {
     method: "POST",
     token: input.token,
     body: JSON.stringify({
       merchantId: input.merchantId,
       environment: input.environment,
-      customerId: input.customerId ?? null,
-      settlementRouteId: input.settlementRouteId ?? null,
+      reference: input.reference,
+      settlement: input.settlement || undefined,
       amount: input.amount,
       currency: input.currency,
-      description: input.description,
+      description: input.description?.trim() || undefined,
       recurring: input.recurring,
     }),
   });

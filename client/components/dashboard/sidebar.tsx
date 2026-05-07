@@ -26,14 +26,14 @@ export function DashboardSidebar({
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden",
         mobile
-          ? "rounded-[1.75rem] border border-white/85 bg-white/96 p-4 shadow-[0_30px_90px_rgba(16,32,20,0.12)]"
-          : "border-r border-[color:var(--line)] bg-white px-4 py-5",
+          ? "rounded-xl border border-[color:var(--line)] bg-white p-3 shadow-[0_20px_60px_rgba(16,32,20,0.12)]"
+          : "border-r border-[color:var(--line)] bg-white px-3 py-4",
       )}
     >
       <Link
         href="/"
         onClick={onNavigate}
-        className="inline-flex w-fit items-center rounded-2xl px-2 py-2"
+        className="inline-flex w-fit items-center rounded-lg px-2 py-2"
         aria-label="Renew home"
       >
         <Logo size="compact" />
@@ -52,7 +52,7 @@ export function DashboardSidebar({
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold tracking-[-0.02em] transition-all duration-200",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-black/4 text-[color:var(--ink)]"
                     : "text-[color:var(--muted)] hover:bg-black/4 hover:text-[color:var(--ink)]",
@@ -60,7 +60,7 @@ export function DashboardSidebar({
               >
                 <span
                   className={cn(
-                    "inline-flex h-9 w-9 items-center justify-center rounded-2xl transition-colors",
+                    "inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
                     isActive
                       ? "bg-white text-[color:var(--ink)] shadow-[inset_0_0_0_1px_rgba(12,18,14,0.04)]"
                       : "bg-black/4 text-[color:var(--muted)]",
@@ -79,13 +79,13 @@ export function DashboardSidebar({
         <button
           type="button"
           onClick={signOut}
-          className="flex w-full items-center justify-between rounded-2xl border border-[color:var(--line)] bg-white/82 px-4 py-3 text-left transition-all duration-200 hover:border-black/8 hover:bg-[#f5f4ef]"
+          className="flex w-full items-center justify-between rounded-lg border border-[color:var(--line)] bg-white px-3 py-2.5 text-left transition-colors hover:bg-[color:var(--soft)]"
         >
           <span className="inline-flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-black/4 text-[color:var(--muted)]">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/4 text-[color:var(--muted)]">
               <SidebarSignOutIcon className="h-[18px] w-[18px]" />
             </span>
-            <span className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+            <span className="text-sm font-medium text-[color:var(--ink)]">
               Sign out
             </span>
           </span>
@@ -129,15 +129,6 @@ function SidebarIcon({ icon, className }: SidebarIconProps) {
           <path d="M4 14L10 17L16 14" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
         </svg>
       );
-    case "refresh":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
-          <path d="M15.5 7.5A5.8 5.8 0 0 0 5.1 5.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-          <path d="M4.8 2.8V6.3H8.3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M4.5 12.5A5.8 5.8 0 0 0 14.9 14.3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-          <path d="M15.2 17.2V13.7H11.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
     case "receipt":
       return (
         <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
@@ -155,13 +146,12 @@ function SidebarIcon({ icon, className }: SidebarIconProps) {
           <path d="M6.5 12.3H9.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       );
-    case "team":
+    case "wallet":
       return (
         <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
-          <circle cx="6.5" cy="8" r="2" stroke="currentColor" strokeWidth="1.7" />
-          <circle cx="13.5" cy="8" r="2" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M3.8 14.2C4.4 12.7 5.7 12 7 12C8.3 12 9.6 12.7 10.2 14.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-          <path d="M9.8 14.2C10.4 12.7 11.7 12 13 12C14.3 12 15.6 12.7 16.2 14.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H15v12H6.5A2.5 2.5 0 0 1 4 13.5v-7Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M14 9H17V13H14A2 2 0 0 1 14 9Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M6.2 7H13.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       );
     case "code":
@@ -170,18 +160,6 @@ function SidebarIcon({ icon, className }: SidebarIconProps) {
           <path d="M7.3 6.2L3.8 10L7.3 13.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M12.7 6.2L16.2 10L12.7 13.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M11.2 4.8L8.8 15.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        </svg>
-      );
-    case "shield":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
-          <path
-            d="M10 3.5L15.2 5.6V9.2C15.2 12.4 13.1 15.3 10 16.5C6.9 15.3 4.8 12.4 4.8 9.2V5.6L10 3.5Z"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinejoin="round"
-          />
-          <path d="M8.1 10.1L9.4 11.4L12.4 8.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "gear":

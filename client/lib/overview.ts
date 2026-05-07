@@ -5,26 +5,29 @@ import { fetchApi } from "@/lib/api";
 export type DashboardOverview = {
   stats: {
     totalCustomers: number;
-    atRiskCustomers: number;
-    activePlans: number;
-    meteredPlans: number;
-    activeSubscriptions: number;
-    pendingSettlements: number;
-    readyNetUsdc: number;
+    openPayments: number;
+    paidPaymentsToday: number;
+    failedPayments: number;
+    pendingPayouts: number;
+    activeSettlementRoutes: number;
+    payoutReadyUsdc: number;
     settledUsdc30d: number;
   };
   marketMix: Array<{
-    market: string;
+    currency: string;
     totalVolume: number;
+    count: number;
     share: number;
   }>;
-  upcomingRenewals: Array<{
-    subscriptionId: string;
-    customerName: string;
-    planName: string;
-    billingCurrency: string;
-    localAmount: number;
-    nextChargeAt: string;
+  recentActivity: Array<{
+    id: string;
+    type: "payment" | "payout";
+    title: string;
+    status: string;
+    amount: number;
+    currency: string;
+    reference: string;
+    createdAt: string;
   }>;
 };
 
@@ -33,7 +36,7 @@ export async function loadDashboardOverview(input: {
   merchantId: string;
   environment: "test" | "live";
 }) {
-  const response = await fetchApi<DashboardOverview>("/dashboard/overview", {
+  const response = await fetchApi<DashboardOverview>("/overview", {
     token: input.token,
     query: {
       merchantId: input.merchantId,

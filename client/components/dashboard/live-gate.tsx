@@ -28,7 +28,7 @@ export function LiveGate() {
               <p className="max-w-2xl text-sm leading-7 text-[color:var(--muted)] sm:text-[15px]">
                 Live onboarding will open after the security audit and mainnet
                 deployment are complete, followed by merchant KYB and operator
-                KYC. Use test mode for billing work for now.
+                KYC. Use test mode for payment work for now.
               </p>
             </div>
 

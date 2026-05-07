@@ -1,13 +1,10 @@
 export type DashboardRouteKey =
   | "overview"
+  | "collections"
+  | "settlement"
   | "customers"
-  | "plans"
-  | "subscriptions"
-  | "invoices"
-  | "payments"
-  | "teams"
-  | "developers"
-  | "audit"
+  | "payouts"
+  | "history"
   | "settings";
 
 export type DashboardNavItem = {
@@ -18,11 +15,9 @@ export type DashboardNavItem = {
     | "home"
     | "users"
     | "stack"
-    | "refresh"
     | "receipt"
     | "card"
-    | "shield"
-    | "team"
+    | "wallet"
     | "code"
     | "gear";
 };

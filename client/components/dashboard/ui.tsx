@@ -25,16 +25,16 @@ export function PageState({
   return (
     <div
       className={cn(
-        "rounded-[2rem] border p-6",
+        "rounded-xl border p-5",
         tone === "danger"
           ? "border-[#cfa7a0] bg-[#fff7f6]"
           : "border-[color:var(--line)] bg-white/82"
       )}
     >
-      <h2 className="font-display text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+      <h2 className="font-display text-xl font-semibold text-[color:var(--ink)]">
         {title}
       </h2>
-      <p className="mt-2 max-w-xl text-sm leading-7 text-[color:var(--muted)]">
+      <p className="mt-2 max-w-xl text-sm leading-6 text-[color:var(--muted)]">
         {message}
       </p>
       {action ? <div className="mt-5">{action}</div> : null}
@@ -52,12 +52,12 @@ export function LoadingState({
   return (
     <div
       className={cn(
-        "flex min-h-[28rem] items-center justify-center rounded-[2rem] border border-[color:var(--line)] bg-white p-8",
+        "flex min-h-[24rem] items-center justify-center rounded-xl border border-[color:var(--line)] bg-white p-8",
         className
       )}
     >
       <div className="flex flex-col items-center gap-4 text-center">
-        <span className="inline-flex h-14 w-14 animate-spin items-center justify-center rounded-full border border-[color:var(--line)] bg-[#f8f8fb] text-[color:var(--ink)]">
+        <span className="inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--soft)] text-[color:var(--ink)]">
           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none">
             <path
               d="M12 3.5V6.1M12 17.9V20.5M20.5 12H17.9M6.1 12H3.5M18.01 5.99L16.17 7.83M7.83 16.17L5.99 18.01M18.01 18.01L16.17 16.17M7.83 7.83L5.99 5.99"
@@ -117,17 +117,17 @@ export function Card({
   return (
     <div
       className={cn(
-        "self-start rounded-[2rem] border border-[color:var(--line)] bg-white p-5 shadow-[0_18px_70px_rgba(16,32,20,0.04)] sm:p-6",
+          "self-start rounded-xl border border-[color:var(--line)] bg-white p-4 shadow-[0_10px_36px_rgba(16,32,20,0.035)] sm:p-5",
         className
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-2xl font-semibold tracking-[-0.05em] text-[color:var(--ink)]">
+          <h2 className="font-display text-xl font-semibold text-[color:var(--ink)]">
             {title}
           </h2>
           {description ? (
-            <p className="mt-2 text-sm leading-7 text-[color:var(--muted)]">
+            <p className="mt-1.5 text-sm leading-6 text-[color:var(--muted)]">
               {description}
             </p>
           ) : null}
@@ -155,13 +155,13 @@ export function DarkCard({
   return (
     <div
       className={cn(
-        "self-start rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(27,28,27,0.98),rgba(10,11,10,0.98))] p-5 text-white shadow-[0_24px_90px_rgba(5,12,8,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] sm:p-6",
+        "self-start rounded-xl border border-white/10 bg-[#111111] p-4 text-white shadow-[0_20px_70px_rgba(5,12,8,0.2)] sm:p-5",
         className
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-2xl font-semibold tracking-[-0.05em]">
+          <h2 className="font-display text-xl font-semibold">
             {title}
           </h2>
           {description ? (
@@ -184,13 +184,11 @@ export function MetricCard({
   note?: string;
 }) {
   return (
-    <div
-      className="rounded-[1.6rem] border border-[color:var(--line)] bg-white p-4 text-[color:var(--ink)]"
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
+    <div className="rounded-xl border border-[color:var(--line)] bg-white p-4 text-[color:var(--ink)]">
+      <p className="text-xs font-medium text-[color:var(--muted)]">
         {label}
       </p>
-      <p className="mt-3 font-display text-2xl font-semibold tracking-[-0.05em]">
+      <p className="mt-2 font-display text-2xl font-semibold">
         {value}
       </p>
     </div>
@@ -211,14 +209,14 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
+        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold capitalize",
         tone === "brand"
-          ? "bg-[#0c4a27] text-[#d9f6bc]"
+          ? "bg-[#e9f5ec] text-[#225c39]"
           : tone === "warning"
-            ? "bg-[#fff1dc] text-[#8a4b0f]"
+            ? "bg-[#fff6e7] text-[#76511a]"
             : tone === "danger"
-              ? "bg-[#fff0ef] text-[#a8382b]"
-              : "border border-[color:var(--line)] bg-[#f5f4ef] text-[color:var(--brand)]"
+              ? "bg-[#fff0ef] text-[#9a3a31]"
+              : "border border-[color:var(--line)] bg-[color:var(--soft)] text-[color:var(--ink)]"
       )}
     >
       {children}
@@ -244,7 +242,7 @@ export function Button({
     <button
       {...props}
       className={cn(
-        "inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold tracking-[-0.02em] transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center rounded-lg border px-3.5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         tone === "brand"
           ? "border-[#111111] bg-[#111111] text-white hover:bg-[#333333]"
           : tone === "danger"
@@ -255,7 +253,7 @@ export function Button({
                 ? "border-[#603029] bg-[#2d1613] text-[#ffb6aa] hover:bg-[#3a1d18]"
                 : tone === "darkNeutral"
                   ? "border-white/12 bg-white/6 text-white hover:bg-white/10"
-                  : "border-[color:var(--line)] bg-white text-[color:var(--ink)]",
+                  : "border-[color:var(--line)] bg-white text-[color:var(--ink)] hover:bg-[color:var(--soft)]",
         className
       )}
     >
@@ -272,12 +270,12 @@ export function Field({
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+    <div className="rounded-lg border border-[color:var(--line)] bg-white px-4 py-3">
+      <p className="text-xs font-medium text-[color:var(--muted)]">
         {label}
       </p>
       <div
-        className="mt-2 min-w-0 break-all text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)] [overflow-wrap:anywhere]"
+        className="mt-2 min-w-0 break-all text-sm font-semibold text-[color:var(--ink)] [overflow-wrap:anywhere]"
         title={typeof value === "string" ? value : undefined}
       >
         {value}
@@ -296,12 +294,12 @@ export function DarkField({
   href?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.04))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/46">
+    <div className="rounded-lg border border-white/10 bg-white/6 px-4 py-3">
+      <p className="text-xs font-medium text-white/50">
         {label}
       </p>
       <div
-        className="mt-2 text-sm font-semibold tracking-[-0.02em] text-white truncate"
+        className="mt-2 truncate text-sm font-semibold text-white"
         title={typeof value === 'string' ? value : undefined}
       >
         {href ? (
@@ -352,14 +350,14 @@ export function Table({
     <div className="space-y-3">
       <div
         className={cn(
-          "hidden gap-3 rounded-2xl border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3 md:grid",
+          "hidden gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--soft)] px-4 py-3 md:grid",
           columnClass
         )}
       >
         {columns.map((column) => (
           <p
             key={column}
-            className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--brand)]"
+            className="text-xs font-semibold text-[color:var(--muted)]"
           >
             {column}
           </p>
@@ -389,10 +387,10 @@ export function TableRow({
   return (
     <div
       className={cn(
-        "grid gap-3 rounded-[1.25rem] border px-4 py-4 transition-colors",
+        "grid gap-3 rounded-lg border px-4 py-4 transition-colors",
         selected
-          ? "border-black/10 bg-[#f8f8fb] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
-          : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[#fafafd]",
+          ? "border-black/10 bg-[color:var(--soft)] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
+          : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[color:var(--soft)]",
         columns === 3
           ? "md:grid-cols-3"
           : columns === 4
@@ -455,7 +453,7 @@ export function Input({
     <input
       {...props}
       className={cn(
-        "h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#111111]",
+        "h-10 w-full rounded-lg border border-[color:var(--line)] bg-white px-3 text-sm font-medium text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#111111]",
         className
       )}
     />
@@ -471,7 +469,7 @@ export function Select({
     <select
       {...props}
       className={cn(
-        "h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
+        "h-10 w-full rounded-lg border border-[color:var(--line)] bg-white px-3 text-sm font-medium text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
         className
       )}
     >
@@ -538,14 +536,14 @@ export function Modal({
       />
       <div
         className={cn(
-          "relative flex max-h-[min(92vh,780px)] flex-col rounded-[2rem] border border-[color:var(--line)] bg-white shadow-[0_40px_120px_rgba(0,0,0,0.12)]",
+          "relative flex max-h-[min(92vh,780px)] flex-col rounded-xl border border-[color:var(--line)] bg-white shadow-[0_40px_120px_rgba(0,0,0,0.12)]",
           widthClass,
         )}
       >
         <div className="shrink-0 border-b border-[color:var(--line)] px-6 pt-5 pb-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-display text-xl font-semibold tracking-[-0.04em] text-[color:var(--ink)]">
+              <h2 className="font-display text-xl font-semibold text-[color:var(--ink)]">
                 {title}
               </h2>
               {description ? (

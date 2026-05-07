@@ -28,7 +28,7 @@ export function DashboardAppShell({ children }: DashboardAppShellProps) {
   return (
     <DashboardSessionProvider>
       <ModeProvider>
-        <div className="min-h-screen bg-white text-[color:var(--ink)]">
+        <div className="min-h-screen bg-[color:var(--page-bg)] text-[color:var(--ink)]">
           <div className="flex min-h-screen">
             <aside className="sticky top-0 hidden h-screen w-[288px] shrink-0 lg:block">
               <DashboardSidebar pathname={pathname} />
@@ -36,7 +36,7 @@ export function DashboardAppShell({ children }: DashboardAppShellProps) {
 
             <div className="flex min-w-0 flex-1 flex-col">
               <DashboardTopbar onOpenSidebar={() => setIsSidebarOpen(true)} />
-              <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+              <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8">
                 <DashboardAccessGate>
                   {children}
                 </DashboardAccessGate>
@@ -55,7 +55,7 @@ export function DashboardAppShell({ children }: DashboardAppShellProps) {
               aria-label="Close dashboard navigation"
               onClick={() => setIsSidebarOpen(false)}
               className={cn(
-                "absolute inset-0 bg-[#121312]/32 transition-opacity duration-200",
+                "absolute inset-0 bg-[#121312]/28 transition-opacity duration-200",
                 isSidebarOpen ? "opacity-100" : "opacity-0",
               )}
             />

@@ -63,7 +63,7 @@ export function statusTone(
   status: string
 ): "neutral" | "brand" | "warning" | "danger" {
   if (
-    ["active", "healthy", "settled", "approved", "executed", "ok", "delivered", "synced"].includes(
+    ["active", "healthy", "settled", "approved", "executed", "ok", "delivered", "synced", "paid"].includes(
       status
     )
   ) {
@@ -71,13 +71,13 @@ export function statusTone(
   }
 
   if (
-    ["pending", "confirming", "awaiting_settlement", "invited"].includes(status)
+    ["open", "pending", "confirming", "awaiting_settlement", "settling", "queued", "invited"].includes(status)
   ) {
     return "warning";
   }
 
   if (
-    ["failed", "reversed", "blacklisted", "error", "suspended", "revoked"].includes(
+    ["failed", "reversed", "cancelled", "blacklisted", "error", "suspended", "revoked", "disabled"].includes(
       status
     )
   ) {

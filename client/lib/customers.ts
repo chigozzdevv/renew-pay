@@ -9,14 +9,8 @@ export type CustomerRecord = {
   name: string;
   email: string;
   market: string;
-  status: "active" | "paused" | "at_risk" | "blacklisted";
-  billingState: "healthy" | "at_risk" | "past_due" | "paused";
-  paymentMethodState: "ok" | "update_needed" | "expired" | "missing";
-  subscriptionCount: number;
+  status: "active" | "inactive" | "blacklisted";
   monthlyVolumeUsdc: number;
-  nextRenewalAt: string | null;
-  lastChargeAt: string | null;
-  autoReminderEnabled: boolean;
   blacklistedAt: string | null;
   blacklistReason: string | null;
   metadata: Record<string, unknown>;
@@ -116,42 +110,6 @@ export async function createCustomer(input: {
       name: input.name,
       email: input.email,
       market: input.market,
-    }),
-  });
-
-  return response.data;
-}
-
-export async function pauseCustomer(input: {
-  token: string;
-  merchantId: string;
-  environment: "test" | "live";
-  customerId: string;
-}) {
-  const response = await fetchApi<CustomerRecord>(`/customers/${input.customerId}/pause`, {
-    method: "POST",
-    token: input.token,
-    body: JSON.stringify({
-      merchantId: input.merchantId,
-      environment: input.environment,
-    }),
-  });
-
-  return response.data;
-}
-
-export async function resumeCustomer(input: {
-  token: string;
-  merchantId: string;
-  environment: "test" | "live";
-  customerId: string;
-}) {
-  const response = await fetchApi<CustomerRecord>(`/customers/${input.customerId}/resume`, {
-    method: "POST",
-    token: input.token,
-    body: JSON.stringify({
-      merchantId: input.merchantId,
-      environment: input.environment,
     }),
   });
 

@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
-
 import { Card, LoadingState, MetricCard, PageState, StatGrid } from "@/components/dashboard/ui";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useResource } from "@/components/dashboard/use-resource";
 import {
   formatCurrency,
   formatCompactNumber,
+  formatDateTime,
 } from "@/components/dashboard/dashboard-utils";
 import { loadDashboardOverview } from "@/lib/overview";
 
@@ -39,12 +38,6 @@ export default function OverviewPage() {
   }
 
   const marketMixPreview = data.marketMix.slice(0, 4);
-  const quickActions = [
-    { href: "/dashboard/plans", label: "Create plan" },
-    { href: "/dashboard/customers", label: "Add customer" },
-    { href: "/dashboard/subscriptions", label: "View subscriptions" },
-    { href: "/dashboard/teams", label: "Add team" },
-  ];
 
   return (
     <div className="space-y-6">
@@ -54,16 +47,16 @@ export default function OverviewPage() {
           value={formatCompactNumber(data.stats.totalCustomers)}
         />
         <MetricCard
-          label="Plans"
-          value={String(data.stats.activePlans)}
+          label="Open collections"
+          value={String(data.stats.openPayments)}
         />
         <MetricCard
-          label="Subscriptions"
-          value={formatCompactNumber(data.stats.activeSubscriptions)}
+          label="Pending payouts"
+          value={String(data.stats.pendingPayouts)}
         />
         <MetricCard
           label="Ready net"
-          value={formatCurrency(data.stats.readyNetUsdc)}
+          value={formatCurrency(data.stats.payoutReadyUsdc)}
         />
       </StatGrid>
 
@@ -78,19 +71,19 @@ export default function OverviewPage() {
             ) : (
               <>
                 {marketMixPreview.map((item) => (
-                  <div key={item.market} className="space-y-2">
+                  <div key={item.currency} className="space-y-2">
                     <div className="flex items-center justify-between gap-3 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                      <span>{item.market}</span>
+                      <span>{item.currency}</span>
                       <span className="text-[color:var(--muted)]">{item.share}%</span>
                     </div>
-                    <div className="h-3 rounded-full bg-[#e9e7df]">
+                    <div className="h-2 rounded-full bg-[color:var(--soft)]">
                       <div
-                        className="h-full rounded-full bg-[#111111]"
+                        className="h-full rounded-full bg-[color:var(--ink)]"
                         style={{ width: `${Math.max(item.share, 4)}%` }}
                       />
                     </div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                      {formatCurrency(item.totalVolume)}
+                    <p className="text-xs text-[color:var(--muted)]">
+                      {item.count} collections · {formatCurrency(item.totalVolume, item.currency)}
                     </p>
                   </div>
                 ))}
@@ -106,38 +99,39 @@ export default function OverviewPage() {
         </Card>
 
         <Card
-          title="Quick actions"
+          title="Recent activity"
           className="h-full min-h-[24rem] self-auto"
         >
-          <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white">
-            {quickActions.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="flex items-center justify-between gap-4 border-b border-[color:var(--line)] px-5 py-5 text-[color:var(--ink)] transition-colors hover:bg-[#fafafd] last:border-b-0"
-              >
-                <div className="flex items-center gap-4">
-                  <span className="inline-flex h-3 w-3 shrink-0 rounded-full bg-[#d9dde5]" />
-                  <span className="text-lg font-semibold tracking-[-0.03em]">
-                    {action.label}
-                  </span>
-                </div>
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  className="h-5 w-5 shrink-0 text-[#b0b7c3]"
-                  fill="none"
+          <div className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-white">
+            {data.recentActivity.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-[color:var(--muted)]">
+                No activity
+              </p>
+            ) : (
+              data.recentActivity.map((item) => (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  className="flex items-center justify-between gap-4 border-b border-[color:var(--line)] px-5 py-4 last:border-b-0"
                 >
-                  <path
-                    d="M7 5l5 5-5 5"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </Link>
-            ))}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[color:var(--ink)]">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-xs text-[color:var(--muted)]">
+                      {item.type} · {item.reference}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[color:var(--ink)]">
+                      {formatCurrency(item.amount, item.currency)}
+                    </p>
+                    <p className="mt-1 text-xs text-[color:var(--muted)]">
+                      {formatDateTime(item.createdAt)}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>

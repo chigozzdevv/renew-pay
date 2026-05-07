@@ -18,8 +18,9 @@ import {
 } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
 import { Logo } from "@/components/shared/logo";
+import DevelopersSettings from "@/components/dashboard/developers-settings";
 import { ApiError } from "@/lib/api";
-import { loadBillingMarketCatalog } from "@/lib/markets";
+import { loadCollectionMarketCatalog } from "@/lib/markets";
 import { updateMerchantSupportedMarkets } from "@/lib/merchants";
 import {
   loadNotificationTemplatePreview,
@@ -35,15 +36,37 @@ import { cn } from "@/lib/utils";
 
 type SettingsTabKey =
   | "workspace"
-  | "billing"
+  | "checkout"
+  | "developers"
   | "wallets"
   | "notifications"
-  | "access";
+  | "security";
 
 type BusinessDraft = WorkspaceSettings["business"];
-type BillingDraft = WorkspaceSettings["billing"];
+type CheckoutDraft = WorkspaceSettings["checkout"];
 type NotificationsDraft = WorkspaceSettings["notifications"];
 type SecurityDraft = WorkspaceSettings["security"];
+
+const settingsTabKeys = [
+  "workspace",
+  "checkout",
+  "developers",
+  "wallets",
+  "notifications",
+  "security",
+] as const satisfies readonly SettingsTabKey[];
+
+function isSettingsTabKey(value: string | null): value is SettingsTabKey {
+  return settingsTabKeys.includes(value as SettingsTabKey);
+}
+
+function readTabFromLocation() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return new URLSearchParams(window.location.search).get("tab");
+}
 
 function formatAddress(value: string | null) {
   if (!value) {
@@ -83,7 +106,7 @@ export default function SettingsPage() {
   );
   const { data: marketCatalog, reload: reloadMarketCatalog } = useResource(
     async ({ token, merchantId }) =>
-      loadBillingMarketCatalog({
+      loadCollectionMarketCatalog({
         token,
         merchantId,
         environment: mode,
@@ -110,7 +133,7 @@ export default function SettingsPage() {
   );
 
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft | null>(null);
-  const [billingDraft, setBillingDraft] = useState<BillingDraft | null>(null);
+  const [checkoutDraft, setCheckoutDraft] = useState<CheckoutDraft | null>(null);
   const [notificationsDraft, setNotificationsDraft] = useState<NotificationsDraft | null>(null);
   const [securityDraft, setSecurityDraft] = useState<SecurityDraft | null>(null);
   const [walletDraft, setWalletDraft] = useState({
@@ -120,12 +143,27 @@ export default function SettingsPage() {
   const [supportedMarketsDraft, setSupportedMarketsDraft] = useState<string[]>([]);
 
   useEffect(() => {
+    const syncTab = () => {
+      const tab = readTabFromLocation();
+
+      if (isSettingsTabKey(tab)) {
+        setActiveTab(tab);
+      }
+    };
+
+    syncTab();
+    window.addEventListener("popstate", syncTab);
+
+    return () => window.removeEventListener("popstate", syncTab);
+  }, []);
+
+  useEffect(() => {
     if (!data) {
       return;
     }
 
     setBusinessDraft(data.business);
-    setBillingDraft(data.billing);
+    setCheckoutDraft(data.checkout);
     setNotificationsDraft(data.notifications);
     setSecurityDraft(data.security);
     setWalletDraft({
@@ -185,13 +223,31 @@ export default function SettingsPage() {
     () =>
       [
         { key: "workspace", label: "Business" },
-        { key: "billing", label: "Billing" },
+        { key: "checkout", label: "Checkout" },
+        { key: "developers", label: "Developers" },
         { key: "wallets", label: "Wallets" },
         { key: "notifications", label: "Notifications" },
-        { key: "access", label: "Access" },
+        { key: "security", label: "Security" },
       ] satisfies Array<{ key: SettingsTabKey; label: string }>,
     [],
   );
+
+  function selectTab(tab: SettingsTabKey) {
+    const params = new URLSearchParams(window.location.search);
+
+    if (tab === "workspace") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+
+    setActiveTab(tab);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`
+    );
+  }
 
   async function runMutation(actionKey: string, runner: () => Promise<void>) {
     setBusyAction(actionKey);
@@ -228,15 +284,15 @@ export default function SettingsPage() {
     });
   }
 
-  function patchBilling<K extends keyof BillingDraft>(key: K, value: BillingDraft[K]) {
-    setBillingDraft((current) => (current ? { ...current, [key]: value } : current));
-  }
-
   function patchNotifications<K extends keyof NotificationsDraft>(
     key: K,
     value: NotificationsDraft[K],
   ) {
     setNotificationsDraft((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  function patchCheckout<K extends keyof CheckoutDraft>(key: K, value: CheckoutDraft[K]) {
+    setCheckoutDraft((current) => (current ? { ...current, [key]: value } : current));
   }
 
   function patchSecurity<K extends keyof SecurityDraft>(key: K, value: SecurityDraft[K]) {
@@ -265,22 +321,6 @@ export default function SettingsPage() {
     });
   }
 
-  async function handleBillingSave() {
-    if (!token || !user?.merchantId || !billingDraft) {
-      return;
-    }
-
-    await runMutation("billing-save", async () => {
-      await updateWorkspaceSettings({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-        payload: { billing: billingDraft },
-      });
-      setActionMessage("Billing defaults saved.");
-    });
-  }
-
   async function handleNotificationsSave() {
     if (!token || !user?.merchantId || !notificationsDraft) {
       return;
@@ -297,6 +337,22 @@ export default function SettingsPage() {
     });
   }
 
+  async function handleCheckoutSave() {
+    if (!token || !user?.merchantId || !checkoutDraft) {
+      return;
+    }
+
+    await runMutation("checkout-save", async () => {
+      await updateWorkspaceSettings({
+        token,
+        merchantId: user.merchantId,
+        environment: mode,
+        payload: { checkout: checkoutDraft },
+      });
+      setActionMessage("Checkout settings saved.");
+    });
+  }
+
   async function handleSecuritySave() {
     if (!token || !user?.merchantId || !securityDraft) {
       return;
@@ -309,7 +365,7 @@ export default function SettingsPage() {
         environment: mode,
         payload: { security: securityDraft },
       });
-      setActionMessage("Access policy saved.");
+      setActionMessage("Security settings saved.");
     });
   }
 
@@ -335,7 +391,7 @@ export default function SettingsPage() {
     return <LoadingState />;
   }
 
-  if (error || !data || !businessDraft || !billingDraft || !notificationsDraft || !securityDraft) {
+  if (error || !data || !businessDraft || !checkoutDraft || !notificationsDraft || !securityDraft) {
     return (
       <PageState
         title="Settings unavailable"
@@ -363,7 +419,7 @@ export default function SettingsPage() {
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => selectTab(tab.key)}
               className={cn(
                 "rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all duration-200",
                 activeTab === tab.key
@@ -410,16 +466,7 @@ export default function SettingsPage() {
                     />
                   </SettingsField>
 
-                  <SettingsField label="Invoice prefix">
-                    <Input
-                      value={businessDraft.invoicePrefix}
-                      onChange={(event) =>
-                        patchBusiness("invoicePrefix", event.target.value.toUpperCase())
-                      }
-                    />
-                  </SettingsField>
-
-                  <SettingsField label="Customer billing domain">
+                  <SettingsField label="Customer domain">
                     <Input
                       value={businessDraft.customerDomain}
                       onChange={(event) => patchBusiness("customerDomain", event.target.value)}
@@ -428,7 +475,7 @@ export default function SettingsPage() {
                 </div>
               </SettingsPanel>
 
-              <SettingsPanel title="Billing identity">
+              <SettingsPanel title="Business identity">
                 <div className="grid gap-4 md:grid-cols-2">
                   <SettingsField label="Primary market">
                     <Select
@@ -446,10 +493,10 @@ export default function SettingsPage() {
                     </Select>
                   </SettingsField>
 
-                  <SettingsField label="Billing timezone">
+                  <SettingsField label="Timezone">
                     <Select
-                      value={businessDraft.billingTimezone}
-                      onChange={(event) => patchBusiness("billingTimezone", event.target.value)}
+                      value={businessDraft.timezone}
+                      onChange={(event) => patchBusiness("timezone", event.target.value)}
                     >
                       <option value="UTC">UTC</option>
                       <option value="Africa/Lagos">Africa/Lagos</option>
@@ -457,10 +504,10 @@ export default function SettingsPage() {
                     </Select>
                   </SettingsField>
 
-                  <SettingsField label="Billing display">
+                  <SettingsField label="Display">
                     <Select
-                      value={businessDraft.billingDisplay}
-                      onChange={(event) => patchBusiness("billingDisplay", event.target.value)}
+                      value={businessDraft.displayMode}
+                      onChange={(event) => patchBusiness("displayMode", event.target.value)}
                     >
                       <option value="local-fiat">Customer local fiat</option>
                       <option value="usd-reference">USD reference</option>
@@ -523,14 +570,6 @@ export default function SettingsPage() {
                     </Select>
                   </SettingsField>
 
-                  <SettingsField label="Invoice footer note">
-                    <textarea
-                      value={businessDraft.invoiceFooter}
-                      onChange={(event) => patchBusiness("invoiceFooter", event.target.value)}
-                      rows={4}
-                      className="w-full resize-none rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3 text-sm text-[color:var(--ink)] outline-none"
-                    />
-                  </SettingsField>
                 </div>
               </SettingsPanel>
 
@@ -549,9 +588,9 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <SettingsMiniStat label="Display" value={businessDraft.billingDisplay} />
+                    <SettingsMiniStat label="Display" value={businessDraft.displayMode} />
                     <SettingsMiniStat label="Fallback" value={businessDraft.fallbackCurrency} />
-                    <SettingsMiniStat label="Timezone" value={businessDraft.billingTimezone} />
+                    <SettingsMiniStat label="Timezone" value={businessDraft.timezone} />
                   </div>
                 </div>
               </SettingsPanel>
@@ -566,75 +605,6 @@ export default function SettingsPage() {
               onClick={() => void handleWorkspaceSave()}
             >
               Save workspace
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      {activeTab === "billing" ? (
-        <Card title="Billing defaults">
-          <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-            <div className="grid gap-4 md:grid-cols-2">
-              <SettingsField label="Retry policy">
-                <Select
-                  value={billingDraft.retryPolicy}
-                  onChange={(event) => patchBilling("retryPolicy", event.target.value)}
-                >
-                  <option value="Smart retries">Smart retries</option>
-                  <option value="3 retries over 5 days">3 retries over 5 days</option>
-                  <option value="2 retries over 3 days">2 retries over 3 days</option>
-                  <option value="No automatic retries">No automatic retries</option>
-                </Select>
-              </SettingsField>
-
-              <SettingsField label="Invoice grace days">
-                <Input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={String(billingDraft.invoiceGraceDays)}
-                  onChange={(event) =>
-                    patchBilling("invoiceGraceDays", Number.parseInt(event.target.value || "0", 10))
-                  }
-                />
-              </SettingsField>
-
-              <SettingsField label="Auto retries">
-                <SettingsToggle
-                  label={billingDraft.autoRetries ? "Enabled" : "Disabled"}
-                  enabled={billingDraft.autoRetries}
-                  onToggle={() => patchBilling("autoRetries", !billingDraft.autoRetries)}
-                />
-              </SettingsField>
-
-              <SettingsField label="Meter approval">
-                <SettingsToggle
-                  label={billingDraft.meterApproval ? "Required" : "Optional"}
-                  enabled={billingDraft.meterApproval}
-                  onToggle={() => patchBilling("meterApproval", !billingDraft.meterApproval)}
-                />
-              </SettingsField>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <SettingsMiniStat label="Retry" value={billingDraft.retryPolicy} />
-              <SettingsMiniStat label="Grace" value={`${billingDraft.invoiceGraceDays} day(s)`} />
-              <SettingsMiniStat label="Auto retries" value={billingDraft.autoRetries ? "On" : "Off"} />
-              <SettingsMiniStat
-                label="Meter approval"
-                value={billingDraft.meterApproval ? "Required" : "Optional"}
-              />
-            </div>
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <Button
-              type="button"
-              tone="brand"
-              disabled={busyAction === "billing-save"}
-              onClick={() => void handleBillingSave()}
-            >
-              Save billing defaults
             </Button>
           </div>
         </Card>
@@ -709,95 +679,63 @@ export default function SettingsPage() {
         </Card>
       ) : null}
 
+      {activeTab === "checkout" ? (
+        <Card title="Checkout">
+          <div className="grid gap-4 md:grid-cols-2">
+            <SettingsField label="Mode">
+              <Select
+                value={checkoutDraft.mode}
+                onChange={(event) =>
+                  patchCheckout("mode", event.target.value as CheckoutDraft["mode"])
+                }
+              >
+                <option value="modal">Modal</option>
+                <option value="redirect">Redirect</option>
+              </Select>
+            </SettingsField>
+            <SettingsField label="Return page">
+              <Input
+                placeholder="https://shop.example/orders/{reference}"
+                value={checkoutDraft.returnPage ?? ""}
+                onChange={(event) => patchCheckout("returnPage", event.target.value || null)}
+              />
+            </SettingsField>
+            <SettingsField label="Allowed domain">
+              <Input
+                placeholder="shop.example"
+                value={checkoutDraft.allowedDomains.join(", ")}
+                onChange={(event) =>
+                  patchCheckout(
+                    "allowedDomains",
+                    event.target.value
+                      .split(",")
+                      .map((value) => value.trim())
+                      .filter(Boolean)
+                  )
+                }
+              />
+            </SettingsField>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button
+              type="button"
+              tone="brand"
+              disabled={busyAction === "checkout-save"}
+              onClick={() => void handleCheckoutSave()}
+            >
+              Save checkout
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {activeTab === "developers" ? <DevelopersSettings /> : null}
+
       {activeTab === "notifications" ? (
         <Card title="Notifications">
           <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-2">
-                <SettingsToggle
-                  label="Customer subscription emails"
-                  enabled={notificationsDraft.customerSubscriptionEmails}
-                  onToggle={() =>
-                    patchNotifications(
-                      "customerSubscriptionEmails",
-                      !notificationsDraft.customerSubscriptionEmails
-                    )
-                  }
-                />
-                <SettingsToggle
-                  label="Customer receipts"
-                  enabled={notificationsDraft.customerReceiptEmails}
-                  onToggle={() =>
-                    patchNotifications(
-                      "customerReceiptEmails",
-                      !notificationsDraft.customerReceiptEmails
-                    )
-                  }
-                />
-                <SettingsToggle
-                  label="Customer follow-ups"
-                  enabled={notificationsDraft.customerPaymentFollowUps}
-                  onToggle={() =>
-                    patchNotifications(
-                      "customerPaymentFollowUps",
-                      !notificationsDraft.customerPaymentFollowUps
-                    )
-                  }
-                />
-                <SettingsToggle
-                  label="Merchant subscription alerts"
-                  enabled={notificationsDraft.merchantSubscriptionAlerts}
-                  onToggle={() =>
-                    patchNotifications(
-                      "merchantSubscriptionAlerts",
-                      !notificationsDraft.merchantSubscriptionAlerts
-                    )
-                  }
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <SettingsField label="Merchant payment digest">
-                  <Select
-                    value={notificationsDraft.merchantPaymentDigestFrequency}
-                    onChange={(event) =>
-                      patchNotifications(
-                        "merchantPaymentDigestFrequency",
-                        event.target.value as NotificationsDraft["merchantPaymentDigestFrequency"]
-                      )
-                    }
-                  >
-                    <option value="off">Off</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </Select>
-                </SettingsField>
-
-                <SettingsField label="Digest detail">
-                  <Select
-                    value={notificationsDraft.merchantPaymentDigestMode}
-                    onChange={(event) =>
-                      patchNotifications(
-                        "merchantPaymentDigestMode",
-                        event.target.value as NotificationsDraft["merchantPaymentDigestMode"]
-                      )
-                    }
-                  >
-                    <option value="counts">Counts only</option>
-                    <option value="detailed">Detailed rows</option>
-                  </Select>
-                </SettingsField>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <SettingsToggle
-                  label="Team invite emails"
-                  enabled={notificationsDraft.teamInviteEmails}
-                  onToggle={() =>
-                    patchNotifications("teamInviteEmails", !notificationsDraft.teamInviteEmails)
-                  }
-                />
                 <SettingsToggle
                   label="Verification alerts"
                   enabled={notificationsDraft.verificationAlerts}
@@ -888,72 +826,27 @@ export default function SettingsPage() {
         </Card>
       ) : null}
 
-      {activeTab === "access" ? (
-        <Card title="Access policy">
-          <div className="grid gap-6 xl:grid-cols-[1fr_1fr] xl:items-start">
-            <div className="space-y-4">
-              <SettingsField label="Session timeout">
-                <Select
-                  value={securityDraft.sessionTimeout}
-                  onChange={(event) => patchSecurity("sessionTimeout", event.target.value)}
-                >
-                  <option value="30 minutes">30 minutes</option>
-                  <option value="1 hour">1 hour</option>
-                  <option value="4 hours">4 hours</option>
-                </Select>
-              </SettingsField>
+      {activeTab === "security" ? (
+        <Card title="Security">
+          <div className="space-y-4">
+            <SettingsField label="Session timeout">
+              <Select
+                value={securityDraft.sessionTimeout}
+                onChange={(event) => patchSecurity("sessionTimeout", event.target.value)}
+              >
+                <option value="30 minutes">30 minutes</option>
+                <option value="1 hour">1 hour</option>
+                <option value="4 hours">4 hours</option>
+              </Select>
+            </SettingsField>
 
-              <SettingsField label="Invite domain policy">
-                <Input
-                  value={securityDraft.inviteDomainPolicy}
-                  onChange={(event) => patchSecurity("inviteDomainPolicy", event.target.value)}
-                />
-              </SettingsField>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <SettingsToggle
-                  label="Enforce two-factor"
-                  enabled={securityDraft.enforceTwoFactor}
-                  onToggle={() =>
-                    patchSecurity("enforceTwoFactor", !securityDraft.enforceTwoFactor)
-                  }
-                />
-                <SettingsToggle
-                  label="Restrict invite domains"
-                  enabled={securityDraft.restrictInviteDomains}
-                  onToggle={() =>
-                    patchSecurity("restrictInviteDomains", !securityDraft.restrictInviteDomains)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                    Team access
-                  </p>
-                  <p className="mt-2 text-sm text-[color:var(--muted)]">
-                    Role defaults and invite policies keep workspace access predictable.
-                  </p>
-                </div>
-                <Badge tone={securityDraft.enforceTwoFactor ? "brand" : "neutral"}>
-                  {securityDraft.enforceTwoFactor ? "2FA required" : "2FA optional"}
-                </Badge>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <SettingsMiniStat
-                  label="Session timeout"
-                  value={securityDraft.sessionTimeout}
-                />
-                <SettingsMiniStat
-                  label="Invite domains"
-                  value={securityDraft.restrictInviteDomains ? "Restricted" : "Open"}
-                />
-              </div>
-            </div>
+            <SettingsToggle
+              label="Enforce two-factor"
+              enabled={securityDraft.enforceTwoFactor}
+              onToggle={() =>
+                patchSecurity("enforceTwoFactor", !securityDraft.enforceTwoFactor)
+              }
+            />
           </div>
 
           <div className="mt-6 flex justify-end">
@@ -963,7 +856,7 @@ export default function SettingsPage() {
               disabled={busyAction === "security-save"}
               onClick={() => void handleSecuritySave()}
             >
-              Save access policy
+              Save security
             </Button>
           </div>
         </Card>

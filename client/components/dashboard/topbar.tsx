@@ -37,12 +37,12 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
   }, [notifOpen, profileOpen]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-white">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 border-b border-[color:var(--line)] bg-white/95 backdrop-blur">
+      <div className="flex items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={onOpenSidebar}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white/82 text-[color:var(--ink)] lg:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--line)] bg-white text-[color:var(--ink)] lg:hidden"
           aria-label="Open dashboard navigation"
         >
           <svg aria-hidden="true" viewBox="0 0 18 18" className="h-4 w-4" fill="none">
@@ -52,34 +52,26 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
           </svg>
         </button>
 
-        <label className="min-w-[220px] flex-1">
-          <span className="sr-only">Search dashboard</span>
-          <span className="relative block">
-            <span className="pointer-events-none absolute inset-y-0 left-4 inline-flex items-center text-[color:var(--muted)]">
-              <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none">
-                <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M10.5 10.5L13.5 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              placeholder="Search customers, plans, payments"
-              className="h-11 w-full rounded-2xl border border-[color:var(--line)] bg-white/88 pl-11 pr-4 text-sm font-medium tracking-[-0.02em] text-[color:var(--ink)] outline-none transition-colors placeholder:text-[color:var(--muted)] focus:border-[#111111]"
-            />
-          </span>
-        </label>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-[color:var(--ink)]">
+            {user?.name ?? "Renew"}
+          </p>
+          <p className="hidden text-xs text-[color:var(--muted)] sm:block">
+            {mode === "live" ? "Live workspace" : "Test workspace"}
+          </p>
+        </div>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center rounded-2xl border border-[color:var(--line)] bg-white/82 p-1">
+          <div className="flex items-center rounded-lg border border-[color:var(--line)] bg-white p-1">
             <button
               type="button"
               onClick={() => void setMode("test")}
               disabled={isUpdating}
               aria-pressed={mode === "test"}
               className={cn(
-                "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",
+                "rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70",
                 mode === "test"
-                  ? "bg-[#0c4a27] text-[#d9f6bc]"
+                  ? "bg-[color:var(--ink)] text-white"
                   : "text-[color:var(--muted)]"
               )}
             >
@@ -88,10 +80,10 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             <button
               type="button"
               disabled
-              title="Live mode is coming soon."
+              title="Live"
               aria-pressed={false}
               className={cn(
-                "rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-70",
+                "rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70",
                 "text-[color:var(--muted)]"
               )}
             >
@@ -103,7 +95,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             <button
               type="button"
               onClick={() => setNotifOpen((v) => !v)}
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white/82 text-[color:var(--ink)] transition-colors hover:bg-white"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--line)] bg-white text-[color:var(--ink)] transition-colors hover:bg-[color:var(--soft)]"
               aria-label="Open notifications"
               aria-expanded={notifOpen}
             >
@@ -124,18 +116,13 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             </button>
 
             {notifOpen ? (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 overflow-hidden rounded-xl border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
                 <div className="border-b border-[color:var(--line)] px-5 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                    Notifications
-                  </p>
-                  <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                    No pending notifications
-                  </p>
+                  <p className="text-sm font-semibold text-[color:var(--ink)]">Notifications</p>
                 </div>
 
                 <div className="px-5 py-6 text-center text-sm text-[color:var(--muted)]">
-                  Payment, invoice, and verification alerts will appear here.
+                  None
                 </div>
               </div>
             ) : null}
@@ -145,11 +132,11 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[color:var(--line)] bg-white/82 px-3 transition-colors hover:bg-white"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[color:var(--line)] bg-white px-2.5 transition-colors hover:bg-[color:var(--soft)]"
               aria-label="Open account menu"
               aria-expanded={profileOpen}
             >
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#111111] text-xs font-semibold text-white">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[color:var(--ink)] text-xs font-semibold text-white">
                 {user?.name
                   ? user.name
                     .split(" ")
@@ -158,7 +145,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                     .join("")
                   : "RW"}
               </span>
-              <span className="hidden text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)] sm:inline">
+              <span className="hidden text-sm font-medium text-[color:var(--ink)] sm:inline">
                 {user?.name ?? "Renew Labs"}
               </span>
               <svg
@@ -173,10 +160,10 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             </button>
 
             {profileOpen ? (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-xl border border-[color:var(--line)] bg-white shadow-[0_16px_48px_rgba(17,17,17,0.08)]">
                 <div className="border-b border-[color:var(--line)] px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#111111] text-sm font-semibold text-white">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[color:var(--ink)] text-sm font-semibold text-white">
                       {user?.name
                         ? user.name
                           .split(" ")
@@ -186,7 +173,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                         : "RW"}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                      <p className="truncate text-sm font-semibold text-[color:var(--ink)]">
                         {user?.name ?? "Renew Labs"}
                       </p>
                       <p className="truncate text-xs text-[color:var(--muted)]">
@@ -200,7 +187,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                   <Link
                     href="/dashboard/settings"
                     onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-[color:var(--ink)] transition-colors hover:bg-[#f2f1eb]"
+                    className="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-[color:var(--ink)] transition-colors hover:bg-[color:var(--soft)]"
                   >
                     <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4 shrink-0 text-[color:var(--muted)]" fill="none">
                       <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" />

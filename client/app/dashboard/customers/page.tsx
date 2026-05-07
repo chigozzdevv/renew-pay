@@ -7,7 +7,7 @@ import { useDashboardSession } from "@/components/dashboard/session-provider";
 import {
   StatusBadge,
   formatCurrency,
-  formatDate,
+  formatDateTime,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
 import { useResource } from "@/components/dashboard/use-resource";
@@ -26,13 +26,11 @@ import {
   Table,
   TableRow,
 } from "@/components/dashboard/ui";
-import { loadBillingMarketCatalog } from "@/lib/markets";
+import { loadCollectionMarketCatalog } from "@/lib/markets";
 import {
   blacklistCustomer,
   createCustomer,
   loadCustomersPage,
-  pauseCustomer,
-  resumeCustomer,
   type CustomerRecord,
 } from "@/lib/customers";
 
@@ -76,7 +74,7 @@ export default function CustomersPage() {
   );
   const { data: marketCatalog } = useResource(
     async ({ token, merchantId }) =>
-      loadBillingMarketCatalog({
+      loadCollectionMarketCatalog({
         token,
         merchantId,
         environment: mode,
@@ -117,15 +115,10 @@ export default function CustomersPage() {
   }, [marketCatalog?.defaultMarket]);
 
   const metrics = useMemo(() => {
-    const atRisk = customers.filter(
-      (c) =>
-        c.status === "at_risk" ||
-        c.billingState === "at_risk" ||
-        c.paymentMethodState === "update_needed"
-    ).length;
+    const blocked = customers.filter((c) => c.status === "blacklisted").length;
     const markets = new Set(customers.map((c) => c.market)).size;
     const active = customers.filter((c) => c.status === "active").length;
-    return { total: pagination.total, active, atRisk, markets };
+    return { total: pagination.total, active, blocked, markets };
   }, [customers, pagination.total]);
 
   async function runAction(key: string, runner: () => Promise<void>) {
@@ -165,19 +158,6 @@ export default function CustomersPage() {
     });
   }
 
-  async function handlePauseResume(customer: CustomerRecord, action: "pause" | "resume") {
-    if (!token || !user?.merchantId) return;
-    await runAction(action, async () => {
-      if (action === "pause") {
-        await pauseCustomer({ token, merchantId: user.merchantId, environment: mode, customerId: customer.id });
-      } else {
-        await resumeCustomer({ token, merchantId: user.merchantId, environment: mode, customerId: customer.id });
-      }
-      setDetailCustomer(null);
-      setMessage(action === "pause" ? "Customer billing paused." : "Customer billing resumed.");
-    });
-  }
-
   async function handleBlacklist() {
     if (!token || !user?.merchantId || !blacklistTarget) return;
     await runAction("blacklist", async () => {
@@ -212,10 +192,10 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       <StatGrid>
-        <MetricCard label="Customers" value={String(metrics.total)} note="Directory records" />
-        <MetricCard label="Active" value={String(metrics.active)} note="Visible page" />
-        <MetricCard label="At risk" value={String(metrics.atRisk)} note="Visible page" />
-        <MetricCard label="Markets" value={String(metrics.markets)} note="Visible page" />
+        <MetricCard label="Customers" value={String(metrics.total)} />
+        <MetricCard label="Active" value={String(metrics.active)} />
+        <MetricCard label="Blocked" value={String(metrics.blocked)} />
+        <MetricCard label="Markets" value={String(metrics.markets)} />
       </StatGrid>
 
       <Card
@@ -234,8 +214,7 @@ export default function CustomersPage() {
             <Select value={status} onChange={(e) => { setStatus(e.target.value as CustomerStatusFilter); setPage(1); }}>
               <option value="all">All statuses</option>
               <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="at_risk">At risk</option>
+              <option value="inactive">Inactive</option>
               <option value="blacklisted">Blacklisted</option>
             </Select>
             <Input
@@ -248,7 +227,7 @@ export default function CustomersPage() {
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#a8382b]">{errorMessage}</p> : null}
 
-          <Table columns={["Customer", "Market", "Subscriptions", "Next renewal", "Actions"]}>
+          <Table columns={["Customer", "Market", "Volume", "Created", "Actions"]}>
             {customers.map((customer) => (
               <TableRow key={customer.id} columns={5}>
                 <button type="button" className="text-left outline-none" onClick={() => setDetailCustomer(customer)}>
@@ -256,34 +235,15 @@ export default function CustomersPage() {
                   <p className="mt-1 text-sm text-[color:var(--muted)]">{customer.email}</p>
                 </button>
                 <p className="self-center text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{customer.market}</p>
-                <p className="self-center text-sm text-[color:var(--muted)]">{customer.subscriptionCount} active</p>
-                <p className="self-center text-sm text-[color:var(--muted)]">{formatDate(customer.nextRenewalAt)}</p>
+                <p className="self-center text-sm text-[color:var(--muted)]">{formatCurrency(customer.monthlyVolumeUsdc)}</p>
+                <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(customer.createdAt)}</p>
                 <div className="flex items-center gap-2 self-center">
-                  <StatusBadge value={customer.status}>
-                    {customer.status === "at_risk" ? "At risk" : customer.status.replace(/_/g, " ")}
-                  </StatusBadge>
-                  {customer.status === "paused" ? (
-                    <button
-                      type="button"
-                      onClick={() => void handlePauseResume(customer, "resume")}
-                      className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
-                    >
-                      Resume
-                    </button>
-                  ) : customer.status !== "blacklisted" ? (
-                    <button
-                      type="button"
-                      onClick={() => void handlePauseResume(customer, "pause")}
-                      className="rounded-xl border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] transition-colors hover:bg-[#f5f4ef]"
-                    >
-                      Pause
-                    </button>
-                  ) : null}
+                  <StatusBadge value={customer.status} />
                   {customer.status !== "blacklisted" ? (
                     <button
                       type="button"
                       onClick={() => setBlacklistTarget(customer)}
-                      className="rounded-xl border border-[#dcb7b0] bg-[#fff7f6] px-3 py-1.5 text-xs font-semibold text-[#922f25] transition-colors hover:bg-[#ffefed]"
+                      className="rounded-lg border border-[#dcb7b0] bg-[#fff7f6] px-3 py-1.5 text-xs font-semibold text-[#922f25] transition-colors hover:bg-[#ffefed]"
                     >
                       Block
                     </button>
@@ -353,22 +313,6 @@ export default function CustomersPage() {
         footer={
           detailCustomer ? (
             <div className="flex items-center justify-end gap-3">
-              {detailCustomer.status === "paused" ? (
-                <Button
-                  tone="brand"
-                  disabled={isBusy === "resume"}
-                  onClick={() => void handlePauseResume(detailCustomer, "resume")}
-                >
-                  {isBusy === "resume" ? "Resuming..." : "Resume billing"}
-                </Button>
-              ) : detailCustomer.status !== "blacklisted" ? (
-                <Button
-                  disabled={isBusy === "pause"}
-                  onClick={() => void handlePauseResume(detailCustomer, "pause")}
-                >
-                  {isBusy === "pause" ? "Pausing..." : "Pause billing"}
-                </Button>
-              ) : null}
               {detailCustomer.status !== "blacklisted" ? (
                 <Button
                   tone="danger"
@@ -390,10 +334,9 @@ export default function CustomersPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Market" value={detailCustomer.market} />
               <Field label="Monthly volume" value={formatCurrency(detailCustomer.monthlyVolumeUsdc)} />
-              <Field label="Next renewal" value={formatDate(detailCustomer.nextRenewalAt)} />
-              <Field label="Last charge" value={formatDate(detailCustomer.lastChargeAt)} />
-              <Field label="Payment method" value={detailCustomer.paymentMethodState.replace(/_/g, " ")} />
-              <Field label="Billing state" value={detailCustomer.billingState.replace(/_/g, " ")} />
+              <Field label="Customer ref" value={detailCustomer.customerRef} />
+              <Field label="Created" value={formatDateTime(detailCustomer.createdAt)} />
+              <Field label="Updated" value={formatDateTime(detailCustomer.updatedAt)} />
             </div>
             {detailCustomer.blacklistReason ? (
               <div className="rounded-2xl border border-[#dcb7b0] bg-[#fff7f6] px-4 py-4 text-sm leading-7 text-[#922f25]">
@@ -423,7 +366,7 @@ export default function CustomersPage() {
         }
       >
         <p className="text-sm leading-7 text-[color:var(--muted)]">
-          Are you sure you want to blacklist <span className="font-semibold text-[color:var(--ink)]">{blacklistTarget?.name}</span>? This will stop all billing activity for this customer.
+          Blacklist <span className="font-semibold text-[color:var(--ink)]">{blacklistTarget?.name}</span>?
         </p>
       </Modal>
     </div>

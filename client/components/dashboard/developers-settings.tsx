@@ -155,7 +155,7 @@ export default function DevelopersPage() {
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [newWebhook, setNewWebhook] = useState<WebhookDraft>(createNewWebhookDraft());
   const [testEventType, setTestEventType] =
-    useState<SupportedWebhookEvent>("charge.settled");
+    useState<SupportedWebhookEvent>("collection.paid");
   const [secretReveal, setSecretReveal] = useState<SecretReveal | null>(null);
 
   const keyPageSize = 12;
@@ -723,7 +723,7 @@ export default function DevelopersPage() {
               Webhook label
             </label>
             <Input
-              placeholder="Billing events"
+              placeholder="Payment events"
               value={newWebhook.label}
               onChange={(event) =>
                 setNewWebhook((current) => ({

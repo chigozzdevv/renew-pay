@@ -2,7 +2,7 @@
 
 import { fetchApi } from "@/lib/api";
 
-export type BillingMarketCatalogEntry = {
+export type CollectionMarketCatalogEntry = {
   currency: string;
   currencyName: string;
   symbol: string;
@@ -14,13 +14,13 @@ export type BillingMarketCatalogEntry = {
   estimatedSettlementTime: number | null;
 };
 
-export type BillingMarketCatalog = {
+export type CollectionMarketCatalog = {
   merchantSupportedMarkets: string[];
   defaultMarket: string | null;
-  markets: BillingMarketCatalogEntry[];
+  markets: CollectionMarketCatalogEntry[];
 };
 
-export type BillingMarketQuote = {
+export type CollectionMarketQuote = {
   currency: string;
   localAmount: number;
   usdcAmount: number;
@@ -45,36 +45,16 @@ export type BillingMarketQuote = {
   } | null;
 };
 
-export async function loadBillingMarketCatalog(input: {
+export async function loadCollectionMarketCatalog(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
 }) {
-  const response = await fetchApi<BillingMarketCatalog>("/dashboard/market-catalog", {
+  const response = await fetchApi<CollectionMarketCatalog>("/overview/market-catalog", {
     token: input.token,
     query: {
       merchantId: input.merchantId,
       environment: input.environment,
-    },
-  });
-
-  return response.data;
-}
-
-export async function loadPlanMarketQuote(input: {
-  token: string;
-  merchantId: string;
-  environment: "test" | "live";
-  planId: string;
-  currency: string;
-}) {
-  const response = await fetchApi<BillingMarketQuote>("/dashboard/market-quote", {
-    token: input.token,
-    query: {
-      merchantId: input.merchantId,
-      environment: input.environment,
-      planId: input.planId,
-      currency: input.currency,
     },
   });
 
