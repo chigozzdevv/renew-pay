@@ -196,7 +196,7 @@ export function MetricCard({
 }
 
 export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{children}</div>;
+  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
 }
 
 export function Badge({
