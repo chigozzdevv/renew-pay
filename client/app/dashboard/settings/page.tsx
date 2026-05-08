@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
@@ -17,11 +16,8 @@ import {
   Select,
 } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
-import { Logo } from "@/components/shared/logo";
 import DevelopersSettings from "@/components/dashboard/developers-settings";
 import { ApiError } from "@/lib/api";
-import { loadCollectionMarketCatalog } from "@/lib/markets";
-import { updateMerchantSupportedMarkets } from "@/lib/merchants";
 import {
   loadNotificationTemplatePreview,
   loadNotificationTemplates,
@@ -80,38 +76,8 @@ function formatAddress(value: string | null) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
-function formatMarket(currency: string) {
-  const labels: Record<string, string> = {
-    GHS: "Ghana cedi",
-    KES: "Kenyan shilling",
-    NGN: "Nigerian naira",
-  };
-
-  return labels[currency] ? `${labels[currency]} (${currency})` : currency;
-}
-
-function formatTimezone(value: string) {
-  const labels: Record<string, string> = {
-    "Africa/Lagos": "Lagos (WAT)",
-    "Africa/Nairobi": "Nairobi (EAT)",
-    UTC: "UTC",
-  };
-
-  return labels[value] ?? value.replace(/_/g, " ");
-}
-
 function formatCheckoutMode(value: CheckoutDraft["mode"]) {
   return value === "modal" ? "Embedded modal" : "Hosted redirect";
-}
-
-function formatBrandAccent(value: string) {
-  const labels: Record<string, string> = {
-    "dark-green": "Dark green",
-    "forest-green": "Forest green",
-    neutral: "Neutral",
-  };
-
-  return labels[value] ?? value.replace(/-/g, " ");
 }
 
 function toErrorMessage(error: unknown) {
@@ -138,15 +104,6 @@ export default function SettingsPage() {
       }),
     [mode]
   );
-  const { data: marketCatalog, reload: reloadMarketCatalog } = useResource(
-    async ({ token, merchantId }) =>
-      loadCollectionMarketCatalog({
-        token,
-        merchantId,
-        environment: mode,
-      }),
-    [mode]
-  );
   const { data: notificationTemplates } = useResource(
     async ({ token, merchantId }) =>
       loadNotificationTemplates({
@@ -161,7 +118,6 @@ export default function SettingsPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [showWalletEditor, setShowWalletEditor] = useState(false);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>(
     "customer.payment.receipt"
   );
@@ -174,7 +130,6 @@ export default function SettingsPage() {
     primaryWallet: "",
     walletAlerts: true,
   });
-  const [supportedMarketsDraft, setSupportedMarketsDraft] = useState<string[]>([]);
 
   useEffect(() => {
     const syncTab = () => {
@@ -205,14 +160,6 @@ export default function SettingsPage() {
       walletAlerts: data.wallets.walletAlerts,
     });
   }, [data]);
-
-  useEffect(() => {
-    if (!marketCatalog) {
-      return;
-    }
-
-    setSupportedMarketsDraft(marketCatalog.merchantSupportedMarkets);
-  }, [marketCatalog]);
 
   useEffect(() => {
     if (!notificationTemplates?.length) {
@@ -302,22 +249,6 @@ export default function SettingsPage() {
     setBusinessDraft((current) => (current ? { ...current, [key]: value } : current));
   }
 
-  function patchSupportedMarkets(nextMarkets: string[]) {
-    setSupportedMarketsDraft(nextMarkets);
-    setBusinessDraft((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        defaultMarket: nextMarkets.includes(current.defaultMarket)
-          ? current.defaultMarket
-          : (nextMarkets[0] ?? ""),
-      };
-    });
-  }
-
   function patchNotifications<K extends keyof NotificationsDraft>(
     key: K,
     value: NotificationsDraft[K],
@@ -334,23 +265,17 @@ export default function SettingsPage() {
   }
 
   async function handleWorkspaceSave() {
-    if (!token || !user?.merchantId || !businessDraft || supportedMarketsDraft.length === 0) {
+    if (!token || !user?.merchantId || !businessDraft) {
       return;
     }
 
     await runMutation("workspace-save", async () => {
-      await updateMerchantSupportedMarkets({
-        token,
-        merchantId: user.merchantId,
-        supportedMarkets: supportedMarketsDraft,
-      });
       await updateWorkspaceSettings({
         token,
         merchantId: user.merchantId,
         environment: mode,
         payload: { business: businessDraft },
       });
-      await reloadMarketCatalog();
       setActionMessage("Workspace settings saved.");
     });
   }
@@ -417,7 +342,6 @@ export default function SettingsPage() {
         walletAlerts: walletDraft.walletAlerts,
       });
       setActionMessage("Wallet settings saved.");
-      setShowWalletEditor(false);
     });
   }
 
@@ -439,11 +363,6 @@ export default function SettingsPage() {
       />
     );
   }
-
-  const availableMarkets = marketCatalog?.markets ?? [];
-  const supportedMarketOptions = availableMarkets.filter((market) =>
-    supportedMarketsDraft.includes(market.currency)
-  );
 
   return (
     <div className="space-y-4">
@@ -481,143 +400,49 @@ export default function SettingsPage() {
 
       {activeTab === "workspace" ? (
         <Card title="Business">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-start">
-            <div className="space-y-4">
-              <SettingsPanel title="Business details">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <SettingsField label="Business name">
-                    <Input
-                      value={businessDraft.name}
-                      onChange={(event) => patchBusiness("name", event.target.value)}
-                    />
-                  </SettingsField>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] xl:items-start">
+            <SettingsPanel title="Business details">
+              <div className="grid gap-4 md:grid-cols-2">
+                <SettingsField label="Business name">
+                  <Input
+                    value={businessDraft.name}
+                    onChange={(event) => patchBusiness("name", event.target.value)}
+                  />
+                </SettingsField>
 
-                  <SettingsField label="Support email">
-                    <Input
-                      type="email"
-                      value={businessDraft.supportEmail}
-                      onChange={(event) => patchBusiness("supportEmail", event.target.value)}
-                    />
-                  </SettingsField>
+                <SettingsField label="Support email">
+                  <Input
+                    type="email"
+                    value={businessDraft.supportEmail}
+                    onChange={(event) => patchBusiness("supportEmail", event.target.value)}
+                  />
+                </SettingsField>
 
-                  <SettingsField label="Checkout domain">
-                    <Input
-                      value={businessDraft.customerDomain}
-                      onChange={(event) => patchBusiness("customerDomain", event.target.value)}
-                    />
-                  </SettingsField>
-                </div>
-              </SettingsPanel>
+                <SettingsField label="Checkout domain">
+                  <Input
+                    value={businessDraft.customerDomain}
+                    onChange={(event) => patchBusiness("customerDomain", event.target.value)}
+                  />
+                </SettingsField>
+              </div>
+            </SettingsPanel>
 
-              <SettingsPanel title="Markets">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <SettingsField label="Primary market">
-                    <Select
-                      value={businessDraft.defaultMarket}
-                      onChange={(event) => patchBusiness("defaultMarket", event.target.value)}
-                    >
-                      {supportedMarketOptions.length === 0 ? (
-                        <option value="">Select a market</option>
-                      ) : null}
-                      {supportedMarketOptions.map((market) => (
-                        <option key={market.currency} value={market.currency}>
-                          {formatMarket(market.currency)}
-                        </option>
-                      ))}
-                    </Select>
-                  </SettingsField>
-
-                  <SettingsField label="Timezone">
-                    <Select
-                      value={businessDraft.timezone}
-                      onChange={(event) => patchBusiness("timezone", event.target.value)}
-                    >
-                      <option value="UTC">UTC</option>
-                      <option value="Africa/Lagos">Lagos (WAT)</option>
-                      <option value="Africa/Nairobi">Nairobi (EAT)</option>
-                    </Select>
-                  </SettingsField>
-                </div>
-
-                <div className="mt-4">
-                  <SettingsField label="Supported markets">
-                    <MarketMultiSelect
-                      options={availableMarkets}
-                      value={supportedMarketsDraft}
-                      onChange={patchSupportedMarkets}
-                      allLabel="All available markets"
-                      placeholder="Select supported markets"
-                    />
-                  </SettingsField>
-                </div>
-              </SettingsPanel>
-            </div>
-
-            <div className="space-y-4">
-              <SettingsPanel title="Branding">
-                <div className="space-y-4">
-                  <SettingsField label="Brand logo">
-                    <ImageUpload
-                      token={token}
-                      value={businessDraft.logoUrl}
-                      alt={`${businessDraft.name} logo`}
-                      onChange={(nextValue) => patchBusiness("logoUrl", nextValue)}
-                      disabled={busyAction === "workspace-save"}
-                    />
-                  </SettingsField>
-
-                  <SettingsField label="Brand accent">
-                    <Select
-                      value={businessDraft.brandAccent}
-                      onChange={(event) => patchBusiness("brandAccent", event.target.value)}
-                    >
-                      <option value="forest-green">Forest green</option>
-                      <option value="dark-green">Dark green</option>
-                      <option value="neutral">Neutral</option>
-                    </Select>
-                  </SettingsField>
-
-                  <SettingsField label="Statement name">
-                    <Input
-                      value={businessDraft.statementDescriptor}
-                      onChange={(event) =>
-                        patchBusiness("statementDescriptor", event.target.value.toUpperCase())
-                      }
-                    />
-                  </SettingsField>
-                </div>
-              </SettingsPanel>
-
-              <SettingsPanel title="Preview">
-                <div className="space-y-4">
-                  <div className="flex h-20 items-center justify-center rounded-2xl border border-[color:var(--line)] bg-white px-4">
-                    {businessDraft.logoUrl ? (
-                      <img
-                        src={businessDraft.logoUrl}
-                        alt={`${businessDraft.name} logo`}
-                        className="max-h-10 w-auto object-contain"
-                      />
-                    ) : (
-                      <Logo />
-                    )}
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <SettingsMiniStat label="Market" value={formatMarket(businessDraft.defaultMarket)} />
-                    <SettingsMiniStat label="Timezone" value={formatTimezone(businessDraft.timezone)} />
-                    <SettingsMiniStat label="Brand" value={formatBrandAccent(businessDraft.brandAccent)} />
-                    <SettingsMiniStat label="Statement" value={businessDraft.statementDescriptor} />
-                  </div>
-                </div>
-              </SettingsPanel>
-            </div>
+            <SettingsPanel title="Brand logo">
+              <ImageUpload
+                token={token}
+                value={businessDraft.logoUrl}
+                alt={`${businessDraft.name} logo`}
+                onChange={(nextValue) => patchBusiness("logoUrl", nextValue)}
+                disabled={busyAction === "workspace-save"}
+              />
+            </SettingsPanel>
           </div>
 
           <div className="mt-6 flex justify-end">
             <Button
               type="button"
               tone="brand"
-              disabled={busyAction === "workspace-save" || supportedMarketsDraft.length === 0}
+              disabled={busyAction === "workspace-save"}
               onClick={() => void handleWorkspaceSave()}
             >
               Save workspace
@@ -639,54 +464,28 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                    Payout destination
-                  </p>
-                </div>
-                <Button type="button" onClick={() => setShowWalletEditor((current) => !current)}>
-                  {showWalletEditor ? "Done" : "Edit"}
+              <SettingsField label="Payout wallet">
+                <Input
+                  value={walletDraft.primaryWallet}
+                  onChange={(event) =>
+                    setWalletDraft((current) => ({
+                      ...current,
+                      primaryWallet: event.target.value,
+                    }))
+                  }
+                />
+              </SettingsField>
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  tone="brand"
+                  disabled={busyAction === "wallet-save"}
+                  onClick={() => void handleWalletSave()}
+                >
+                  Save settlement
                 </Button>
               </div>
-
-              <SettingsToggle
-                label="Wallet alerts"
-                enabled={walletDraft.walletAlerts}
-                onToggle={() =>
-                  setWalletDraft((current) => ({
-                    ...current,
-                    walletAlerts: !current.walletAlerts,
-                  }))
-                }
-              />
-
-              {showWalletEditor ? (
-                <div className="space-y-4">
-                  <SettingsField label="Primary payout wallet">
-                    <Input
-                      value={walletDraft.primaryWallet}
-                      onChange={(event) =>
-                        setWalletDraft((current) => ({
-                          ...current,
-                          primaryWallet: event.target.value,
-                        }))
-                      }
-                    />
-                  </SettingsField>
-
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      tone="brand"
-                      disabled={busyAction === "wallet-save"}
-                      onClick={() => void handleWalletSave()}
-                    >
-                      Save wallet settings
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
         </Card>
@@ -698,6 +497,7 @@ export default function SettingsPage() {
             <SettingsField label="Checkout opens as">
               <Select
                 value={checkoutDraft.mode}
+                wrapperClassName="w-56 max-w-full"
                 onChange={(event) =>
                   patchCheckout("mode", event.target.value as CheckoutDraft["mode"])
                 }
@@ -908,25 +708,6 @@ function SettingsPanel({
         {title}
       </p>
       <div className="mt-4">{children}</div>
-    </div>
-  );
-}
-
-function SettingsMiniStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
-      <p className="text-xs font-semibold text-[color:var(--muted)]">
-        {label}
-      </p>
-      <p className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-        {value}
-      </p>
     </div>
   );
 }

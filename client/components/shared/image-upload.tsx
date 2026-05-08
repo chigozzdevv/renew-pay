@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { Button, Input } from "@/components/dashboard/ui";
+import { Button } from "@/components/dashboard/ui";
 import { ApiError } from "@/lib/api";
 import { uploadLogoToCloudinary } from "@/lib/media";
 import { Logo } from "@/components/shared/logo";
@@ -39,11 +39,6 @@ export function ImageUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [urlDraft, setUrlDraft] = useState(value ?? "");
-
-  useEffect(() => {
-    setUrlDraft(value ?? "");
-  }, [value]);
 
   async function handleFileSelect(file: File) {
     if (!token) {
@@ -69,7 +64,6 @@ export function ImageUpload({
         file,
         token,
       });
-      setUrlDraft(nextUrl);
       onChange(nextUrl);
     } catch (uploadError) {
       setError(toErrorMessage(uploadError));
@@ -78,25 +72,6 @@ export function ImageUpload({
       if (inputRef.current) {
         inputRef.current.value = "";
       }
-    }
-  }
-
-  function applyUrl() {
-    const nextValue = urlDraft.trim();
-
-    if (!nextValue) {
-      setError(null);
-      onChange(null);
-      return;
-    }
-
-    try {
-      const normalized = new URL(nextValue).toString();
-      setError(null);
-      setUrlDraft(normalized);
-      onChange(normalized);
-    } catch {
-      setError("Enter a valid image URL.");
     }
   }
 
@@ -132,22 +107,13 @@ export function ImageUpload({
         >
           {isUploading ? "Uploading..." : value ? "Replace image" : "Upload image"}
         </Button>
-        <Button
-          type="button"
-          tone="neutral"
-          disabled={disabled || isUploading}
-          onClick={applyUrl}
-        >
-          Use URL
-        </Button>
-        {(value || urlDraft.trim()) ? (
+        {value ? (
           <Button
             type="button"
             tone="neutral"
             disabled={disabled || isUploading}
             onClick={() => {
               setError(null);
-              setUrlDraft("");
               onChange(null);
             }}
           >
@@ -156,19 +122,8 @@ export function ImageUpload({
         ) : null}
       </div>
 
-      <Input
-        type="url"
-        value={urlDraft}
-        onChange={(event) => {
-          setError(null);
-          setUrlDraft(event.target.value);
-        }}
-        placeholder="https://..."
-        disabled={disabled || isUploading}
-      />
-
       <p className="text-xs leading-6 text-[color:var(--muted)]">
-        Upload a file or paste an image URL. PNG, JPG, WEBP, or SVG. Max 5MB.
+        PNG, JPG, WEBP, or SVG. Max 5MB.
       </p>
 
       {error ? (

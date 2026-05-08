@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, Pencil } from "lucide-react";
+import { Ban, Pencil, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -457,7 +457,12 @@ export default function DevelopersPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card
           title="Server keys"
-          action={<Button tone="brand" onClick={() => setShowCreateKey(true)}>Create key</Button>}
+          action={
+            <Button tone="brand" className="gap-2" onClick={() => setShowCreateKey(true)}>
+              <Plus className="h-4 w-4" strokeWidth={2.2} />
+              Create key
+            </Button>
+          }
         >
           <div className="space-y-4">
             {keys.length === 0 ? (
@@ -481,7 +486,7 @@ export default function DevelopersPage() {
                       <div className="self-center">
                         <StatusBadge value={key.status} />
                       </div>
-                      <div className="flex justify-start md:justify-end">
+                      <div className="flex justify-start">
                         {key.status === "active" ? (
                           <RowActionButton
                             label="Revoke key"
@@ -513,7 +518,12 @@ export default function DevelopersPage() {
 
         <Card
           title="Webhooks"
-          action={<Button tone="brand" onClick={() => setShowCreateWebhook(true)}>Create webhook</Button>}
+          action={
+            <Button tone="brand" className="gap-2" onClick={() => setShowCreateWebhook(true)}>
+              <Plus className="h-4 w-4" strokeWidth={2.2} />
+              Create webhook
+            </Button>
+          }
         >
           <div className="space-y-4">
             {webhooks.length === 0 ? (
@@ -538,7 +548,7 @@ export default function DevelopersPage() {
                     <div className="self-center">
                       <StatusBadge value={webhook.status} />
                     </div>
-                    <div className="flex items-center justify-start gap-2 md:justify-end">
+                    <div className="flex items-center justify-start gap-2">
                       <RowActionButton
                         label="Edit webhook"
                         tone="brand"
