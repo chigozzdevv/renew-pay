@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -201,10 +202,11 @@ export default function CustomersPage() {
       <Card
         title="Customers"
         action={
-          <Button tone="brand" onClick={() => {
+          <Button tone="brand" className="gap-2" onClick={() => {
             setDraft({ customerRef: "", name: "", email: "", market: marketCatalog?.defaultMarket ?? "" });
             setShowCreate(true);
           }}>
+            <Plus className="h-4 w-4" strokeWidth={2.2} />
             Add customer
           </Button>
         }

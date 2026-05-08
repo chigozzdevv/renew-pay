@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -169,7 +170,12 @@ export default function SettlementPage() {
 
       <Card
         title="Settlement"
-        action={<Button tone="brand" onClick={() => setShowCreate(true)}>New route</Button>}
+        action={
+          <Button tone="brand" className="gap-2" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" strokeWidth={2.2} />
+            New route
+          </Button>
+        }
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
