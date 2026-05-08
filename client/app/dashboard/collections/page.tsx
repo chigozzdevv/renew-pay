@@ -202,7 +202,11 @@ export default function CollectionsPage() {
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[160px_160px_minmax(0,1fr)]">
-            <Select value={status} onChange={(event) => setStatus(event.target.value as CollectionStatusFilter)}>
+            <Select
+              value={status}
+              wrapperClassName="w-40 max-w-full"
+              onChange={(event) => setStatus(event.target.value as CollectionStatusFilter)}
+            >
               <option value="all">All statuses</option>
               <option value="created">Created</option>
               <option value="collecting">Collecting</option>
@@ -210,7 +214,11 @@ export default function CollectionsPage() {
               <option value="failed">Failed</option>
               <option value="cancelled">Cancelled</option>
             </Select>
-            <Select value={recurring} onChange={(event) => setRecurring(event.target.value as RecurringFilter)}>
+            <Select
+              value={recurring}
+              wrapperClassName="w-44 max-w-full"
+              onChange={(event) => setRecurring(event.target.value as RecurringFilter)}
+            >
               <option value="all">All collections</option>
               <option value="false">One-time</option>
               <option value="true">Recurring</option>

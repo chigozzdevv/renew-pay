@@ -131,7 +131,11 @@ export default function PayoutsPage() {
       <Card title="Payouts">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-            <Select value={status} onChange={(event) => setStatus(event.target.value as PayoutStatusFilter)}>
+            <Select
+              value={status}
+              wrapperClassName="w-40 max-w-full"
+              onChange={(event) => setStatus(event.target.value as PayoutStatusFilter)}
+            >
               <option value="all">All statuses</option>
               <option value="queued">Queued</option>
               <option value="confirming">Confirming</option>

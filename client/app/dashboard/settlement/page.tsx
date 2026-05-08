@@ -180,7 +180,11 @@ export default function SettlementPage() {
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-            <Select value={provider} onChange={(event) => setProvider(event.target.value as SettlementRouteRecord["provider"] | "all")}>
+            <Select
+              value={provider}
+              wrapperClassName="w-44 max-w-full"
+              onChange={(event) => setProvider(event.target.value as SettlementRouteRecord["provider"] | "all")}
+            >
               <option value="all">All providers</option>
               <option value="direct">Standard</option>
               <option value="umbra">Private</option>

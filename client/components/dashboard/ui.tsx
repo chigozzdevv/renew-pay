@@ -363,10 +363,12 @@ export function Table({
   columns,
   children,
   bodyClassName,
+  gridClassName,
 }: {
   columns: string[];
   children: ReactNode;
   bodyClassName?: string;
+  gridClassName?: string;
 }) {
   const columnClass =
     columns.length === 3
@@ -384,7 +386,7 @@ export function Table({
       <div
         className={cn(
           "hidden gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--soft)] px-4 py-3 md:grid",
-          columnClass
+          gridClassName ?? columnClass
         )}
       >
         {columns.map((column) => (
@@ -412,10 +414,12 @@ export function TableRow({
   children,
   columns,
   selected,
+  gridClassName,
 }: {
   children: ReactNode;
   columns: 3 | 4 | 5 | 6;
   selected?: boolean;
+  gridClassName?: string;
 }) {
   return (
     <div
@@ -424,13 +428,14 @@ export function TableRow({
         selected
           ? "border-black/10 bg-[color:var(--soft)] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
           : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[color:var(--soft)]",
-        columns === 3
-          ? "md:grid-cols-3"
-          : columns === 4
-            ? "md:grid-cols-4"
-            : columns === 5
-              ? "md:grid-cols-5"
-              : "md:grid-cols-6"
+        gridClassName ??
+          (columns === 3
+            ? "md:grid-cols-3"
+            : columns === 4
+              ? "md:grid-cols-4"
+              : columns === 5
+                ? "md:grid-cols-5"
+                : "md:grid-cols-6")
       )}
     >
       {children}
@@ -497,11 +502,14 @@ export function Input({
 
 export function Select({
   className,
+  wrapperClassName,
   children,
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  wrapperClassName?: string;
+}) {
   return (
-    <div className="relative w-full">
+    <div className={cn("relative", wrapperClassName ?? "w-full")}>
       <select
         {...props}
         className={cn(

@@ -39,6 +39,9 @@ import {
 
 type CustomerStatusFilter = CustomerRecord["status"] | "all";
 
+const CUSTOMER_TABLE_GRID =
+  "md:grid-cols-[minmax(220px,1.45fr)_72px_minmax(96px,0.8fr)_minmax(132px,0.95fr)_88px_116px]";
+
 export default function CustomersPage() {
   const { token, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
@@ -233,7 +236,11 @@ export default function CustomersPage() {
       >
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-            <Select value={status} onChange={(e) => { setStatus(e.target.value as CustomerStatusFilter); setPage(1); }}>
+            <Select
+              value={status}
+              wrapperClassName="w-40 max-w-full"
+              onChange={(e) => { setStatus(e.target.value as CustomerStatusFilter); setPage(1); }}
+            >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -249,12 +256,15 @@ export default function CustomersPage() {
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#a8382b]">{errorMessage}</p> : null}
 
-          <Table columns={["Customer", "Market", "Volume", "Created", "Status", "Actions"]}>
+          <Table
+            columns={["Customer", "Market", "Volume", "Created", "Status", "Actions"]}
+            gridClassName={CUSTOMER_TABLE_GRID}
+          >
             {customers.map((customer) => (
-              <TableRow key={customer.id} columns={6}>
-                <button type="button" className="text-left outline-none" onClick={() => setDetailCustomer(customer)}>
-                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{customer.name}</p>
-                  <p className="mt-1 text-sm text-[color:var(--muted)]">{customer.email}</p>
+              <TableRow key={customer.id} columns={6} gridClassName={CUSTOMER_TABLE_GRID}>
+                <button type="button" className="min-w-0 text-left outline-none" onClick={() => setDetailCustomer(customer)}>
+                  <p className="truncate text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]" title={customer.name}>{customer.name}</p>
+                  <p className="mt-1 truncate text-sm text-[color:var(--muted)]" title={customer.email}>{customer.email}</p>
                 </button>
                 <p className="self-center text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{customer.market}</p>
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatCurrency(customer.monthlyVolumeUsdc)}</p>

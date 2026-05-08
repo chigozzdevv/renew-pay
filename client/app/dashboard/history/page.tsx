@@ -76,7 +76,11 @@ export default function HistoryPage() {
       <Card title="History">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[190px_minmax(0,1fr)]">
-            <Select value={type} onChange={(event) => setType(event.target.value as HistoryFilter)}>
+            <Select
+              value={type}
+              wrapperClassName="w-48 max-w-full"
+              onChange={(event) => setType(event.target.value as HistoryFilter)}
+            >
               <option value="all">All events</option>
               <option value="payment">Collections</option>
               <option value="payout">Payouts</option>
