@@ -116,6 +116,32 @@ export async function createCustomer(input: {
   return response.data;
 }
 
+export async function updateCustomer(input: {
+  token: string;
+  merchantId: string;
+  environment: "test" | "live";
+  customerId: string;
+  name: string;
+  email: string;
+  market: string;
+}) {
+  const response = await fetchApi<CustomerRecord>(`/customers/${input.customerId}`, {
+    method: "PATCH",
+    token: input.token,
+    query: {
+      merchantId: input.merchantId,
+      environment: input.environment,
+    },
+    body: JSON.stringify({
+      name: input.name,
+      email: input.email,
+      market: input.market,
+    }),
+  });
+
+  return response.data;
+}
+
 export async function blacklistCustomer(input: {
   token: string;
   merchantId: string;

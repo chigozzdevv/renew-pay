@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Ban, Eye, Pencil, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -32,6 +32,7 @@ import {
   blacklistCustomer,
   createCustomer,
   loadCustomersPage,
+  updateCustomer,
   type CustomerRecord,
 } from "@/lib/customers";
 
@@ -49,6 +50,7 @@ export default function CustomersPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<CustomerRecord | null>(null);
+  const [editCustomer, setEditCustomer] = useState<CustomerRecord | null>(null);
   const [blacklistTarget, setBlacklistTarget] = useState<CustomerRecord | null>(null);
 
   const [draft, setDraft] = useState({
@@ -159,6 +161,23 @@ export default function CustomersPage() {
     });
   }
 
+  async function handleUpdate() {
+    if (!token || !user?.merchantId || !editCustomer) return;
+    await runAction("update-customer", async () => {
+      await updateCustomer({
+        token,
+        merchantId: user.merchantId,
+        environment: mode,
+        customerId: editCustomer.id,
+        name: draft.name.trim(),
+        email: draft.email.trim(),
+        market: draft.market.trim().toUpperCase(),
+      });
+      setEditCustomer(null);
+      setMessage("Customer updated.");
+    });
+  }
+
   async function handleBlacklist() {
     if (!token || !user?.merchantId || !blacklistTarget) return;
     await runAction("blacklist", async () => {
@@ -171,7 +190,7 @@ export default function CustomersPage() {
       });
       setBlacklistTarget(null);
       setDetailCustomer(null);
-      setMessage("Customer blacklisted.");
+      setMessage("Customer blocked.");
     });
   }
 
@@ -241,14 +260,35 @@ export default function CustomersPage() {
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(customer.createdAt)}</p>
                 <div className="flex items-center gap-2 self-center">
                   <StatusBadge value={customer.status} />
+                  <CustomerActionButton
+                    label="View customer"
+                    onClick={() => setDetailCustomer(customer)}
+                  >
+                    <Eye className="h-4 w-4" strokeWidth={2.1} />
+                  </CustomerActionButton>
+                  <CustomerActionButton
+                    label="Edit customer"
+                    onClick={() => {
+                      setDraft({
+                        customerRef: customer.customerRef,
+                        name: customer.name,
+                        email: customer.email,
+                        market: customer.market,
+                      });
+                      setEditCustomer(customer);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" strokeWidth={2.1} />
+                  </CustomerActionButton>
                   {customer.status !== "blacklisted" ? (
-                    <button
-                      type="button"
+                    <CustomerActionButton
+                      label="Block customer"
+                      tone="danger"
+                      disabled={isBusy === "blacklist"}
                       onClick={() => setBlacklistTarget(customer)}
-                      className="rounded-lg border border-[#dcb7b0] bg-[#fff7f6] px-3 py-1.5 text-xs font-semibold text-[#922f25] transition-colors hover:bg-[#ffefed]"
                     >
-                      Block
-                    </button>
+                      <Ban className="h-4 w-4" strokeWidth={2.1} />
+                    </CustomerActionButton>
                   ) : null}
                 </div>
               </TableRow>
@@ -308,6 +348,45 @@ export default function CustomersPage() {
       </Modal>
 
       <Modal
+        open={!!editCustomer}
+        onClose={() => setEditCustomer(null)}
+        title="Edit customer"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button onClick={() => setEditCustomer(null)}>Cancel</Button>
+            <Button
+              tone="brand"
+              disabled={isBusy === "update-customer" || !draft.name.trim() || !draft.email.trim() || !draft.market}
+              onClick={() => void handleUpdate()}
+            >
+              {isBusy === "update-customer" ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Customer ref" value={draft.customerRef} />
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">Market</label>
+            <Select value={draft.market} onChange={(e) => setDraft((c) => ({ ...c, market: e.target.value }))}>
+              <option value="">Select market</option>
+              {supportedMarkets.map((market) => (
+                <option key={market.currency} value={market.currency}>{market.currency}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">Name</label>
+            <Input placeholder="Customer name" value={draft.name} onChange={(e) => setDraft((c) => ({ ...c, name: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-[color:var(--muted)]">Email</label>
+            <Input placeholder="Customer email" value={draft.email} onChange={(e) => setDraft((c) => ({ ...c, email: e.target.value }))} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={!!detailCustomer}
         onClose={() => setDetailCustomer(null)}
         title={detailCustomer?.name ?? "Customer profile"}
@@ -324,7 +403,7 @@ export default function CustomersPage() {
                     setBlacklistTarget(detailCustomer);
                   }}
                 >
-                  Blacklist
+                  Block
                 </Button>
               ) : null}
             </div>
@@ -352,7 +431,7 @@ export default function CustomersPage() {
       <Modal
         open={!!blacklistTarget}
         onClose={() => setBlacklistTarget(null)}
-        title="Blacklist customer"
+        title="Block customer"
         size="sm"
         footer={
           <div className="flex items-center justify-end gap-3">
@@ -362,15 +441,46 @@ export default function CustomersPage() {
               disabled={isBusy === "blacklist"}
               onClick={() => void handleBlacklist()}
             >
-              {isBusy === "blacklist" ? "Blocking..." : "Blacklist"}
+              {isBusy === "blacklist" ? "Blocking..." : "Block"}
             </Button>
           </div>
         }
       >
         <p className="text-sm leading-7 text-[color:var(--muted)]">
-          Blacklist <span className="font-semibold text-[color:var(--ink)]">{blacklistTarget?.name}</span>?
+          Block <span className="font-semibold text-[color:var(--ink)]">{blacklistTarget?.name}</span>?
         </p>
       </Modal>
     </div>
+  );
+}
+
+function CustomerActionButton({
+  label,
+  children,
+  tone = "neutral",
+  disabled,
+  onClick,
+}: {
+  label: string;
+  children: ReactNode;
+  tone?: "neutral" | "danger";
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={
+        tone === "danger"
+          ? "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e0beb7] bg-[#fff8f7] text-[#922f25] transition-colors hover:bg-[#ffefed] disabled:cursor-not-allowed disabled:opacity-50"
+          : "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--line)] bg-white text-[color:var(--ink)] transition-colors hover:bg-[color:var(--soft)] disabled:cursor-not-allowed disabled:opacity-50"
+      }
+    >
+      {children}
+    </button>
   );
 }
