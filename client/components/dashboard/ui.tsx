@@ -470,7 +470,7 @@ export function Select({
       <select
         {...props}
         className={cn(
-          "h-10 w-full appearance-none rounded-lg border border-[color:var(--line)] bg-white px-3 pr-14 text-sm font-medium text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
+          "h-10 w-full appearance-none rounded-lg border border-[color:var(--line)] bg-white px-3 pr-12 text-sm font-medium text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
           className
         )}
       >
@@ -479,7 +479,7 @@ export function Select({
       <svg
         aria-hidden="true"
         viewBox="0 0 16 16"
-        className="pointer-events-none absolute right-6 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--ink)]"
+        className="pointer-events-none absolute right-5 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--ink)]"
         fill="none"
       >
         <path
