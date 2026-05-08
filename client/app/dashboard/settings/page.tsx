@@ -80,6 +80,40 @@ function formatAddress(value: string | null) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
+function formatMarket(currency: string) {
+  const labels: Record<string, string> = {
+    GHS: "Ghana cedi",
+    KES: "Kenyan shilling",
+    NGN: "Nigerian naira",
+  };
+
+  return labels[currency] ? `${labels[currency]} (${currency})` : currency;
+}
+
+function formatTimezone(value: string) {
+  const labels: Record<string, string> = {
+    "Africa/Lagos": "Lagos (WAT)",
+    "Africa/Nairobi": "Nairobi (EAT)",
+    UTC: "UTC",
+  };
+
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function formatCheckoutMode(value: CheckoutDraft["mode"]) {
+  return value === "modal" ? "Embedded modal" : "Hosted redirect";
+}
+
+function formatBrandAccent(value: string) {
+  const labels: Record<string, string> = {
+    "dark-green": "Dark green",
+    "forest-green": "Forest green",
+    neutral: "Neutral",
+  };
+
+  return labels[value] ?? value.replace(/-/g, " ");
+}
+
 function toErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
     return error.message;
@@ -225,7 +259,7 @@ export default function SettingsPage() {
         { key: "workspace", label: "Business" },
         { key: "checkout", label: "Checkout" },
         { key: "developers", label: "Developers" },
-        { key: "wallets", label: "Wallets" },
+        { key: "wallets", label: "Settlement" },
         { key: "notifications", label: "Notifications" },
         { key: "security", label: "Security" },
       ] satisfies Array<{ key: SettingsTabKey; label: string }>,
@@ -421,7 +455,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() => selectTab(tab.key)}
               className={cn(
-                "rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all duration-200",
+                "rounded-lg px-3 py-2 text-sm font-semibold tracking-[-0.02em] transition-all duration-200",
                 activeTab === tab.key
                   ? "bg-[#111111] text-white"
                   : "border border-[color:var(--line)] bg-white text-[color:var(--muted)] hover:bg-[#f8f8fb]",
@@ -446,10 +480,10 @@ export default function SettingsPage() {
       </Card>
 
       {activeTab === "workspace" ? (
-        <Card title="Workspace">
+        <Card title="Business">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-start">
             <div className="space-y-4">
-              <SettingsPanel title="Business profile">
+              <SettingsPanel title="Business details">
                 <div className="grid gap-4 md:grid-cols-2">
                   <SettingsField label="Business name">
                     <Input
@@ -466,7 +500,7 @@ export default function SettingsPage() {
                     />
                   </SettingsField>
 
-                  <SettingsField label="Customer domain">
+                  <SettingsField label="Checkout domain">
                     <Input
                       value={businessDraft.customerDomain}
                       onChange={(event) => patchBusiness("customerDomain", event.target.value)}
@@ -475,7 +509,7 @@ export default function SettingsPage() {
                 </div>
               </SettingsPanel>
 
-              <SettingsPanel title="Business identity">
+              <SettingsPanel title="Markets">
                 <div className="grid gap-4 md:grid-cols-2">
                   <SettingsField label="Primary market">
                     <Select
@@ -487,7 +521,7 @@ export default function SettingsPage() {
                       ) : null}
                       {supportedMarketOptions.map((market) => (
                         <option key={market.currency} value={market.currency}>
-                          {market.currency}
+                          {formatMarket(market.currency)}
                         </option>
                       ))}
                     </Select>
@@ -499,50 +533,23 @@ export default function SettingsPage() {
                       onChange={(event) => patchBusiness("timezone", event.target.value)}
                     >
                       <option value="UTC">UTC</option>
-                      <option value="Africa/Lagos">Africa/Lagos</option>
-                      <option value="Africa/Nairobi">Africa/Nairobi</option>
+                      <option value="Africa/Lagos">Lagos (WAT)</option>
+                      <option value="Africa/Nairobi">Nairobi (EAT)</option>
                     </Select>
                   </SettingsField>
+                </div>
 
-                  <SettingsField label="Display">
-                    <Select
-                      value={businessDraft.displayMode}
-                      onChange={(event) => patchBusiness("displayMode", event.target.value)}
-                    >
-                      <option value="local-fiat">Customer local fiat</option>
-                      <option value="usd-reference">USD reference</option>
-                    </Select>
-                  </SettingsField>
-
-                  <SettingsField label="Fallback currency">
-                    <Select
-                      value={businessDraft.fallbackCurrency}
-                      onChange={(event) => patchBusiness("fallbackCurrency", event.target.value)}
-                    >
-                      <option value="USDC">USDC</option>
-                      <option value="USD">USD</option>
-                    </Select>
-                  </SettingsField>
-
-                  <SettingsField label="Statement descriptor">
-                    <Input
-                      value={businessDraft.statementDescriptor}
-                      onChange={(event) =>
-                        patchBusiness("statementDescriptor", event.target.value.toUpperCase())
-                      }
+                <div className="mt-4">
+                  <SettingsField label="Supported markets">
+                    <MarketMultiSelect
+                      options={availableMarkets}
+                      value={supportedMarketsDraft}
+                      onChange={patchSupportedMarkets}
+                      allLabel="All available markets"
+                      placeholder="Select supported markets"
                     />
                   </SettingsField>
                 </div>
-              </SettingsPanel>
-
-              <SettingsPanel title="Supported markets">
-                <MarketMultiSelect
-                  options={availableMarkets}
-                  value={supportedMarketsDraft}
-                  onChange={patchSupportedMarkets}
-                  allLabel="All available markets"
-                  placeholder="Select supported markets"
-                />
               </SettingsPanel>
             </div>
 
@@ -570,6 +577,14 @@ export default function SettingsPage() {
                     </Select>
                   </SettingsField>
 
+                  <SettingsField label="Statement name">
+                    <Input
+                      value={businessDraft.statementDescriptor}
+                      onChange={(event) =>
+                        patchBusiness("statementDescriptor", event.target.value.toUpperCase())
+                      }
+                    />
+                  </SettingsField>
                 </div>
               </SettingsPanel>
 
@@ -587,10 +602,11 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <SettingsMiniStat label="Display" value={businessDraft.displayMode} />
-                    <SettingsMiniStat label="Fallback" value={businessDraft.fallbackCurrency} />
-                    <SettingsMiniStat label="Timezone" value={businessDraft.timezone} />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <SettingsMiniStat label="Market" value={formatMarket(businessDraft.defaultMarket)} />
+                    <SettingsMiniStat label="Timezone" value={formatTimezone(businessDraft.timezone)} />
+                    <SettingsMiniStat label="Brand" value={formatBrandAccent(businessDraft.brandAccent)} />
+                    <SettingsMiniStat label="Statement" value={businessDraft.statementDescriptor} />
                   </div>
                 </div>
               </SettingsPanel>
@@ -611,13 +627,13 @@ export default function SettingsPage() {
       ) : null}
 
       {activeTab === "wallets" ? (
-        <Card title="Wallets">
+        <Card title="Settlement">
           <div className="grid gap-6 xl:grid-cols-[1fr_1fr] xl:items-start">
             <div className="space-y-4">
               <SettingsSummaryRow
-                label="Primary payout wallet"
+                label="Payout wallet"
                 value={formatAddress(data.wallets.primaryWallet)}
-                badge="Primary"
+                badge="Default"
                 tone="brand"
               />
             </div>
@@ -625,15 +641,12 @@ export default function SettingsPage() {
             <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                    Wallet editor
-                  </p>
-                  <p className="mt-2 text-sm text-[color:var(--muted)]">
-                    Update payout destinations used for stable settlement.
+                  <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+                    Payout destination
                   </p>
                 </div>
                 <Button type="button" onClick={() => setShowWalletEditor((current) => !current)}>
-                  {showWalletEditor ? "Hide editor" : "Edit wallets"}
+                  {showWalletEditor ? "Done" : "Edit"}
                 </Button>
               </div>
 
@@ -682,25 +695,25 @@ export default function SettingsPage() {
       {activeTab === "checkout" ? (
         <Card title="Checkout">
           <div className="grid gap-4 md:grid-cols-2">
-            <SettingsField label="Mode">
+            <SettingsField label="Checkout opens as">
               <Select
                 value={checkoutDraft.mode}
                 onChange={(event) =>
                   patchCheckout("mode", event.target.value as CheckoutDraft["mode"])
                 }
               >
-                <option value="modal">Modal</option>
-                <option value="redirect">Redirect</option>
+                <option value="modal">{formatCheckoutMode("modal")}</option>
+                <option value="redirect">{formatCheckoutMode("redirect")}</option>
               </Select>
             </SettingsField>
-            <SettingsField label="Return page">
+            <SettingsField label="Return URL">
               <Input
                 placeholder="https://shop.example/orders/{reference}"
                 value={checkoutDraft.returnPage ?? ""}
                 onChange={(event) => patchCheckout("returnPage", event.target.value || null)}
               />
             </SettingsField>
-            <SettingsField label="Allowed domain">
+            <SettingsField label="Allowed domains">
               <Input
                 placeholder="shop.example"
                 value={checkoutDraft.allowedDomains.join(", ")}
@@ -737,7 +750,7 @@ export default function SettingsPage() {
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-2">
                 <SettingsToggle
-                  label="Verification alerts"
+                  label="Compliance alerts"
                   enabled={notificationsDraft.verificationAlerts}
                   onToggle={() =>
                     patchNotifications(
@@ -765,7 +778,7 @@ export default function SettingsPage() {
 
             <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
               <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
                   Email preview
                 </p>
                 <Select
@@ -781,7 +794,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+                <p className="text-xs font-semibold text-[color:var(--muted)]">
                   Subject
                 </p>
                 <div className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
@@ -841,7 +854,7 @@ export default function SettingsPage() {
             </SettingsField>
 
             <SettingsToggle
-              label="Enforce two-factor"
+              label="Require two-factor authentication"
               enabled={securityDraft.enforceTwoFactor}
               onToggle={() =>
                 patchSecurity("enforceTwoFactor", !securityDraft.enforceTwoFactor)
@@ -874,7 +887,7 @@ function SettingsField({
 }) {
   return (
     <div className="space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+      <p className="text-xs font-semibold text-[color:var(--muted)]">
         {label}
       </p>
       {children}
@@ -891,7 +904,7 @@ function SettingsPanel({
 }) {
   return (
     <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+      <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
         {title}
       </p>
       <div className="mt-4">{children}</div>
@@ -908,7 +921,7 @@ function SettingsMiniStat({
 }) {
   return (
     <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+      <p className="text-xs font-semibold text-[color:var(--muted)]">
         {label}
       </p>
       <p className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
@@ -933,7 +946,7 @@ function SettingsSummaryRow({
     <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
+          <p className="text-xs font-semibold text-[color:var(--muted)]">
             {label}
           </p>
           <p className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
