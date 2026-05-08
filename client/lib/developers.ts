@@ -59,10 +59,8 @@ export type DeliveryRecord = {
 export type DeveloperWorkspace = {
   keys: DeveloperKeyRecord[];
   webhooks: WebhookRecord[];
-  deliveries: DeliveryRecord[];
   keysPagination: ApiPagination;
   webhooksPagination: ApiPagination;
-  deliveriesPagination: ApiPagination;
 };
 
 function resolvePagination(
@@ -89,18 +87,13 @@ export async function loadDeveloperWorkspace(input: {
   keyLimit?: number;
   webhookPage?: number;
   webhookLimit?: number;
-  deliveryPage?: number;
-  deliveryLimit?: number;
-  webhookId?: string | null;
 }) {
   const keyPage = input.keyPage ?? 1;
   const keyLimit = input.keyLimit ?? 12;
   const webhookPage = input.webhookPage ?? 1;
   const webhookLimit = input.webhookLimit ?? 12;
-  const deliveryPage = input.deliveryPage ?? 1;
-  const deliveryLimit = input.deliveryLimit ?? 12;
 
-  const [keysResponse, webhooksResponse, deliveriesResponse] = await Promise.all([
+  const [keysResponse, webhooksResponse] = await Promise.all([
     fetchApi<DeveloperKeyRecord[]>("/developers/keys", {
         token: input.token,
         query: {
@@ -119,22 +112,11 @@ export async function loadDeveloperWorkspace(input: {
           limit: webhookLimit,
         },
     }),
-    fetchApi<DeliveryRecord[]>("/developers/deliveries", {
-        token: input.token,
-        query: {
-          merchantId: input.merchantId,
-          environment: input.environment,
-          webhookId: input.webhookId ?? undefined,
-          page: deliveryPage,
-          limit: deliveryLimit,
-        },
-    }),
   ]);
 
   return {
     keys: keysResponse.data,
     webhooks: webhooksResponse.data,
-    deliveries: deliveriesResponse.data,
     keysPagination: resolvePagination(
       keysResponse.pagination,
       keyPage,
@@ -146,12 +128,6 @@ export async function loadDeveloperWorkspace(input: {
       webhookPage,
       webhookLimit,
       webhooksResponse.data.length
-    ),
-    deliveriesPagination: resolvePagination(
-      deliveriesResponse.pagination,
-      deliveryPage,
-      deliveryLimit,
-      deliveriesResponse.data.length
     ),
   } satisfies DeveloperWorkspace;
 }

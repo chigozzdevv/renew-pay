@@ -34,7 +34,6 @@ import {
   sendWebhookTest,
   supportedWebhookEvents,
   updateWebhook,
-  type DeliveryRecord,
   type DeveloperKeyRecord,
   type SupportedWebhookEvent,
   type WebhookRecord,
@@ -142,8 +141,6 @@ export default function DevelopersPage() {
   const { mode } = useWorkspaceMode();
   const [keyPage, setKeyPage] = useState(1);
   const [webhookPage, setWebhookPage] = useState(1);
-  const [deliveryPage, setDeliveryPage] = useState(1);
-  const [selectedWebhookId, setSelectedWebhookId] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -160,7 +157,6 @@ export default function DevelopersPage() {
 
   const keyPageSize = 12;
   const webhookPageSize = 12;
-  const deliveryPageSize = 12;
 
   const { data, isLoading, error, reload } = useResource(
     async ({ token, merchantId }) =>
@@ -172,16 +168,12 @@ export default function DevelopersPage() {
         keyLimit: keyPageSize,
         webhookPage,
         webhookLimit: webhookPageSize,
-        deliveryPage,
-        deliveryLimit: deliveryPageSize,
-        webhookId: selectedWebhookId,
       }),
-    [deliveryPage, keyPage, mode, selectedWebhookId, webhookPage]
+    [keyPage, mode, webhookPage]
   );
 
   const keys = data?.keys ?? [];
   const webhooks = data?.webhooks ?? [];
-  const deliveries = data?.deliveries ?? [];
   const keysPagination = data?.keysPagination ?? {
     page: keyPage,
     limit: keyPageSize,
@@ -194,14 +186,6 @@ export default function DevelopersPage() {
     total: webhooks.length,
     totalPages: 1,
   };
-  const deliveriesPagination = data?.deliveriesPagination ?? {
-    page: deliveryPage,
-    limit: deliveryPageSize,
-    total: deliveries.length,
-    totalPages: 1,
-  };
-  const selectedWebhook =
-    webhooks.find((webhook) => webhook.id === selectedWebhookId) ?? manageWebhook ?? null;
 
   useEffect(() => {
     if (!message && !errorMessage) {
@@ -219,12 +203,7 @@ export default function DevelopersPage() {
   useEffect(() => {
     setKeyPage(1);
     setWebhookPage(1);
-    setDeliveryPage(1);
   }, [mode]);
-
-  useEffect(() => {
-    setDeliveryPage(1);
-  }, [selectedWebhookId]);
 
   useEffect(() => {
     if (!manageWebhook) {
@@ -242,17 +221,8 @@ export default function DevelopersPage() {
       activeKeys: keys.filter((key) => key.status === "active").length,
       webhooks: webhooksPagination.total,
       activeWebhooks: webhooks.filter((webhook) => webhook.status === "active").length,
-      deliveries: deliveriesPagination.total,
-      failedDeliveries: deliveries.filter((delivery) => delivery.status === "failed").length,
     }),
-    [
-      deliveries,
-      deliveriesPagination.total,
-      keys,
-      keysPagination.total,
-      webhooks,
-      webhooksPagination.total,
-    ]
+    [keys, keysPagination.total, webhooks, webhooksPagination.total]
   );
 
   async function runAction(key: string, runner: () => Promise<void>) {
@@ -271,7 +241,6 @@ export default function DevelopersPage() {
   }
 
   function openManageWebhook(webhook: WebhookRecord) {
-    setSelectedWebhookId(webhook.id);
     setManageWebhook(webhook);
     setEditingWebhook(createWebhookDraft(webhook));
   }
@@ -338,10 +307,8 @@ export default function DevelopersPage() {
       });
 
       setWebhookPage(1);
-      setDeliveryPage(1);
       setShowCreateWebhook(false);
       setNewWebhook(createNewWebhookDraft());
-      setSelectedWebhookId(result.webhook.id);
       setSecretReveal({
         title: "Webhook secret created",
         value: result.secret,
@@ -470,16 +437,6 @@ export default function DevelopersPage() {
           value={String(metrics.webhooks)}
           note={`${metrics.activeWebhooks} active on page`}
         />
-        <MetricCard
-          label="Deliveries"
-          value={String(metrics.deliveries)}
-          note={selectedWebhook ? "For selected webhook" : "Current environment"}
-        />
-        <MetricCard
-          label="Failed"
-          value={String(metrics.failedDeliveries)}
-          note="Visible page"
-        />
       </StatGrid>
 
       {message ? (
@@ -601,73 +558,6 @@ export default function DevelopersPage() {
           </div>
         </Card>
       </div>
-
-      <Card
-        title="Webhook deliveries"
-        description={
-          selectedWebhook
-            ? `Recent delivery attempts for ${selectedWebhook.label}.`
-            : "Recent delivery attempts for the selected environment."
-        }
-        action={
-          selectedWebhookId ? (
-            <Button
-              onClick={() => {
-                setSelectedWebhookId(null);
-                setDeliveryPage(1);
-              }}
-            >
-              Clear filter
-            </Button>
-          ) : undefined
-        }
-      >
-        {deliveries.length === 0 ? (
-          <DeveloperEmptyState title="No deliveries yet" />
-        ) : (
-          <Table columns={["Event", "Attempts", "HTTP", "Delivered", "Status"]}>
-            {deliveries.map((delivery: DeliveryRecord) => (
-              <div key={delivery.id} className="space-y-2">
-                <TableRow columns={5}>
-                  <div>
-                    <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                      {delivery.eventType}
-                    </p>
-                    <p className="mt-1 text-sm text-[color:var(--muted)]">{delivery.eventId}</p>
-                  </div>
-                  <p className="self-center text-sm text-[color:var(--muted)]">
-                    {delivery.attempts}
-                  </p>
-                  <p className="self-center text-sm text-[color:var(--muted)]">
-                    {delivery.httpStatus ?? "--"}
-                  </p>
-                  <p className="self-center text-sm text-[color:var(--muted)]">
-                    {formatDateTime(delivery.deliveredAt)}
-                  </p>
-                  <div className="self-center">
-                    <StatusBadge value={delivery.status} />
-                  </div>
-                </TableRow>
-                {delivery.errorMessage ? (
-                  <div className="rounded-2xl border border-[#efe2df] bg-[#fff7f6] px-4 py-3 text-sm text-[#922f25]">
-                    {delivery.errorMessage}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </Table>
-        )}
-
-        <PaginationControls
-          page={deliveriesPagination.page}
-          total={deliveriesPagination.total}
-          totalPages={deliveriesPagination.totalPages}
-          onPrevious={() => setDeliveryPage((current) => Math.max(1, current - 1))}
-          onNext={() =>
-            setDeliveryPage((current) => Math.min(deliveriesPagination.totalPages, current + 1))
-          }
-        />
-      </Card>
 
       <Modal
         open={showCreateKey}
