@@ -262,6 +262,37 @@ export function Button({
   );
 }
 
+export function RowActionButton({
+  label,
+  children,
+  tone = "neutral",
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  tone?: "neutral" | "brand" | "danger";
+}) {
+  return (
+    <button
+      {...props}
+      type="button"
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        tone === "brand"
+          ? "border-[#111111] bg-[#111111] text-white hover:bg-[#333333]"
+          : tone === "danger"
+            ? "border-[#e0beb7] bg-[#fff8f7] text-[#922f25] hover:bg-[#ffefed]"
+            : "border-[color:var(--line)] bg-white text-[color:var(--ink)] hover:bg-[color:var(--soft)]",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function Field({
   label,
   value,
@@ -344,7 +375,9 @@ export function Table({
         ? "md:grid-cols-4"
         : columns.length === 5
           ? "md:grid-cols-5"
-          : "md:grid-cols-2";
+          : columns.length === 6
+            ? "md:grid-cols-6"
+            : "md:grid-cols-2";
 
   return (
     <div className="space-y-3">
@@ -381,7 +414,7 @@ export function TableRow({
   selected,
 }: {
   children: ReactNode;
-  columns: 3 | 4 | 5;
+  columns: 3 | 4 | 5 | 6;
   selected?: boolean;
 }) {
   return (
@@ -395,7 +428,9 @@ export function TableRow({
           ? "md:grid-cols-3"
           : columns === 4
             ? "md:grid-cols-4"
-            : "md:grid-cols-5"
+            : columns === 5
+              ? "md:grid-cols-5"
+              : "md:grid-cols-6"
       )}
     >
       {children}

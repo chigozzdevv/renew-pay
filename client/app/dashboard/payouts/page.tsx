@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Eye } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import {
@@ -22,6 +23,7 @@ import {
   MetricCard,
   Modal,
   PageState,
+  RowActionButton,
   Select,
   StatGrid,
   Table,
@@ -159,13 +161,12 @@ export default function PayoutsPage() {
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(payout.scheduledFor)}</p>
                 <div className="flex items-center gap-2 self-center">
                   <StatusBadge value={payout.status} />
-                  <button
-                    type="button"
+                  <RowActionButton
+                    label="View payout"
                     onClick={() => setDetailPayout(payout)}
-                    className="rounded-lg border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] hover:bg-[color:var(--soft)]"
                   >
-                    View
-                  </button>
+                    <Eye className="h-4 w-4" strokeWidth={2.1} />
+                  </RowActionButton>
                 </div>
               </TableRow>
             ))}

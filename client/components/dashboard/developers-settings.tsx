@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Ban, Pencil } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -20,6 +21,7 @@ import {
   Modal,
   PaginationControls,
   PageState,
+  RowActionButton,
   Select,
   StatGrid,
   Table,
@@ -148,6 +150,7 @@ export default function DevelopersPage() {
   const [showCreateKey, setShowCreateKey] = useState(false);
   const [showCreateWebhook, setShowCreateWebhook] = useState(false);
   const [manageWebhook, setManageWebhook] = useState<WebhookRecord | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<DeveloperKeyRecord | null>(null);
   const [editingWebhook, setEditingWebhook] = useState<WebhookDraft | null>(null);
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [newWebhook, setNewWebhook] = useState<WebhookDraft>(createNewWebhookDraft());
@@ -280,6 +283,7 @@ export default function DevelopersPage() {
         merchantId: key.merchantId,
         developerKeyId: key.id,
       });
+      setRevokeTarget(null);
       setMessage("Server key revoked.");
     });
   }
@@ -479,12 +483,14 @@ export default function DevelopersPage() {
                       </div>
                       <div className="flex justify-start md:justify-end">
                         {key.status === "active" ? (
-                          <Button
+                          <RowActionButton
+                            label="Revoke key"
+                            tone="danger"
                             disabled={isBusy === `revoke-key:${key.id}`}
-                            onClick={() => void handleRevokeKey(key)}
+                            onClick={() => setRevokeTarget(key)}
                           >
-                            Revoke
-                          </Button>
+                            <Ban className="h-4 w-4" strokeWidth={2.1} />
+                          </RowActionButton>
                         ) : null}
                       </div>
                     </TableRow>
@@ -533,13 +539,13 @@ export default function DevelopersPage() {
                       <StatusBadge value={webhook.status} />
                     </div>
                     <div className="flex items-center justify-start gap-2 md:justify-end">
-                      <button
-                        type="button"
+                      <RowActionButton
+                        label="Edit webhook"
+                        tone="brand"
                         onClick={() => openManageWebhook(webhook)}
-                        className="rounded-xl border border-[#111111] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#333333]"
                       >
-                        Manage
-                      </button>
+                        <Pencil className="h-4 w-4" strokeWidth={2.1} />
+                      </RowActionButton>
                     </div>
                   </TableRow>
                 ))}
@@ -587,6 +593,31 @@ export default function DevelopersPage() {
             onChange={(event) => setNewKeyLabel(event.target.value)}
           />
         </div>
+      </Modal>
+
+      <Modal
+        open={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        title="Revoke key"
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button onClick={() => setRevokeTarget(null)}>Cancel</Button>
+            <Button
+              tone="danger"
+              disabled={revokeTarget ? isBusy === `revoke-key:${revokeTarget.id}` : false}
+              onClick={() => revokeTarget && void handleRevokeKey(revokeTarget)}
+            >
+              {revokeTarget && isBusy === `revoke-key:${revokeTarget.id}`
+                ? "Revoking..."
+                : "Revoke"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-7 text-[color:var(--muted)]">
+          Revoke <span className="font-semibold text-[color:var(--ink)]">{revokeTarget?.label}</span>?
+        </p>
       </Modal>
 
       <Modal

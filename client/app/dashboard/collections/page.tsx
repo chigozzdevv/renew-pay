@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -22,6 +22,7 @@ import {
   Modal,
   PaginationControls,
   PageState,
+  RowActionButton,
   Select,
   StatGrid,
   Table,
@@ -241,13 +242,12 @@ export default function CollectionsPage() {
                   <StatusBadge value={collection.status} />
                 </div>
                 <div className="flex items-center gap-2 self-center">
-                  <button
-                    type="button"
+                  <RowActionButton
+                    label="View collection"
                     onClick={() => setDetailCollection(collection)}
-                    className="rounded-lg border border-[color:var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[color:var(--ink)] hover:bg-[color:var(--soft)]"
                   >
-                    View
-                  </button>
+                    <Eye className="h-4 w-4" strokeWidth={2.1} />
+                  </RowActionButton>
                 </div>
               </TableRow>
             ))}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -20,6 +20,7 @@ import {
   MetricCard,
   Modal,
   PageState,
+  RowActionButton,
   Select,
   StatGrid,
   Table,
@@ -189,9 +190,9 @@ export default function SettlementPage() {
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#9a3a31]">{errorMessage}</p> : null}
 
-          <Table columns={["Route", "Asset", "Mode", "Destination", "Status"]}>
+          <Table columns={["Route", "Asset", "Mode", "Destination", "Status", "Actions"]}>
             {routes.map((route) => (
-              <TableRow key={route.id} columns={5}>
+              <TableRow key={route.id} columns={6}>
                 <button type="button" className="min-w-0 text-left" onClick={() => setDetailRoute(route)}>
                   <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{route.name}</p>
                   <p className="mt-1 text-xs text-[color:var(--muted)]">{route.routeCode}</p>
@@ -202,6 +203,14 @@ export default function SettlementPage() {
                 <div className="flex items-center gap-2 self-center">
                   {route.isDefault ? <StatusBadge value="active">Default</StatusBadge> : null}
                   <StatusBadge value={route.status} />
+                </div>
+                <div className="flex items-center gap-2 self-center">
+                  <RowActionButton
+                    label="View route"
+                    onClick={() => setDetailRoute(route)}
+                  >
+                    <Eye className="h-4 w-4" strokeWidth={2.1} />
+                  </RowActionButton>
                 </div>
               </TableRow>
             ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Ban, Eye, Pencil, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
@@ -22,6 +22,7 @@ import {
   Modal,
   PaginationControls,
   PageState,
+  RowActionButton,
   Select,
   StatGrid,
   Table,
@@ -260,13 +261,13 @@ export default function CustomersPage() {
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(customer.createdAt)}</p>
                 <div className="flex items-center gap-2 self-center">
                   <StatusBadge value={customer.status} />
-                  <CustomerActionButton
+                  <RowActionButton
                     label="View customer"
                     onClick={() => setDetailCustomer(customer)}
                   >
                     <Eye className="h-4 w-4" strokeWidth={2.1} />
-                  </CustomerActionButton>
-                  <CustomerActionButton
+                  </RowActionButton>
+                  <RowActionButton
                     label="Edit customer"
                     onClick={() => {
                       setDraft({
@@ -279,16 +280,16 @@ export default function CustomersPage() {
                     }}
                   >
                     <Pencil className="h-4 w-4" strokeWidth={2.1} />
-                  </CustomerActionButton>
+                  </RowActionButton>
                   {customer.status !== "blacklisted" ? (
-                    <CustomerActionButton
+                    <RowActionButton
                       label="Block customer"
                       tone="danger"
                       disabled={isBusy === "blacklist"}
                       onClick={() => setBlacklistTarget(customer)}
                     >
                       <Ban className="h-4 w-4" strokeWidth={2.1} />
-                    </CustomerActionButton>
+                    </RowActionButton>
                   ) : null}
                 </div>
               </TableRow>
@@ -451,36 +452,5 @@ export default function CustomersPage() {
         </p>
       </Modal>
     </div>
-  );
-}
-
-function CustomerActionButton({
-  label,
-  children,
-  tone = "neutral",
-  disabled,
-  onClick,
-}: {
-  label: string;
-  children: ReactNode;
-  tone?: "neutral" | "danger";
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={
-        tone === "danger"
-          ? "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e0beb7] bg-[#fff8f7] text-[#922f25] transition-colors hover:bg-[#ffefed] disabled:cursor-not-allowed disabled:opacity-50"
-          : "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--line)] bg-white text-[color:var(--ink)] transition-colors hover:bg-[color:var(--soft)] disabled:cursor-not-allowed disabled:opacity-50"
-      }
-    >
-      {children}
-    </button>
   );
 }
