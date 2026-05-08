@@ -466,15 +466,31 @@ export function Select({
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select
-      {...props}
-      className={cn(
-        "h-10 w-full rounded-lg border border-[color:var(--line)] bg-white px-3 text-sm font-medium text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
-        className
-      )}
-    >
-      {children}
-    </select>
+    <div className="relative w-full">
+      <select
+        {...props}
+        className={cn(
+          "h-10 w-full appearance-none rounded-lg border border-[color:var(--line)] bg-white px-3 pr-14 text-sm font-medium text-[color:var(--ink)] outline-none transition-colors focus:border-[#111111]",
+          className
+        )}
+      >
+        {children}
+      </select>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        className="pointer-events-none absolute right-6 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--ink)]"
+        fill="none"
+      >
+        <path
+          d="M4 6L8 10L12 6"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
   );
 }
 
