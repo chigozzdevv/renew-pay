@@ -249,9 +249,9 @@ export default function CustomersPage() {
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#a8382b]">{errorMessage}</p> : null}
 
-          <Table columns={["Customer", "Market", "Volume", "Created", "Actions"]}>
+          <Table columns={["Customer", "Market", "Volume", "Created", "Status", "Actions"]}>
             {customers.map((customer) => (
-              <TableRow key={customer.id} columns={5}>
+              <TableRow key={customer.id} columns={6}>
                 <button type="button" className="text-left outline-none" onClick={() => setDetailCustomer(customer)}>
                   <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{customer.name}</p>
                   <p className="mt-1 text-sm text-[color:var(--muted)]">{customer.email}</p>
@@ -259,8 +259,10 @@ export default function CustomersPage() {
                 <p className="self-center text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">{customer.market}</p>
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatCurrency(customer.monthlyVolumeUsdc)}</p>
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(customer.createdAt)}</p>
-                <div className="flex items-center gap-2 self-center">
+                <div className="self-center">
                   <StatusBadge value={customer.status} />
+                </div>
+                <div className="flex items-center gap-2 self-center">
                   <RowActionButton
                     label="View customer"
                     onClick={() => setDetailCustomer(customer)}
@@ -392,28 +394,12 @@ export default function CustomersPage() {
         onClose={() => setDetailCustomer(null)}
         title={detailCustomer?.name ?? "Customer profile"}
         size="lg"
-        footer={
-          detailCustomer ? (
-            <div className="flex items-center justify-end gap-3">
-              {detailCustomer.status !== "blacklisted" ? (
-                <Button
-                  tone="danger"
-                  disabled={isBusy === "blacklist"}
-                  onClick={() => {
-                    setDetailCustomer(null);
-                    setBlacklistTarget(detailCustomer);
-                  }}
-                >
-                  Block
-                </Button>
-              ) : null}
-            </div>
-          ) : null
-        }
+        footer={<div className="flex justify-end"><Button onClick={() => setDetailCustomer(null)}>Close</Button></div>}
       >
         {detailCustomer ? (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Status" value={<StatusBadge value={detailCustomer.status} />} />
               <Field label="Market" value={detailCustomer.market} />
               <Field label="Monthly volume" value={formatCurrency(detailCustomer.monthlyVolumeUsdc)} />
               <Field label="Customer ref" value={detailCustomer.customerRef} />

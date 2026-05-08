@@ -149,9 +149,9 @@ export default function PayoutsPage() {
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#9a3a31]">{errorMessage}</p> : null}
 
-          <Table columns={["Batch", "Net", "Destination", "Scheduled", "Actions"]}>
+          <Table columns={["Batch", "Net", "Destination", "Scheduled", "Status", "Actions"]}>
             {payouts.map((payout) => (
-              <TableRow key={payout.id} columns={5}>
+              <TableRow key={payout.id} columns={6}>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{payout.batchRef}</p>
                   <p className="mt-1 text-xs text-[color:var(--muted)]">{payout.sourceKind}</p>
@@ -159,8 +159,10 @@ export default function PayoutsPage() {
                 <p className="self-center text-sm font-semibold text-[color:var(--ink)]">{formatCurrency(payout.netUsdc)}</p>
                 <p className="truncate self-center text-sm text-[color:var(--muted)]">{payout.destinationWallet}</p>
                 <p className="self-center text-sm text-[color:var(--muted)]">{formatDateTime(payout.scheduledFor)}</p>
-                <div className="flex items-center gap-2 self-center">
+                <div className="self-center">
                   <StatusBadge value={payout.status} />
+                </div>
+                <div className="flex items-center gap-2 self-center">
                   <RowActionButton
                     label="View payout"
                     onClick={() => setDetailPayout(payout)}
