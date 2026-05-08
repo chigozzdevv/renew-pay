@@ -53,7 +53,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center rounded-lg border border-[color:var(--line)] bg-white p-1">
+          <div className="inline-flex w-fit items-center rounded-lg border border-[color:var(--line)] bg-white p-1">
             <button
               type="button"
               onClick={() => void setMode("test")}
@@ -84,7 +84,6 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-
           <div className="relative" ref={notifRef}>
             <button
               type="button"
@@ -126,7 +125,7 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--line)] bg-white transition-colors hover:bg-[color:var(--soft)]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[color:var(--line)] bg-white px-2.5 transition-colors hover:bg-[color:var(--soft)]"
               aria-label="Open account menu"
               aria-expanded={profileOpen}
             >
@@ -139,6 +138,18 @@ export function DashboardTopbar({ onOpenSidebar }: DashboardTopbarProps) {
                     .join("")
                   : "RW"}
               </span>
+              <span className="hidden text-sm font-medium text-[color:var(--ink)] sm:inline">
+                {user?.name ?? "Renew Labs"}
+              </span>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 10 6"
+                className={`hidden h-2.5 w-2.5 text-[color:var(--muted)] transition-transform duration-150 sm:block ${profileOpen ? "rotate-180" : ""
+                  }`}
+                fill="none"
+              >
+                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
 
             {profileOpen ? (
