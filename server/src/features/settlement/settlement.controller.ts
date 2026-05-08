@@ -17,14 +17,15 @@ import { asyncHandler } from "@/shared/utils/async-handler";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
 
 function resolveMerchantScope(request: Request, fallback?: string) {
-  return request.platformAuthUser?.merchantId ?? fallback;
+  return request.platformAuthUser?.merchantId ?? request.developerAuth?.merchantId ?? fallback;
 }
 
 function resolveEnvironmentScope(request: Request) {
   return optionalEnvironmentInputSchema.parse(
-    typeof request.query.environment === "string"
+    request.developerAuth?.environment ??
+    (typeof request.query.environment === "string"
       ? request.query.environment
-      : request.body?.environment
+      : request.body?.environment)
   );
 }
 

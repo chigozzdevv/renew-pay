@@ -315,20 +315,30 @@ export default function PayPage() {
     }
 
     const timer = window.setTimeout(() => {
-      window.parent.postMessage(
-        {
-          source: "renew.checkout",
-          type: "success",
-          payId,
-        },
-        "*"
-      );
+      if (window.parent !== window) {
+        window.parent.postMessage(
+          {
+            source: "renew.checkout",
+            type: "success",
+            payId,
+          },
+          "*"
+        );
+        return;
+      }
+
+      if (payment?.checkout.returnPage) {
+        const returnUrl = new URL(payment.checkout.returnPage);
+        returnUrl.searchParams.set("collection", payId);
+        returnUrl.searchParams.set("status", "paid");
+        window.location.href = returnUrl.toString();
+      }
     }, 1500);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [checkoutState, payId]);
+  }, [checkoutState, payId, payment?.checkout.returnPage]);
 
   async function refreshPayment() {
     if (!payId) {

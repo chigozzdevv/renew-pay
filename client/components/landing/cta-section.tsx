@@ -5,7 +5,7 @@ import { GetStartedButton } from "@/components/shared/get-started";
 
 export function CTASection() {
   return (
-    <section id="enterprise" className="bg-[#fbfbfa] pb-14 pt-4 sm:pb-18 sm:pt-6">
+    <section id="enterprise" className="pb-14 pt-4 sm:pb-18 sm:pt-6">
       <Container>
         <Reveal offset={24}>
           <div className="relative overflow-hidden rounded-xl bg-[#111111] px-7 py-9 shadow-[0_22px_90px_rgba(18,32,22,0.12)] sm:px-10 sm:py-11 lg:px-12 lg:py-12">
@@ -39,9 +39,6 @@ export function CTASection() {
                 <h2 className="mx-auto max-w-[9ch] text-balance font-display text-[clamp(2.8rem,6vw,4.2rem)] leading-[0.95] tracking-[-0.05em] text-white lg:mx-0">
                   Start collecting locally.
                 </h2>
-                <p className="mt-4 text-sm font-medium text-white/58">
-                  Create collections, collect fiat, settle stable.
-                </p>
               </div>
 
               <div className="mx-auto flex flex-row flex-wrap items-center justify-center gap-3 lg:mx-0 lg:flex-col lg:items-end lg:justify-start">

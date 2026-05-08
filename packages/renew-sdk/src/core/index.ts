@@ -20,9 +20,20 @@ export type {
   RenewPaymentRecord,
   RenewPaymentRecurring,
   RenewPaymentStatus,
+  RenewPublicCheckoutState,
   RenewPublicPaymentRecord,
   RenewRecurringInterval,
   RenewRuntimeMode,
   StartRenewPublicPaymentInput,
   UpdateRenewPaymentInput,
 } from "../types/payment.js";
+export type {
+  CreateRenewSettlementRouteInput,
+  ListRenewSettlementRoutesQuery,
+  RenewSettlementChain,
+  RenewSettlementMode,
+  RenewSettlementProvider,
+  RenewSettlementRouteRecord,
+  RenewSettlementRouteStatus,
+  UpdateRenewSettlementRouteInput,
+} from "../types/settlement.js";

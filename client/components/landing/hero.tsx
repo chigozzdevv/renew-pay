@@ -8,7 +8,7 @@ import { supportedCollectionCurrencies } from "@/lib/content";
 
 export function Hero() {
   return (
-    <section className="bg-[#e8f5e9] py-[12vh] sm:py-[14vh] lg:py-[16vh]">
+    <section className="py-[12vh] sm:py-[14vh] lg:py-[16vh]">
       <Container className="w-full">
         <div className="flex flex-col lg:flex-row lg:items-center lg:gap-12">
           <div className="w-full shrink-0 lg:flex lg:min-h-[30rem] lg:w-[44%] lg:flex-col lg:justify-center">

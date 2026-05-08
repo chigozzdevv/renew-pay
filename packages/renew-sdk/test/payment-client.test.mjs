@@ -154,6 +154,70 @@ test("creates collections through the collections endpoint", async () => {
   });
 });
 
+test("creates settlement routes with server key scope", async () => {
+  let captured = null;
+
+  const client = createRenewPaymentClient({
+    environment: "sandbox",
+    fetch: async (url, init) => {
+      captured = { url, init };
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            id: "route_123",
+            merchantId: "merchant_123",
+            environment: "test",
+            routeCode: "main-wallet",
+            name: "Main wallet",
+            mode: "standard",
+            provider: "direct",
+            chain: "solana",
+            assetSymbol: "USDC",
+            assetMint: "EPjFWdd5AufqSSqeM2q7hF8uVjPgnjK4s7t1v6Xh4Jz",
+            assetDecimals: 6,
+            destinationAddress: "11111111111111111111111111111111",
+            feeBps: 0,
+            isDefault: true,
+            status: "active",
+            privacy: null,
+            metadata: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        }
+      );
+    },
+  });
+
+  await client.createSettlementRoute(
+    {
+      routeCode: "main-wallet",
+      name: "Main wallet",
+      destinationAddress: "11111111111111111111111111111111",
+      isDefault: true,
+    },
+    { secretKey: "rw_test_example" }
+  );
+
+  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/settlement/routes");
+  assert.equal(captured.init.method, "POST");
+  assert.equal(captured.init.headers["x-renew-secret-key"], "rw_test_example");
+  assert.deepEqual(JSON.parse(captured.init.body), {
+    routeCode: "main-wallet",
+    name: "Main wallet",
+    destinationAddress: "11111111111111111111111111111111",
+    isDefault: true,
+  });
+});
+
 test("starts a public payment with payer details", async () => {
   let captured = null;
 
@@ -182,6 +246,30 @@ test("starts a public payment with payer details", async () => {
               interval: null,
               intervalCount: null,
             },
+            customer: {
+              reference: "customer_123",
+              email: "customer@example.com",
+              name: "Amina Yusuf",
+            },
+            checkout: {
+              state: "show_bank_transfer",
+              verification: {
+                methods: [],
+                selectedMethod: null,
+                selectedHint: null,
+                phoneConfirmationRequired: false,
+                message: null,
+                bvnLast4: null,
+              },
+              returnPage: null,
+              bankTransfer: {
+                bankCode: "101",
+                bankName: "Providus Bank",
+                accountName: "Renew merchant - Amina Yusuf",
+                accountNumber: "1234567890",
+                currency: "NGN",
+              },
+            },
             collection: {
               provider: "partna",
               status: "pending",
@@ -189,7 +277,7 @@ test("starts a public payment with payer details", async () => {
               stableAmount: 16,
               feeAmount: 0,
               paidAt: null,
-              paymentUrl: "https://partna.example/pay",
+              paymentUrl: null,
             },
           },
         }),

@@ -129,6 +129,7 @@ export type RenewPublicPaymentRecord = {
       readonly message: string | null;
       readonly bvnLast4: string | null;
     };
+    readonly returnPage: string | null;
     readonly bankTransfer: {
       readonly bankCode: string | null;
       readonly bankName: string | null;

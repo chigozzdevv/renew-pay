@@ -430,7 +430,7 @@ async function toPublicPaymentResponse(document: PaymentRecord) {
       .lean()
       .exec(),
     SettingModel.findOne({ merchantId: document.merchantId })
-      .select({ business: 1 })
+      .select({ business: 1, checkout: 1 })
       .lean()
       .exec(),
     findPublicCheckoutCustomer(document),
@@ -488,6 +488,7 @@ async function toPublicPaymentResponse(document: PaymentRecord) {
         message: readString(partnaRaw.otpDispatchMessage),
         bvnLast4: readString(customerDocument?.paymentProfile?.partna?.bvnLast4),
       },
+      returnPage: setting?.checkout?.returnPage ?? null,
       bankTransfer: bankTransfer
         ? {
             bankCode: bankTransfer.bankCode ?? null,

@@ -48,6 +48,7 @@ export type PublicPayment = {
       message: string | null;
       bvnLast4: string | null;
     };
+    returnPage: string | null;
     bankTransfer: {
       bankCode: string | null;
       bankName: string | null;

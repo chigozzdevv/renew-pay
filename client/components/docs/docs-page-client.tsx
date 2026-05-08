@@ -31,7 +31,7 @@ type SidebarGroup = {
 
 const defaultCategory: DocsCategoryId = "api";
 const defaultPageId =
-  getDocsPage("guide-quickstart")?.id ?? getDocsPages(defaultCategory)[0]?.id ?? "";
+  getDocsPage("api-overview")?.id ?? getDocsPages(defaultCategory)[0]?.id ?? "";
 
 function getReferenceBadgeClassName(label: string) {
   const normalized = label.toUpperCase();

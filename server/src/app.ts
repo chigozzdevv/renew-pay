@@ -125,8 +125,7 @@ export function createApp() {
     );
     app.use(
       `${apiBasePath}/settlement`,
-      requirePlatformAuth,
-      requirePlatformPermissions(["settlement", "settings"]),
+      requireWorkspaceApiAuth(["settlement", "settings"]),
       blockLiveModeUntilLaunch(),
       settlementRouter
     );

@@ -3,6 +3,7 @@
 Renew SDK for:
 
 - collection creation
+- settlement routes
 - checkout links
 - browser checkout
 - webhook signing and verification helpers
@@ -13,30 +14,42 @@ Renew SDK for:
 npm install @renew.sh/sdk
 ```
 
-## Environments
+## Test and live
 
-Renew SDK supports two runtime environments:
-
-- `sandbox`
-- `live`
-
-You can configure the client with either:
-
-- `environment`
-- `apiOrigin`
-
-Server keys must use:
+The server SDK infers test or live from the server key:
 
 - `rw_test_*` for sandbox
 - `rw_live_*` for live
 
-## Server Usage
+Use `environment` or `apiOrigin` only for advanced overrides. The API host and key must still match.
+
+## One-Time Settlement Setup
+
+Create a default route from the dashboard or server SDK.
 
 ```ts
 import { renew } from "@renew.sh/sdk";
 
 const client = renew({
-  environment: "sandbox",
+  secretKey: process.env.RENEW_SECRET_KEY!,
+});
+
+await client.settlement.routes.create({
+  routeCode: "main-wallet",
+  name: "Main wallet",
+  destinationAddress: process.env.SETTLEMENT_WALLET!,
+  isDefault: true,
+});
+```
+
+## Server Usage
+
+Create a collection for each order on your server.
+
+```ts
+import { renew } from "@renew.sh/sdk";
+
+const client = renew({
   secretKey: process.env.RENEW_SECRET_KEY!,
 });
 
@@ -52,12 +65,25 @@ console.log(collection.id, collection.checkoutUrl);
 
 ## Browser Usage
 
-```ts
+```tsx
 "use client";
 
 import { checkout } from "@renew.sh/sdk";
 
-checkout.open(collection.checkoutUrl);
+export function PayButton({ orderId }: { orderId: string }) {
+  async function pay() {
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ orderId }),
+    });
+    const collection = await response.json();
+
+    await checkout.open(collection.checkoutUrl);
+  }
+
+  return <button onClick={pay}>Pay</button>;
+}
 ```
 
 ## React Usage
@@ -67,7 +93,7 @@ checkout.open(collection.checkoutUrl);
 
 import { RenewCheckout } from "@renew.sh/sdk/react";
 
-export function PayButton({ checkoutUrl }: { checkoutUrl: string }) {
+export function RenewPayButton({ checkoutUrl }: { checkoutUrl: string }) {
   return <RenewCheckout checkoutUrl={checkoutUrl}>Pay</RenewCheckout>;
 }
 ```
@@ -95,6 +121,7 @@ const isValid = verifyRenewWebhookSignature({
   - `renew(...)`
   - `checkout.open(...)`
   - collection client
+  - settlement route client
 - `@renew.sh/sdk/server`
   - server integration helpers
   - webhook signing and verification

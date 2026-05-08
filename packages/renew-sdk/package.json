@@ -1,7 +1,7 @@
 {
   "name": "@renew.sh/sdk",
   "version": "0.1.11",
-  "description": "Renew SDK for payment creation, public payment links, and webhook verification.",
+  "description": "Renew SDK for collections, settlement routes, checkout, and webhook verification.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

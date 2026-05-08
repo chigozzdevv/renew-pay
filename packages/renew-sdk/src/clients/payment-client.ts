@@ -11,6 +11,12 @@ import type {
   StartRenewPublicPaymentInput,
   UpdateRenewPaymentInput,
 } from "../types/payment.js";
+import type {
+  CreateRenewSettlementRouteInput,
+  ListRenewSettlementRoutesQuery,
+  RenewSettlementRouteRecord,
+  UpdateRenewSettlementRouteInput,
+} from "../types/settlement.js";
 
 type FetchImplementation = typeof fetch;
 
@@ -153,6 +159,26 @@ export type RenewPaymentClient = {
     collectionId: string,
     options: SecretKeyOptions
   ): Promise<RenewCollectionRecord>;
+  createSettlementRoute(
+    input: CreateRenewSettlementRouteInput,
+    options: SecretKeyOptions
+  ): Promise<RenewSettlementRouteRecord>;
+  listSettlementRoutes(
+    query: ListRenewSettlementRoutesQuery | undefined,
+    options: SecretKeyOptions
+  ): Promise<readonly RenewSettlementRouteRecord[]>;
+  getDefaultSettlementRoute(
+    options: SecretKeyOptions
+  ): Promise<RenewSettlementRouteRecord>;
+  getSettlementRoute(
+    routeId: string,
+    options: SecretKeyOptions
+  ): Promise<RenewSettlementRouteRecord>;
+  updateSettlementRoute(
+    routeId: string,
+    input: UpdateRenewSettlementRouteInput,
+    options: SecretKeyOptions
+  ): Promise<RenewSettlementRouteRecord>;
   createPayment(
     input: CreateRenewPaymentInput,
     options: SecretKeyOptions
@@ -228,6 +254,54 @@ export function createRenewPaymentClient(
         path: `/collections/${encodeURIComponent(collectionId)}/cancel`,
         method: "POST",
         secretKey: resolveSecretKey(options),
+      });
+    },
+
+    createSettlementRoute(input, options) {
+      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+        apiOrigin,
+        path: "/settlement/routes",
+        method: "POST",
+        secretKey: resolveSecretKey(options),
+        body: input,
+      });
+    },
+
+    listSettlementRoutes(query, options) {
+      return request<readonly RenewSettlementRouteRecord[]>(fetchImplementation, {
+        apiOrigin,
+        path: "/settlement/routes",
+        method: "GET",
+        secretKey: resolveSecretKey(options),
+        query,
+      });
+    },
+
+    getDefaultSettlementRoute(options) {
+      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+        apiOrigin,
+        path: "/settlement/routes/default",
+        method: "GET",
+        secretKey: resolveSecretKey(options),
+      });
+    },
+
+    getSettlementRoute(routeId, options) {
+      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+        apiOrigin,
+        path: `/settlement/routes/${encodeURIComponent(routeId)}`,
+        method: "GET",
+        secretKey: resolveSecretKey(options),
+      });
+    },
+
+    updateSettlementRoute(routeId, input, options) {
+      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+        apiOrigin,
+        path: `/settlement/routes/${encodeURIComponent(routeId)}`,
+        method: "PATCH",
+        secretKey: resolveSecretKey(options),
+        body: input,
       });
     },
 

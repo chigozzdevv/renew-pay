@@ -1,4 +1,4 @@
-export type DocsCategoryId = "api";
+export type DocsCategoryId = "api" | "sdk";
 
 export type CodeLanguage = "bash" | "ts" | "tsx" | "json" | "sol";
 
@@ -42,16 +42,26 @@ export type DocsCategory = {
   label: string;
 };
 
-export const docsCategories: DocsCategory[] = [{ id: "api", label: "API" }];
+export const docsCategories: DocsCategory[] = [
+  { id: "api", label: "API" },
+  { id: "sdk", label: "SDK" },
+];
 
 const docsPageOrder: Record<DocsCategoryId, string[]> = {
   api: [
-    "guide-quickstart",
-    "guide-collections",
-    "guide-settlement",
-    "guide-customers",
-    "guide-payouts",
-    "guide-webhooks",
+    "api-overview",
+    "api-keys",
+    "api-checkout-settings",
+    "api-settlement",
+    "api-collections",
+    "api-webhooks",
+    "api-customers",
+  ],
+  sdk: [
+    "sdk-quickstart",
+    "sdk-checkout",
+    "sdk-server",
+    "sdk-react",
   ],
 };
 
@@ -70,29 +80,150 @@ function createJsonSample(
 
 export const docsPages: DocsPage[] = [
   {
-    id: "guide-quickstart",
+    id: "api-overview",
     category: "api",
     group: "Start here",
-    navTitle: "Quickstart",
-    title: "Quickstart",
-    description: "Create a collection and open checkout.",
+    navTitle: "Overview",
+    title: "Integration flow",
+    description: "Set up Renew, create a collection, open checkout, and fulfill from webhooks.",
     sections: [
       {
-        id: "guide-quickstart-flow",
-        title: "Flow",
-        paragraphs: ["Collections are the money-in object merchants create for orders, invoices, subscriptions, and payment links."],
+        id: "api-overview-flow",
+        title: "Merchant flow",
+        paragraphs: [
+          "Renew is organized around collections and settlement. A collection is money you want Renew to collect from a customer. Settlement is how the collected stable value reaches your wallet.",
+        ],
         steps: [
-          "Configure checkout, developers, and settlement in the dashboard.",
+          "Create test keys in Settings > Developers.",
+          "Set checkout mode, site domains, and return page in Settings > Checkout.",
+          "Create or select a default settlement route with the API or dashboard.",
           "Create a collection with amount, currency, and reference.",
-          "Open the returned `checkoutUrl` with the checkout SDK or redirect the payer to it.",
+          "Open the returned checkout URL with the SDK or redirect the customer to it.",
           "Listen for `collection.paid` before fulfilling the order.",
-          "Track collection and settlement status from the dashboard or API.",
+          "Track settlement from the dashboard and webhook events.",
         ],
       },
       {
-        id: "guide-quickstart-create",
-        title: "Create collection",
-        paragraphs: ["A collection can be one-time or recurring."],
+        id: "api-overview-objects",
+        title: "Core objects",
+        paragraphs: ["These are the objects most merchant integrations need."],
+        references: [
+          { label: "Object", value: "Collection", detail: "Money-in request for an order, invoice, subscription, or link." },
+          { label: "Object", value: "Checkout", detail: "Renew-hosted customer payment flow for a collection." },
+          { label: "Object", value: "Customer", detail: "Payer profile Renew creates or updates from checkout details." },
+          { label: "Object", value: "Settlement", detail: "Route and payout state for collected stable value." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "api-keys",
+    category: "api",
+    group: "Start here",
+    navTitle: "Keys and modes",
+    title: "Keys and modes",
+    description: "Use test keys in sandbox and live keys in production.",
+    sections: [
+      {
+        id: "api-keys-create",
+        title: "Create keys",
+        paragraphs: [
+          "Create server keys from Settings > Developers. Test keys start with `rw_test_`; live keys start with `rw_live_`.",
+        ],
+        steps: [
+          "Open Dashboard > Settings > Developers.",
+          "Switch to the environment you want.",
+          "Create a server key.",
+          "Store the full key immediately.",
+          "Use it only from your server.",
+        ],
+      },
+      {
+        id: "api-keys-hosts",
+        title: "API hosts",
+        paragraphs: [
+          "The API host and server key must match. Renew scopes server API requests to the merchant and environment stored on the key.",
+        ],
+        references: [
+          { label: "Sandbox", value: "https://staging-pay.renew.sh", detail: "Use with `rw_test_` keys." },
+          { label: "Live", value: "https://pay.renew.sh", detail: "Use with `rw_live_` keys." },
+          { label: "Header", value: "x-renew-secret-key", detail: "Send the server key on API requests." },
+        ],
+        note: "Do not pass an `environment` field in server API payloads. The server key and host decide sandbox or live.",
+      },
+      {
+        id: "api-keys-request",
+        title: "Request example",
+        paragraphs: ["Server API calls use the same key header."],
+        sample: {
+          label: "Authenticated request",
+          language: "bash",
+          filename: "request.sh",
+          code: `curl https://staging-pay.renew.sh/v1/collections \\
+  -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
+  -H "Content-Type: application/json"`,
+        },
+      },
+    ],
+  },
+  {
+    id: "api-checkout-settings",
+    category: "api",
+    group: "Start here",
+    navTitle: "Checkout setup",
+    title: "Checkout setup",
+    description: "Configure how customers enter and leave checkout.",
+    sections: [
+      {
+        id: "api-checkout-settings-dashboard",
+        title: "Dashboard settings",
+        paragraphs: ["Checkout settings live in Dashboard > Settings > Checkout."],
+        references: [
+          { label: "Mode", value: "modal | redirect", detail: "Modal opens over the merchant site. Redirect sends the customer to hosted checkout." },
+          { label: "Return page", value: "https://merchant.com/checkout/return", detail: "Hosted checkout redirects here after a confirmed successful payment." },
+          { label: "Domains", value: "merchant.com", detail: "Site domains your team uses for modal checkout." },
+        ],
+      },
+      {
+        id: "api-checkout-settings-result",
+        title: "Success behavior",
+        paragraphs: [
+          "Modal checkout shows the success animation and closes. Hosted checkout shows the same success state, then redirects to the return page with `collection` and `status` query parameters.",
+        ],
+        sample: {
+          label: "Return page query",
+          language: "bash",
+          filename: "return-url.txt",
+          code: `https://merchant.com/checkout/return?collection=pay_7de830caf3cc49df9f18d8a1&status=paid`,
+        },
+      },
+    ],
+  },
+  {
+    id: "api-collections",
+    category: "api",
+    group: "Collect",
+    navTitle: "Collections",
+    title: "Collections API",
+    description: "Create and manage money-in collections.",
+    sections: [
+      {
+        id: "api-collections-endpoints",
+        title: "Endpoints",
+        paragraphs: ["Use these endpoints from your server. Renew scopes each request to the merchant and mode on the server key."],
+        references: [
+          { label: "POST", value: "/v1/collections", detail: "Create a collection and receive a `checkoutUrl`." },
+          { label: "GET", value: "/v1/collections", detail: "List collections for reconciliation and support." },
+          { label: "GET", value: "/v1/collections/:collectionId", detail: "Fetch one collection by id." },
+          { label: "POST", value: "/v1/collections/:collectionId/cancel", detail: "Cancel an unpaid collection." },
+        ],
+      },
+      {
+        id: "api-collections-create",
+        title: "Create request",
+        paragraphs: [
+          "Create a collection from your server when a customer is ready to pay. `reference` should be your order, invoice, subscription, or cart id.",
+        ],
         sample: {
           label: "Create collection",
           language: "bash",
@@ -105,93 +236,49 @@ export const docsPages: DocsPage[] = [
     "currency": "NGN",
     "reference": "order_1042",
     "description": "Order #1042",
-    "recurring": { "enabled": false }
+    "settlement": "default",
+    "customer": {
+      "reference": "user_123",
+      "email": "ada@example.com",
+      "name": "Ada Okafor"
+    }
   }'`,
         },
       },
       {
-        id: "guide-quickstart-open",
-        title: "Open checkout",
-        paragraphs: ["Use the browser SDK to open the Renew checkout modal. The hosted URL also works directly for emails, invoices, and no-JS sites."],
-        samples: [
-          {
-            label: "Browser",
-            language: "ts",
-            filename: "checkout.ts",
-            code: `import { checkout } from "@renew.sh/sdk";
-
-await checkout.open(collection.checkoutUrl);`,
-          },
-          {
-            label: "Redirect",
-            language: "ts",
-            filename: "redirect.ts",
-            code: `window.location.href = collection.checkoutUrl;`,
-          },
+        id: "api-collections-payload",
+        title: "Request shape",
+        paragraphs: [
+          "`settlement` can be `default`, a route code, or a route id. `customer` is optional and only pre-fills details you already know. Renew still creates or updates the customer from checkout.",
         ],
-      },
-      {
-        id: "guide-quickstart-webhook",
-        title: "Fulfill from webhooks",
-        paragraphs: ["Browser callbacks are optional UI helpers. Server-side webhook events are the source of truth for fulfillment."],
-        sample: {
-          label: "Handler",
-          language: "ts",
-          filename: "webhook.ts",
-          code: `if (event.type === "collection.paid") {
-  await orders.markPaid(event.data.reference);
-}`,
-        },
-      },
-    ],
-  },
-  {
-    id: "guide-collections",
-    category: "api",
-    group: "Core",
-    navTitle: "Collections",
-    title: "Collections",
-    description: "Create and manage money-in collections.",
-    sections: [
-      {
-        id: "guide-collections-endpoints",
-        title: "Endpoints",
-        paragraphs: ["Use `reference` to map Renew collections back to your orders."],
         references: [
-          { label: "GET", value: "/v1/collections", detail: "List collections." },
-          { label: "POST", value: "/v1/collections", detail: "Create a collection." },
-          { label: "GET", value: "/v1/collections/:collectionId", detail: "Fetch one collection." },
-          { label: "POST", value: "/v1/collections/:collectionId/cancel", detail: "Cancel a collection." },
+          { label: "Required", value: "amount", detail: "Local amount to collect." },
+          { label: "Required", value: "currency", detail: "Local collection currency, for example `NGN`, `KES`, or `GHS`." },
+          { label: "Required", value: "reference", detail: "Your internal id for the order or invoice." },
+          { label: "Optional", value: "settlement", detail: "`default`, route code, route id, `standard`, or `private`." },
+          { label: "Optional", value: "customer", detail: "Known customer reference, email, or name for prefill." },
+          { label: "Optional", value: "recurring", detail: "Recurring cadence when the collection is for a subscription." },
         ],
       },
       {
-        id: "guide-collections-payload",
-        title: "Payload",
-        paragraphs: ["The server returns a hosted `checkoutUrl`."],
+        id: "api-collections-response",
+        title: "Create response",
+        paragraphs: [
+          "Send `checkoutUrl` to the browser SDK or redirect the customer to it.",
+        ],
         samples: [
-          createJsonSample("Create request", "create-collection.request.json", {
-            amount: 25000,
-            currency: "NGN",
-            reference: "order_1042",
-            description: "Order #1042",
-            settlement: "default",
-            customer: {
-              reference: "user_123",
-              email: "ada@example.com",
-              name: "Ada Okafor",
-            },
-            recurring: {
-              enabled: false,
-            },
-          }),
           createJsonSample("Create response", "create-collection.response.json", {
             id: "pay_7de830caf3cc49df9f18d8a1",
+            paymentId: "66f1d2c11d0e63b8a1",
             reference: "order_1042",
             amount: 25000,
             currency: "NGN",
             description: "Order #1042",
             status: "created",
             checkoutUrl: "https://app.renew.sh/pay/pay_7de830caf3cc49df9f18d8a1",
+            settlement: {
+              id: "66f1d2c11d0e63b8a1",
+            },
             customer: {
               reference: "user_123",
               email: "ada@example.com",
@@ -200,111 +287,440 @@ await checkout.open(collection.checkoutUrl);`,
           }),
         ],
       },
-    ],
-  },
-  {
-    id: "guide-settlement",
-    category: "api",
-    group: "Core",
-    navTitle: "Settlement",
-    title: "Settlement",
-    description: "Configure where stable settlement is delivered.",
-    sections: [
       {
-        id: "guide-settlement-routes",
-        title: "Routes",
-        paragraphs: ["A collection uses settlement. If none is passed, Renew uses the active default settlement."],
+        id: "api-collections-statuses",
+        title: "Statuses",
+        paragraphs: ["Use webhook events, not browser callbacks, to move orders through paid and failed states."],
         references: [
-          { label: "GET", value: "/v1/settlement/routes", detail: "List routes." },
-          { label: "POST", value: "/v1/settlement/routes", detail: "Create a route." },
-          { label: "GET", value: "/v1/settlement/routes/default", detail: "Fetch the default route." },
-          { label: "PATCH", value: "/v1/settlement/routes/:routeId", detail: "Update a route." },
-        ],
-      },
-      {
-        id: "guide-settlement-providers",
-        title: "Providers",
-        paragraphs: ["Use `direct` for standard SPL settlement and `umbra` for private USDC settlement."],
-      },
-    ],
-  },
-  {
-    id: "guide-customers",
-    category: "api",
-    group: "Core",
-    navTitle: "Customers",
-    title: "Customers",
-    description: "Store payer profiles when a merchant wants reusable customer records.",
-    sections: [
-      {
-        id: "guide-customers-endpoints",
-        title: "Endpoints",
-        paragraphs: ["Renew creates or updates customers from checkout details."],
-        references: [
-          { label: "GET", value: "/v1/customers", detail: "List customers." },
-          { label: "POST", value: "/v1/customers", detail: "Create a customer." },
-          { label: "GET", value: "/v1/customers/:customerId", detail: "Fetch one customer." },
-          { label: "PATCH", value: "/v1/customers/:customerId", detail: "Update a customer." },
-          { label: "POST", value: "/v1/customers/:customerId/blacklist", detail: "Block a customer." },
+          { label: "Status", value: "created", detail: "Collection exists but checkout has not started." },
+          { label: "Status", value: "collecting", detail: "Customer is in checkout or bank transfer details have been issued." },
+          { label: "Status", value: "paid", detail: "Payment has been confirmed." },
+          { label: "Status", value: "failed", detail: "Collection cannot be completed." },
+          { label: "Status", value: "cancelled", detail: "Collection was cancelled before payment." },
         ],
       },
     ],
   },
   {
-    id: "guide-payouts",
+    id: "api-webhooks",
     category: "api",
-    group: "Core",
-    navTitle: "Payouts",
-    title: "Payouts",
-    description: "Track and process merchant payouts.",
-    sections: [
-      {
-        id: "guide-payouts-endpoints",
-        title: "Endpoints",
-        paragraphs: ["Payouts settle merchant balances through the selected settlement provider."],
-        references: [
-          { label: "GET", value: "/v1/payouts", detail: "List payouts." },
-          { label: "POST", value: "/v1/payouts", detail: "Create a payout." },
-          { label: "GET", value: "/v1/payouts/:payoutId", detail: "Fetch one payout." },
-          { label: "PATCH", value: "/v1/payouts/:payoutId", detail: "Update a payout." },
-          { label: "POST", value: "/v1/payouts/:payoutId/process", detail: "Process a payout." },
-        ],
-      },
-    ],
-  },
-  {
-    id: "guide-webhooks",
-    category: "api",
-    group: "Core",
+    group: "Collect",
     navTitle: "Webhooks",
     title: "Webhooks",
-    description: "Receive collection, settlement, payout, and customer events.",
+    description: "Use webhooks as the source of truth for fulfillment.",
     sections: [
       {
-        id: "guide-webhooks-endpoints",
-        title: "Endpoints",
-        paragraphs: ["Configure webhook endpoints from Settings > Developers or API."],
-        references: [
-          { label: "GET", value: "/v1/developers/webhooks", detail: "List webhooks." },
-          { label: "POST", value: "/v1/developers/webhooks", detail: "Create a webhook." },
-          { label: "PATCH", value: "/v1/developers/webhooks/:webhookId", detail: "Update a webhook." },
-          { label: "POST", value: "/v1/developers/webhooks/:webhookId/test", detail: "Send a test delivery." },
+        id: "api-webhooks-create",
+        title: "Create a webhook",
+        paragraphs: ["Create webhook endpoints from Settings > Developers. Store the signing secret when it is shown."],
+        steps: [
+          "Open Dashboard > Settings > Developers.",
+          "Select the test or live environment.",
+          "Add your webhook URL.",
+          "Choose the collection and settlement events to receive.",
+          "Store the signing secret.",
+          "Send a test delivery before going live.",
         ],
       },
       {
-        id: "guide-webhooks-events",
+        id: "api-webhooks-events",
         title: "Events",
         paragraphs: ["Use collection events for order state and settlement events for payout tracking."],
         bullets: [
-          "`collection.created`",
-          "`collection.collecting`",
           "`collection.paid`",
           "`collection.failed`",
-          "`collection.cancelled`",
-          "`settlement.processing`",
           "`settlement.settled`",
           "`settlement.failed`",
         ],
+      },
+      {
+        id: "api-webhooks-signatures",
+        title: "Signatures",
+        paragraphs: ["Renew signs each webhook delivery. Verify the raw request body before trusting the event."],
+        references: [
+          { label: "Header", value: "x-renew-signature", detail: "Signature header formatted as `v1=<digest>`." },
+          { label: "Header", value: "x-renew-timestamp", detail: "Unix timestamp used in the signed payload." },
+          { label: "Secret", value: "whsec_*", detail: "Webhook signing secret shown when the endpoint is created." },
+        ],
+      },
+      {
+        id: "api-webhooks-fulfillment",
+        title: "Fulfillment rule",
+        paragraphs: ["Fulfill only after your server receives and verifies `collection.paid`."],
+        sample: {
+          label: "Fulfill order",
+          language: "ts",
+          filename: "webhook.ts",
+          code: `if (event.type === "collection.paid") {
+  await orders.markPaid(event.data.collection.reference);
+}`,
+        },
+      },
+    ],
+  },
+  {
+    id: "api-settlement",
+    category: "api",
+    group: "Settle",
+    navTitle: "Settlement",
+    title: "Settlement API",
+    description: "Create settlement routes and choose where collected value lands.",
+    sections: [
+      {
+        id: "api-settlement-endpoints",
+        title: "Endpoints",
+        paragraphs: ["Use settlement route endpoints from your server or manage the same routes in Dashboard > Settlement."],
+        references: [
+          { label: "POST", value: "/v1/settlement/routes", detail: "Create a settlement route." },
+          { label: "GET", value: "/v1/settlement/routes", detail: "List settlement routes." },
+          { label: "GET", value: "/v1/settlement/routes/default", detail: "Fetch the active default route." },
+          { label: "GET", value: "/v1/settlement/routes/:routeId", detail: "Fetch one route by id." },
+          { label: "PATCH", value: "/v1/settlement/routes/:routeId", detail: "Update route details, default state, or status." },
+        ],
+      },
+      {
+        id: "api-settlement-create",
+        title: "Create route",
+        paragraphs: [
+          "Create at least one active default route before creating live collections. Standard routes settle directly to your destination wallet.",
+        ],
+        sample: {
+          label: "Create standard route",
+          language: "bash",
+          filename: "create-route.sh",
+          code: `curl https://staging-pay.renew.sh/v1/settlement/routes \\
+  -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "routeCode": "main-wallet",
+    "name": "Main wallet",
+    "provider": "direct",
+    "chain": "solana",
+    "assetSymbol": "USDC",
+    "destinationAddress": "YOUR_SOLANA_WALLET",
+    "isDefault": true
+  }'`,
+        },
+      },
+      {
+        id: "api-settlement-response",
+        title: "Route response",
+        paragraphs: ["Use the route `id` or `routeCode` when a collection should settle somewhere other than the default route."],
+        samples: [
+          createJsonSample("Settlement route", "settlement-route.response.json", {
+            id: "66f1d2c11d0e63b8a1",
+            routeCode: "main-wallet",
+            name: "Main wallet",
+            mode: "standard",
+            provider: "direct",
+            chain: "solana",
+            assetSymbol: "USDC",
+            destinationAddress: "YOUR_SOLANA_WALLET",
+            isDefault: true,
+            status: "active",
+          }),
+        ],
+      },
+      {
+        id: "api-settlement-select",
+        title: "Use a route",
+        paragraphs: [
+          "Collections use the default route when `settlement` is omitted or set to `default`. Pass a route code or route id only when that collection needs a specific destination.",
+        ],
+        sample: {
+          label: "Collection settlement",
+          language: "json",
+          filename: "collection-settlement.json",
+          code: JSON.stringify(
+            {
+              amount: 25000,
+              currency: "NGN",
+              reference: "order_1042",
+              settlement: "main-wallet",
+            },
+            null,
+            2
+          ),
+        },
+      },
+      {
+        id: "api-settlement-private",
+        title: "Private routes",
+        paragraphs: [
+          "Use `provider: \"umbra\"` and `mode: \"private\"` when the merchant wants private USDC settlement. Private settlement is still selected from the collection with the same `settlement` field.",
+        ],
+      },
+      {
+        id: "api-settlement-payouts",
+        title: "Payouts",
+        paragraphs: ["Payouts track settlement execution for collected value. Use settlement webhooks for automation and Dashboard > Settlement for operations."],
+      },
+    ],
+  },
+  {
+    id: "api-customers",
+    category: "api",
+    group: "Operations",
+    navTitle: "Customers",
+    title: "Customers",
+    description: "View payer profiles Renew creates from checkout.",
+    sections: [
+      {
+        id: "api-customers-role",
+        title: "How customers work",
+        paragraphs: [
+          "Merchants do not need to create customers before checkout. Pass `customer.reference`, `customer.email`, or `customer.name` only when you already have them.",
+        ],
+      },
+      {
+        id: "api-customers-dashboard",
+        title: "Dashboard",
+        paragraphs: ["Use the Customers page for support, history, and risk workflows."],
+        references: [
+          { label: "Dashboard", value: "Customers", detail: "Search customers, inspect collection history, and handle support or risk actions." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "sdk-quickstart",
+    category: "sdk",
+    group: "Start here",
+    navTitle: "Quickstart",
+    title: "SDK quickstart",
+    description: "Create a collection on your server and open checkout in the browser.",
+    sections: [
+      {
+        id: "sdk-quickstart-install",
+        title: "Install",
+        paragraphs: ["Install the SDK in the app that creates collections and opens checkout."],
+        sample: {
+          label: "Install",
+          language: "bash",
+          filename: "terminal",
+          code: "npm install @renew.sh/sdk",
+        },
+      },
+      {
+        id: "sdk-quickstart-settlement",
+        title: "One-time setup",
+        paragraphs: ["Create a default settlement route once from the dashboard or server SDK."],
+        sample: {
+          label: "Create default route",
+          language: "ts",
+          filename: "setup.ts",
+          code: `import { renew } from "@renew.sh/sdk";
+
+const client = renew({
+  secretKey: process.env.RENEW_SECRET_KEY!,
+});
+
+await client.settlement.routes.create({
+  routeCode: "main-wallet",
+  name: "Main wallet",
+  destinationAddress: process.env.SETTLEMENT_WALLET!,
+  isDefault: true,
+});`,
+        },
+      },
+      {
+        id: "sdk-quickstart-server",
+        title: "Server checkout",
+        paragraphs: ["Create the collection on your server and return only the checkout URL to the browser."],
+        sample: {
+          label: "Create checkout",
+          language: "ts",
+          filename: "server.ts",
+          code: `import { renew } from "@renew.sh/sdk";
+
+const client = renew({
+  secretKey: process.env.RENEW_SECRET_KEY!,
+});
+
+export async function createCheckout(order: {
+  id: string;
+  total: number;
+  currency: "NGN" | "KES" | "GHS";
+  customer: {
+    id: string;
+    email?: string;
+    name?: string;
+  };
+}) {
+  const collection = await client.collections.create({
+    amount: order.total,
+    currency: order.currency,
+    reference: order.id,
+    description: "Order " + order.id,
+    customer: {
+      reference: order.customer.id,
+      email: order.customer.email,
+      name: order.customer.name,
+    },
+  });
+
+  return {
+    collectionId: collection.id,
+    checkoutUrl: collection.checkoutUrl,
+  };
+}`,
+        },
+      },
+      {
+        id: "sdk-quickstart-browser",
+        title: "Checkout button",
+        paragraphs: ["The browser never sees the server key. It asks your server for a checkout URL, then opens Renew checkout."],
+        sample: {
+          label: "Open checkout",
+          language: "tsx",
+          filename: "PayButton.tsx",
+          code: `"use client";
+
+import { checkout } from "@renew.sh/sdk";
+
+export function PayButton({ orderId }: { orderId: string }) {
+  async function pay() {
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ orderId }),
+    });
+    const collection = await response.json();
+
+    await checkout.open(collection.checkoutUrl);
+  }
+
+  return <button onClick={pay}>Pay</button>;
+}`,
+        },
+      },
+    ],
+  },
+  {
+    id: "sdk-checkout",
+    category: "sdk",
+    group: "Checkout",
+    navTitle: "Checkout SDK",
+    title: "Checkout SDK",
+    description: "Use Renew-hosted checkout as a modal or redirect.",
+    sections: [
+      {
+        id: "sdk-checkout-modal",
+        title: "Modal mode",
+        paragraphs: [
+          "Modal mode opens Renew checkout in an iframe over the merchant site. Renew controls the payment UI, success animation, and close message.",
+        ],
+        sample: {
+          label: "Modal checkout",
+          language: "ts",
+          filename: "modal.ts",
+          code: `import { checkout } from "@renew.sh/sdk";
+
+checkout.open(collection.checkoutUrl);`,
+        },
+      },
+      {
+        id: "sdk-checkout-redirect",
+        title: "Redirect mode",
+        paragraphs: ["Redirect mode sends the customer to the hosted checkout URL."],
+        sample: {
+          label: "Redirect checkout",
+          language: "ts",
+          filename: "redirect.ts",
+          code: `import { checkout } from "@renew.sh/sdk";
+
+checkout.open(collection.checkoutUrl, { mode: "redirect" });`,
+        },
+      },
+      {
+        id: "sdk-checkout-close",
+        title: "Success close",
+        paragraphs: ["After a confirmed successful payment, modal checkout shows the animated success state and closes itself."],
+      },
+    ],
+  },
+  {
+    id: "sdk-server",
+    category: "sdk",
+    group: "Server",
+    navTitle: "Server SDK",
+    title: "Server SDK",
+    description: "Use the server SDK for collections and webhook verification.",
+    sections: [
+      {
+        id: "sdk-server-collections",
+        title: "Collections",
+        paragraphs: ["The server SDK wraps the collections API and sends the server key header for you."],
+        sample: {
+          label: "Collection methods",
+          language: "ts",
+          filename: "collections.ts",
+          code: `await client.collections.create(input);
+await client.collections.list();
+await client.collections.get(collectionId);
+await client.collections.cancel(collectionId);`,
+        },
+      },
+      {
+        id: "sdk-server-settlement",
+        title: "Settlement routes",
+        paragraphs: ["Use settlement route methods for setup and route management."],
+        sample: {
+          label: "Settlement methods",
+          language: "ts",
+          filename: "settlement.ts",
+          code: `await client.settlement.routes.create(input);
+await client.settlement.routes.list();
+await client.settlement.routes.getDefault();
+await client.settlement.routes.get(routeId);
+await client.settlement.routes.update(routeId, input);`,
+        },
+      },
+      {
+        id: "sdk-server-webhooks",
+        title: "Verify webhooks",
+        paragraphs: ["Verify the raw request body before trusting the payload."],
+        sample: {
+          label: "Signature check",
+          language: "ts",
+          filename: "webhook.ts",
+          code: `import {
+  renewWebhookHeaderNames,
+  verifyRenewWebhookSignature,
+} from "@renew.sh/sdk/server";
+
+const valid = verifyRenewWebhookSignature({
+  payload: rawBody,
+  signingSecret: process.env.RENEW_WEBHOOK_SECRET!,
+  signatureHeader: request.headers.get(renewWebhookHeaderNames.signature),
+  timestampHeader: request.headers.get(renewWebhookHeaderNames.timestamp),
+});`,
+        },
+      },
+    ],
+  },
+  {
+    id: "sdk-react",
+    category: "sdk",
+    group: "Checkout",
+    navTitle: "React",
+    title: "React checkout",
+    description: "Use the React helper when your checkout button lives in React.",
+    sections: [
+      {
+        id: "sdk-react-button",
+        title: "Checkout button",
+        paragraphs: ["`RenewCheckout` is a small wrapper around `checkout.open(...)`."],
+        sample: {
+          label: "React button",
+          language: "tsx",
+          filename: "CheckoutButton.tsx",
+          code: `import { RenewCheckout } from "@renew.sh/sdk/react";
+
+export function CheckoutButton({ checkoutUrl }: { checkoutUrl: string }) {
+  return <RenewCheckout checkoutUrl={checkoutUrl}>Pay</RenewCheckout>;
+}`,
+        },
       },
     ],
   },
