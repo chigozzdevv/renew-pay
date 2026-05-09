@@ -10,7 +10,6 @@ import {
   Button,
   Card,
   Input,
-  InlineLoading,
   LoadingState,
   PageState,
   Select,
@@ -18,10 +17,6 @@ import {
 import { ImageUpload } from "@/components/shared/image-upload";
 import DevelopersSettings from "@/components/dashboard/developers-settings";
 import { ApiError } from "@/lib/api";
-import {
-  loadNotificationTemplatePreview,
-  loadNotificationTemplates,
-} from "@/lib/notifications";
 import {
   loadWorkspaceSettings,
   saveWalletSettings,
@@ -104,23 +99,10 @@ export default function SettingsPage() {
       }),
     [mode]
   );
-  const { data: notificationTemplates } = useResource(
-    async ({ token, merchantId }) =>
-      loadNotificationTemplates({
-        token,
-        merchantId,
-        environment: mode,
-      }),
-    [mode]
-  );
-
   const [activeTab, setActiveTab] = useState<SettingsTabKey>("workspace");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>(
-    "customer.payment.receipt"
-  );
 
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft | null>(null);
   const [checkoutDraft, setCheckoutDraft] = useState<CheckoutDraft | null>(null);
@@ -160,32 +142,6 @@ export default function SettingsPage() {
       walletAlerts: data.wallets.walletAlerts,
     });
   }, [data]);
-
-  useEffect(() => {
-    if (!notificationTemplates?.length) {
-      return;
-    }
-
-    if (!notificationTemplates.some((entry) => entry.key === selectedTemplateKey)) {
-      setSelectedTemplateKey(notificationTemplates[0]?.key ?? "customer.payment.receipt");
-    }
-  }, [notificationTemplates, selectedTemplateKey]);
-
-  const { data: notificationPreview } = useResource(
-    async ({ token, merchantId }) => {
-      if (!selectedTemplateKey) {
-        return null;
-      }
-
-      return loadNotificationTemplatePreview({
-        token,
-        merchantId,
-        templateKey: selectedTemplateKey,
-        environment: mode,
-      });
-    },
-    [mode, selectedTemplateKey]
-  );
 
   useEffect(() => {
     if (!actionMessage && !actionError) {
@@ -546,84 +502,31 @@ export default function SettingsPage() {
 
       {activeTab === "notifications" ? (
         <Card title="Notifications">
-          <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-            <div className="space-y-5">
-              <div className="grid gap-3 md:grid-cols-2">
-                <SettingsToggle
-                  label="Compliance alerts"
-                  enabled={notificationsDraft.verificationAlerts}
-                  onToggle={() =>
-                    patchNotifications(
-                      "verificationAlerts",
-                      !notificationsDraft.verificationAlerts
-                    )
-                  }
-                />
-                <SettingsToggle
-                  label="Developer alerts"
-                  enabled={notificationsDraft.developerAlerts}
-                  onToggle={() =>
-                    patchNotifications("developerAlerts", !notificationsDraft.developerAlerts)
-                  }
-                />
-                <SettingsToggle
-                  label="Security alerts"
-                  enabled={notificationsDraft.securityAlerts}
-                  onToggle={() =>
-                    patchNotifications("securityAlerts", !notificationsDraft.securityAlerts)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                  Email preview
-                </p>
-                <Select
-                  value={selectedTemplateKey}
-                  onChange={(event) => setSelectedTemplateKey(event.target.value)}
-                >
-                  {(notificationTemplates ?? []).map((template) => (
-                    <option key={template.key} value={template.key}>
-                      {template.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-                <p className="text-xs font-semibold text-[color:var(--muted)]">
-                  Subject
-                </p>
-                <div className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-                  {notificationPreview?.subject ? (
-                    notificationPreview.subject
-                  ) : (
-                    <InlineLoading label="Preparing preview" />
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">
-                  {notificationPreview?.description ??
-                    "Preview a rendered template with current workspace branding."}
-                </p>
-              </div>
-
-              <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white">
-                {notificationPreview ? (
-                  <iframe
-                    title="Notification preview"
-                    srcDoc={notificationPreview.html}
-                    className="h-[540px] w-full bg-white"
-                  />
-                ) : (
-                  <div className="flex min-h-[320px] items-center justify-center px-4 py-8">
-                    <InlineLoading label="Preparing preview" />
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <SettingsToggle
+              label="Compliance alerts"
+              enabled={notificationsDraft.verificationAlerts}
+              onToggle={() =>
+                patchNotifications(
+                  "verificationAlerts",
+                  !notificationsDraft.verificationAlerts
+                )
+              }
+            />
+            <SettingsToggle
+              label="Developer alerts"
+              enabled={notificationsDraft.developerAlerts}
+              onToggle={() =>
+                patchNotifications("developerAlerts", !notificationsDraft.developerAlerts)
+              }
+            />
+            <SettingsToggle
+              label="Security alerts"
+              enabled={notificationsDraft.securityAlerts}
+              onToggle={() =>
+                patchNotifications("securityAlerts", !notificationsDraft.securityAlerts)
+              }
+            />
           </div>
 
           <div className="mt-6 flex justify-end">
