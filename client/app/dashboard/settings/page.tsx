@@ -356,42 +356,41 @@ export default function SettingsPage() {
 
       {activeTab === "workspace" ? (
         <Card title="Business">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] xl:items-start">
-            <SettingsPanel title="Business details">
-              <div className="grid gap-4 md:grid-cols-2">
-                <SettingsField label="Business name">
-                  <Input
-                    value={businessDraft.name}
-                    onChange={(event) => patchBusiness("name", event.target.value)}
-                  />
-                </SettingsField>
-
-                <SettingsField label="Support email">
-                  <Input
-                    type="email"
-                    value={businessDraft.supportEmail}
-                    onChange={(event) => patchBusiness("supportEmail", event.target.value)}
-                  />
-                </SettingsField>
-
-                <SettingsField label="Checkout domain">
-                  <Input
-                    value={businessDraft.customerDomain}
-                    onChange={(event) => patchBusiness("customerDomain", event.target.value)}
-                  />
-                </SettingsField>
-              </div>
-            </SettingsPanel>
-
-            <SettingsPanel title="Brand logo">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+            <div className="shrink-0 sm:w-48">
               <ImageUpload
                 token={token}
                 value={businessDraft.logoUrl}
                 alt={`${businessDraft.name} logo`}
                 onChange={(nextValue) => patchBusiness("logoUrl", nextValue)}
                 disabled={busyAction === "workspace-save"}
+                variant="compact"
               />
-            </SettingsPanel>
+            </div>
+
+            <div className="grid flex-1 gap-4 sm:grid-cols-2">
+              <SettingsField label="Business name">
+                <Input
+                  value={businessDraft.name}
+                  onChange={(event) => patchBusiness("name", event.target.value)}
+                />
+              </SettingsField>
+
+              <SettingsField label="Support email">
+                <Input
+                  type="email"
+                  value={businessDraft.supportEmail}
+                  onChange={(event) => patchBusiness("supportEmail", event.target.value)}
+                />
+              </SettingsField>
+
+              <SettingsField label="Checkout domain">
+                <Input
+                  value={businessDraft.customerDomain}
+                  onChange={(event) => patchBusiness("customerDomain", event.target.value)}
+                />
+              </SettingsField>
+            </div>
           </div>
 
           <div className="mt-6 flex justify-end">
@@ -401,7 +400,7 @@ export default function SettingsPage() {
               disabled={busyAction === "workspace-save"}
               onClick={() => void handleWorkspaceSave()}
             >
-              Save workspace
+              Save changes
             </Button>
           </div>
         </Card>
@@ -409,47 +408,47 @@ export default function SettingsPage() {
 
       {activeTab === "wallets" ? (
         <Card title="Settlement">
-          <div className="grid gap-6 xl:grid-cols-[1fr_1fr] xl:items-start">
-            <div className="space-y-4">
-              <SettingsSummaryRow
-                label="Payout wallet"
-                value={formatAddress(data.wallets.primaryWallet)}
-                badge="Default"
-                tone="brand"
+          <div className="space-y-4 max-w-xl">
+            <SettingsField label="Payout wallet">
+              <Input
+                value={walletDraft.primaryWallet}
+                placeholder="Wallet address"
+                onChange={(event) =>
+                  setWalletDraft((current) => ({
+                    ...current,
+                    primaryWallet: event.target.value,
+                  }))
+                }
               />
-            </div>
+            </SettingsField>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-              <SettingsField label="Payout wallet">
-                <Input
-                  value={walletDraft.primaryWallet}
-                  onChange={(event) =>
-                    setWalletDraft((current) => ({
-                      ...current,
-                      primaryWallet: event.target.value,
-                    }))
-                  }
-                />
-              </SettingsField>
-
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  tone="brand"
-                  disabled={busyAction === "wallet-save"}
-                  onClick={() => void handleWalletSave()}
-                >
-                  Save settlement
-                </Button>
+            {data.wallets.primaryWallet ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-[color:var(--muted)]">Current:</span>
+                <span className="text-sm font-semibold text-[color:var(--ink)]">
+                  {formatAddress(data.wallets.primaryWallet)}
+                </span>
+                <Badge tone="brand">Default</Badge>
               </div>
-            </div>
+            ) : null}
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <Button
+              type="button"
+              tone="brand"
+              disabled={busyAction === "wallet-save"}
+              onClick={() => void handleWalletSave()}
+            >
+              Save settlement
+            </Button>
           </div>
         </Card>
       ) : null}
 
       {activeTab === "checkout" ? (
         <Card title="Checkout">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 max-w-2xl sm:grid-cols-2">
             <SettingsField label="Checkout opens as">
               <Select
                 value={checkoutDraft.mode}
@@ -464,14 +463,14 @@ export default function SettingsPage() {
             </SettingsField>
             <SettingsField label="Return URL">
               <Input
-                placeholder="https://shop.example/orders/{reference}"
+                placeholder="https://example.com/orders/{ref}"
                 value={checkoutDraft.returnPage ?? ""}
                 onChange={(event) => patchCheckout("returnPage", event.target.value || null)}
               />
             </SettingsField>
             <SettingsField label="Allowed domains">
               <Input
-                placeholder="shop.example"
+                placeholder="example.com"
                 value={checkoutDraft.allowedDomains.join(", ")}
                 onChange={(event) =>
                   patchCheckout(
@@ -502,9 +501,9 @@ export default function SettingsPage() {
 
       {activeTab === "notifications" ? (
         <Card title="Notifications">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 max-w-2xl sm:grid-cols-2">
             <SettingsToggle
-              label="Compliance alerts"
+              label="Compliance"
               enabled={notificationsDraft.verificationAlerts}
               onToggle={() =>
                 patchNotifications(
@@ -514,14 +513,14 @@ export default function SettingsPage() {
               }
             />
             <SettingsToggle
-              label="Developer alerts"
+              label="Developer"
               enabled={notificationsDraft.developerAlerts}
               onToggle={() =>
                 patchNotifications("developerAlerts", !notificationsDraft.developerAlerts)
               }
             />
             <SettingsToggle
-              label="Security alerts"
+              label="Security"
               enabled={notificationsDraft.securityAlerts}
               onToggle={() =>
                 patchNotifications("securityAlerts", !notificationsDraft.securityAlerts)
@@ -536,7 +535,7 @@ export default function SettingsPage() {
               disabled={busyAction === "notifications-save"}
               onClick={() => void handleNotificationsSave()}
             >
-              Save notifications
+              Save
             </Button>
           </div>
         </Card>
@@ -544,10 +543,11 @@ export default function SettingsPage() {
 
       {activeTab === "security" ? (
         <Card title="Security">
-          <div className="space-y-4">
+          <div className="space-y-4 max-w-md">
             <SettingsField label="Session timeout">
               <Select
                 value={securityDraft.sessionTimeout}
+                wrapperClassName="w-full"
                 onChange={(event) => patchSecurity("sessionTimeout", event.target.value)}
               >
                 <option value="30 minutes">30 minutes</option>
@@ -557,7 +557,7 @@ export default function SettingsPage() {
             </SettingsField>
 
             <SettingsToggle
-              label="Require two-factor authentication"
+              label="Require 2FA"
               enabled={securityDraft.enforceTwoFactor}
               onToggle={() =>
                 patchSecurity("enforceTwoFactor", !securityDraft.enforceTwoFactor)
@@ -572,7 +572,7 @@ export default function SettingsPage() {
               disabled={busyAction === "security-save"}
               onClick={() => void handleSecuritySave()}
             >
-              Save security
+              Save
             </Button>
           </div>
         </Card>
@@ -594,51 +594,6 @@ function SettingsField({
         {label}
       </p>
       {children}
-    </div>
-  );
-}
-
-function SettingsPanel({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-white p-5">
-      <p className="text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-        {title}
-      </p>
-      <div className="mt-4">{children}</div>
-    </div>
-  );
-}
-
-function SettingsSummaryRow({
-  label,
-  value,
-  badge,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  badge?: string;
-  tone?: "neutral" | "brand";
-}) {
-  return (
-    <div className="rounded-2xl border border-[color:var(--line)] bg-white px-4 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold text-[color:var(--muted)]">
-            {label}
-          </p>
-          <p className="mt-2 text-sm font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
-            {value}
-          </p>
-        </div>
-        {badge ? <Badge tone={tone}>{badge}</Badge> : null}
-      </div>
     </div>
   );
 }
