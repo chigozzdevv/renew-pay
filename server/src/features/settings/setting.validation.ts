@@ -53,6 +53,8 @@ const checkoutSettingsSchema = z.object({
 });
 
 const notificationSettingsSchema = z.object({
+  paymentAlerts: z.boolean().optional(),
+  settlementAlerts: z.boolean().optional(),
   verificationAlerts: z.boolean().optional(),
   developerAlerts: z.boolean().optional(),
   securityAlerts: z.boolean().optional(),

@@ -38,9 +38,8 @@ function toSettingResponse(document: SettingDocument) {
       allowedDomains: document.checkout?.allowedDomains ?? [],
     },
     notifications: {
-      verificationAlerts: document.notifications.verificationAlerts,
-      developerAlerts: document.notifications.developerAlerts,
-      securityAlerts: document.notifications.securityAlerts,
+      paymentAlerts: document.notifications.paymentAlerts ?? true,
+      settlementAlerts: document.notifications.settlementAlerts ?? true,
     },
     security: {
       sessionTimeout: document.security.sessionTimeout,
@@ -175,6 +174,14 @@ export async function updateSettingsByMerchantId(
   }
 
   if (input.notifications) {
+    if (input.notifications.paymentAlerts !== undefined) {
+      setting.notifications.paymentAlerts = input.notifications.paymentAlerts;
+    }
+
+    if (input.notifications.settlementAlerts !== undefined) {
+      setting.notifications.settlementAlerts = input.notifications.settlementAlerts;
+    }
+
     if (input.notifications.verificationAlerts !== undefined) {
       setting.notifications.verificationAlerts =
         input.notifications.verificationAlerts;

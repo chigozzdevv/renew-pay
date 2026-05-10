@@ -27,9 +27,8 @@ export type WorkspaceSettings = {
     allowedDomains: string[];
   };
   notifications: {
-    verificationAlerts: boolean;
-    developerAlerts: boolean;
-    securityAlerts: boolean;
+    paymentAlerts: boolean;
+    settlementAlerts: boolean;
   };
   security: {
     sessionTimeout: string;
@@ -37,6 +36,14 @@ export type WorkspaceSettings = {
   };
   createdAt: string;
   updatedAt: string;
+};
+
+type WorkspaceSettingsUpdate = {
+  business?: Partial<WorkspaceSettings["business"]>;
+  wallets?: Partial<WorkspaceSettings["wallets"]>;
+  checkout?: Partial<WorkspaceSettings["checkout"]>;
+  notifications?: Partial<WorkspaceSettings["notifications"]>;
+  security?: Partial<WorkspaceSettings["security"]>;
 };
 
 export async function loadWorkspaceSettings(input: {
@@ -61,7 +68,7 @@ export async function updateWorkspaceSettings(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  payload: Partial<Pick<WorkspaceSettings, "business" | "wallets" | "checkout" | "notifications" | "security">>;
+  payload: WorkspaceSettingsUpdate;
 }) {
   const response = await fetchApi<WorkspaceSettings>(
     `/settings/${input.merchantId}`,

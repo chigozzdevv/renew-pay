@@ -3,6 +3,7 @@ import { Types, type HydratedDocument } from "mongoose";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import { queueMoneyMovementNotificationForStatusChange } from "@/features/notifications/notification.service";
 import { PaymentModel } from "@/features/payments/payment.model";
 import { PayoutModel, type PayoutDocument } from "@/features/payouts/payout.model";
 import type {
@@ -120,11 +121,18 @@ async function syncLinkedPaymentFromPayout(payout: {
   }
   await payment.save();
 
-  await emitPaymentWebhookEventForStatusChange({
-    previousStatus,
-    paymentId: payment._id.toString(),
-    nextStatus: payment.status,
-  }).catch(() => undefined);
+  await Promise.all([
+    emitPaymentWebhookEventForStatusChange({
+      previousStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+    queueMoneyMovementNotificationForStatusChange({
+      previousStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+  ]);
 }
 
 async function resolvePayoutSettlementRoute(payout: {

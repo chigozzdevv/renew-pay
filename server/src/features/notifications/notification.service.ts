@@ -16,6 +16,8 @@ import {
   resendEmailReceivedWebhookSchema,
   resendWebhookEnvelopeSchema,
 } from "@/features/notifications/notification.validation";
+import { PaymentModel } from "@/features/payments/payment.model";
+import { PayoutModel } from "@/features/payouts/payout.model";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
@@ -94,6 +96,46 @@ function resolveMerchantLabel(input: {
   supportEmail?: string | null;
 }) {
   return input.name?.trim() || input.supportEmail?.trim() || "Renew workspace";
+}
+
+function asRecord(value: unknown) {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readString(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function formatMoney(amount: number | null | undefined, currency: string) {
+  const normalizedCurrency = currency.trim().toUpperCase() || "USD";
+  const normalizedAmount = Number.isFinite(amount) ? Number(amount) : 0;
+
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: normalizedCurrency,
+      maximumFractionDigits: 2,
+    }).format(normalizedAmount);
+  } catch {
+    return `${normalizedAmount.toLocaleString("en", {
+      maximumFractionDigits: 2,
+    })} ${normalizedCurrency}`;
+  }
+}
+
+function shortenValue(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
 }
 
 function escapeHtml(value: string) {
@@ -394,7 +436,7 @@ async function loadMerchantBranding(merchantId: string) {
 
 async function resolveMerchantRecipients(input: {
   merchantId: string;
-  group: "verification" | "developer" | "security";
+  group: "payment" | "settlement" | "verification" | "developer" | "security";
 }) {
   const merchant = await MerchantModel.findById(input.merchantId)
     .select({ supportEmail: 1, ownerName: 1, name: 1 })
@@ -683,7 +725,7 @@ export async function queueVerificationNotification(input: {
 }) {
   const setting = await getOrCreateMerchantSetting(input.merchantId);
 
-  if (!setting.notifications.verificationAlerts) {
+  if (setting.notifications.verificationAlerts === false) {
     return [];
   }
 
@@ -735,4 +777,134 @@ export async function queueVerificationNotification(input: {
   }
 
   return notifications;
+}
+
+function resolveMoneyMovementNotification(input: {
+  previousStatus?: string | null;
+  nextStatus: string;
+}) {
+  const previousWasPaid = ["paid", "settling", "settled"].includes(
+    input.previousStatus ?? ""
+  );
+
+  if (input.nextStatus === input.previousStatus) {
+    return null;
+  }
+
+  if (input.nextStatus === "settled" && previousWasPaid) {
+    return {
+      group: "settlement" as const,
+      templateKey: "merchant.settlement.settled" as const,
+    };
+  }
+
+  if (input.nextStatus === "failed") {
+    return previousWasPaid
+      ? {
+          group: "settlement" as const,
+          templateKey: "merchant.settlement.failed" as const,
+        }
+      : {
+          group: "payment" as const,
+          templateKey: "merchant.payment.failed" as const,
+        };
+  }
+
+  if (
+    ["paid", "settling", "settled"].includes(input.nextStatus) &&
+    !previousWasPaid
+  ) {
+    return {
+      group: "payment" as const,
+      templateKey: "merchant.payment.paid" as const,
+    };
+  }
+
+  return null;
+}
+
+export async function queueMoneyMovementNotificationForStatusChange(input: {
+  previousStatus?: string | null;
+  paymentId: string;
+  nextStatus: string;
+}) {
+  const notification = resolveMoneyMovementNotification(input);
+
+  if (!notification) {
+    return [];
+  }
+
+  const payment = await PaymentModel.findById(input.paymentId).exec();
+
+  if (!payment) {
+    return [];
+  }
+
+  const merchantId = payment.merchantId.toString();
+  const setting = await getOrCreateMerchantSetting(merchantId);
+
+  if (notification.group === "payment" && setting.notifications.paymentAlerts === false) {
+    return [];
+  }
+
+  if (
+    notification.group === "settlement" &&
+    setting.notifications.settlementAlerts === false
+  ) {
+    return [];
+  }
+
+  const payout =
+    notification.group === "settlement"
+      ? await PayoutModel.findOne({ sourcePaymentId: payment._id })
+          .sort({ createdAt: -1 })
+          .exec()
+      : null;
+  const metadata = asRecord(payment.metadata);
+  const reference = readString(metadata.reference) ?? payment.payId;
+  const settlementAmount =
+    payout?.netUsdc ?? payment.collection.stableAmount ?? payment.amount;
+  const recipients = await resolveMerchantRecipients({
+    merchantId,
+    group: notification.group,
+  });
+  const queuedNotifications = [];
+
+  for (const recipient of recipients) {
+    const record = await createNotificationRecord({
+      merchantId,
+      environment: payment.environment === "live" ? "live" : "test",
+      templateKey: notification.templateKey,
+      audience: "merchant",
+      category: notification.group,
+      recipient,
+      payload: {
+        amountLabel: formatMoney(payment.amount, payment.currency),
+        settlementAmountLabel: formatMoney(settlementAmount, "USDC"),
+        referenceLabel: reference,
+        destinationLabel: shortenValue(payout?.destinationWallet),
+        appUrl: getAppUrl(
+          notification.group === "settlement"
+            ? "/dashboard/settlement"
+            : "/dashboard/collections"
+        ),
+      },
+      metadata: {
+        paymentId: payment._id.toString(),
+        payId: payment.payId,
+        payoutId: payout?._id.toString() ?? null,
+        previousStatus: input.previousStatus ?? null,
+        nextStatus: input.nextStatus,
+      },
+      idempotencyKey: createNotificationIdempotencyKey([
+        notification.templateKey,
+        payment._id.toString(),
+        recipient.email,
+      ]),
+    });
+    await queueNotificationRecord(record._id.toString());
+    queuedNotifications.push(record);
+  }
+
+  return queuedNotifications;
 }

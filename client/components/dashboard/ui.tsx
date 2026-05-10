@@ -108,33 +108,39 @@ export function Card({
   action,
   className,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   children: ReactNode;
   action?: ReactNode;
   className?: string;
 }) {
+  const hasHeader = Boolean(title || description || action);
+
   return (
     <div
       className={cn(
-          "self-start rounded-xl border border-[color:var(--line)] bg-white p-4 shadow-[0_10px_36px_rgba(16,32,20,0.035)] sm:p-5",
+        "self-start rounded-xl border border-[color:var(--line)] bg-white p-4 shadow-[0_10px_36px_rgba(16,32,20,0.035)] sm:p-5",
         className
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-display text-xl font-semibold text-[color:var(--ink)]">
-            {title}
-          </h2>
-          {description ? (
-            <p className="mt-1.5 text-sm leading-6 text-[color:var(--muted)]">
-              {description}
-            </p>
-          ) : null}
+      {hasHeader ? (
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            {title ? (
+              <h2 className="font-display text-xl font-semibold text-[color:var(--ink)]">
+                {title}
+              </h2>
+            ) : null}
+            {description ? (
+              <p className="mt-1.5 text-sm leading-6 text-[color:var(--muted)]">
+                {description}
+              </p>
+            ) : null}
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
-      <div className={cn(description ? "mt-5" : "mt-4")}>{children}</div>
+      ) : null}
+      <div className={cn(hasHeader && (description ? "mt-5" : "mt-4"))}>{children}</div>
     </div>
   );
 }

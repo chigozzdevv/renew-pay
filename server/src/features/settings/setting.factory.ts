@@ -35,6 +35,8 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
         walletAlerts: true,
       },
       notifications: {
+        paymentAlerts: true,
+        settlementAlerts: true,
         developerAlerts: true,
         verificationAlerts: true,
         securityAlerts: true,

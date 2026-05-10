@@ -30,13 +30,11 @@ type SettingsTabKey =
   | "checkout"
   | "developers"
   | "wallets"
-  | "notifications"
-  | "security";
+  | "notifications";
 
 type BusinessDraft = WorkspaceSettings["business"];
 type CheckoutDraft = WorkspaceSettings["checkout"];
 type NotificationsDraft = WorkspaceSettings["notifications"];
-type SecurityDraft = WorkspaceSettings["security"];
 
 const settingsTabKeys = [
   "workspace",
@@ -44,7 +42,6 @@ const settingsTabKeys = [
   "developers",
   "wallets",
   "notifications",
-  "security",
 ] as const satisfies readonly SettingsTabKey[];
 
 function isSettingsTabKey(value: string | null): value is SettingsTabKey {
@@ -107,7 +104,6 @@ export default function SettingsPage() {
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft | null>(null);
   const [checkoutDraft, setCheckoutDraft] = useState<CheckoutDraft | null>(null);
   const [notificationsDraft, setNotificationsDraft] = useState<NotificationsDraft | null>(null);
-  const [securityDraft, setSecurityDraft] = useState<SecurityDraft | null>(null);
   const [walletDraft, setWalletDraft] = useState({
     primaryWallet: "",
     walletAlerts: true,
@@ -136,7 +132,6 @@ export default function SettingsPage() {
     setBusinessDraft(data.business);
     setCheckoutDraft(data.checkout);
     setNotificationsDraft(data.notifications);
-    setSecurityDraft(data.security);
     setWalletDraft({
       primaryWallet: data.wallets.primaryWallet,
       walletAlerts: data.wallets.walletAlerts,
@@ -164,7 +159,6 @@ export default function SettingsPage() {
         { key: "developers", label: "Developers" },
         { key: "wallets", label: "Settlement" },
         { key: "notifications", label: "Notifications" },
-        { key: "security", label: "Security" },
       ] satisfies Array<{ key: SettingsTabKey; label: string }>,
     [],
   );
@@ -216,10 +210,6 @@ export default function SettingsPage() {
     setCheckoutDraft((current) => (current ? { ...current, [key]: value } : current));
   }
 
-  function patchSecurity<K extends keyof SecurityDraft>(key: K, value: SecurityDraft[K]) {
-    setSecurityDraft((current) => (current ? { ...current, [key]: value } : current));
-  }
-
   async function handleWorkspaceSave() {
     if (!token || !user?.merchantId || !businessDraft) {
       return;
@@ -246,14 +236,19 @@ export default function SettingsPage() {
         token,
         merchantId: user.merchantId,
         environment: mode,
-        payload: { notifications: notificationsDraft },
+        payload: {
+          notifications: {
+            paymentAlerts: notificationsDraft.paymentAlerts,
+            settlementAlerts: notificationsDraft.settlementAlerts,
+          },
+        },
       });
       setActionMessage("Notification settings saved.");
     });
   }
 
   async function handleCheckoutSave() {
-    if (!token || !user?.merchantId || !checkoutDraft) {
+    if (!token || !user?.merchantId || !checkoutDraft || !businessDraft) {
       return;
     }
 
@@ -262,25 +257,14 @@ export default function SettingsPage() {
         token,
         merchantId: user.merchantId,
         environment: mode,
-        payload: { checkout: checkoutDraft },
+        payload: {
+          business: {
+            customerDomain: businessDraft.customerDomain,
+          },
+          checkout: checkoutDraft,
+        },
       });
       setActionMessage("Checkout settings saved.");
-    });
-  }
-
-  async function handleSecuritySave() {
-    if (!token || !user?.merchantId || !securityDraft) {
-      return;
-    }
-
-    await runMutation("security-save", async () => {
-      await updateWorkspaceSettings({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-        payload: { security: securityDraft },
-      });
-      setActionMessage("Security settings saved.");
     });
   }
 
@@ -305,7 +289,7 @@ export default function SettingsPage() {
     return <LoadingState />;
   }
 
-  if (error || !data || !businessDraft || !checkoutDraft || !notificationsDraft || !securityDraft) {
+  if (error || !data || !businessDraft || !checkoutDraft || !notificationsDraft) {
     return (
       <PageState
         title="Settings unavailable"
@@ -322,7 +306,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <Card title="Settings">
+      <Card>
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => (
             <button
@@ -355,7 +339,7 @@ export default function SettingsPage() {
       </Card>
 
       {activeTab === "workspace" ? (
-        <Card title="Business">
+        <Card>
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
             <div className="shrink-0 sm:w-48">
               <ImageUpload
@@ -383,13 +367,6 @@ export default function SettingsPage() {
                   onChange={(event) => patchBusiness("supportEmail", event.target.value)}
                 />
               </SettingsField>
-
-              <SettingsField label="Checkout domain">
-                <Input
-                  value={businessDraft.customerDomain}
-                  onChange={(event) => patchBusiness("customerDomain", event.target.value)}
-                />
-              </SettingsField>
             </div>
           </div>
 
@@ -407,7 +384,7 @@ export default function SettingsPage() {
       ) : null}
 
       {activeTab === "wallets" ? (
-        <Card title="Settlement">
+        <Card>
           <div className="space-y-4 max-w-xl">
             <SettingsField label="Payout wallet">
               <Input
@@ -447,7 +424,7 @@ export default function SettingsPage() {
       ) : null}
 
       {activeTab === "checkout" ? (
-        <Card title="Checkout">
+        <Card>
           <div className="grid gap-4 max-w-2xl sm:grid-cols-2">
             <SettingsField label="Checkout opens as">
               <Select
@@ -466,6 +443,13 @@ export default function SettingsPage() {
                 placeholder="https://example.com/orders/{ref}"
                 value={checkoutDraft.returnPage ?? ""}
                 onChange={(event) => patchCheckout("returnPage", event.target.value || null)}
+              />
+            </SettingsField>
+            <SettingsField label="Checkout domain">
+              <Input
+                value={businessDraft.customerDomain}
+                placeholder="checkout.example.com"
+                onChange={(event) => patchBusiness("customerDomain", event.target.value)}
               />
             </SettingsField>
             <SettingsField label="Allowed domains">
@@ -500,30 +484,26 @@ export default function SettingsPage() {
       {activeTab === "developers" ? <DevelopersSettings /> : null}
 
       {activeTab === "notifications" ? (
-        <Card title="Notifications">
+        <Card>
           <div className="grid gap-3 max-w-2xl sm:grid-cols-2">
             <SettingsToggle
-              label="Compliance"
-              enabled={notificationsDraft.verificationAlerts}
+              label="Payment alerts"
+              enabled={notificationsDraft.paymentAlerts}
               onToggle={() =>
                 patchNotifications(
-                  "verificationAlerts",
-                  !notificationsDraft.verificationAlerts
+                  "paymentAlerts",
+                  !notificationsDraft.paymentAlerts
                 )
               }
             />
             <SettingsToggle
-              label="Developer"
-              enabled={notificationsDraft.developerAlerts}
+              label="Settlement alerts"
+              enabled={notificationsDraft.settlementAlerts}
               onToggle={() =>
-                patchNotifications("developerAlerts", !notificationsDraft.developerAlerts)
-              }
-            />
-            <SettingsToggle
-              label="Security"
-              enabled={notificationsDraft.securityAlerts}
-              onToggle={() =>
-                patchNotifications("securityAlerts", !notificationsDraft.securityAlerts)
+                patchNotifications(
+                  "settlementAlerts",
+                  !notificationsDraft.settlementAlerts
+                )
               }
             />
           </div>
@@ -534,43 +514,6 @@ export default function SettingsPage() {
               tone="brand"
               disabled={busyAction === "notifications-save"}
               onClick={() => void handleNotificationsSave()}
-            >
-              Save
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      {activeTab === "security" ? (
-        <Card title="Security">
-          <div className="space-y-4 max-w-md">
-            <SettingsField label="Session timeout">
-              <Select
-                value={securityDraft.sessionTimeout}
-                wrapperClassName="w-full"
-                onChange={(event) => patchSecurity("sessionTimeout", event.target.value)}
-              >
-                <option value="30 minutes">30 minutes</option>
-                <option value="1 hour">1 hour</option>
-                <option value="4 hours">4 hours</option>
-              </Select>
-            </SettingsField>
-
-            <SettingsToggle
-              label="Require 2FA"
-              enabled={securityDraft.enforceTwoFactor}
-              onToggle={() =>
-                patchSecurity("enforceTwoFactor", !securityDraft.enforceTwoFactor)
-              }
-            />
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <Button
-              type="button"
-              tone="brand"
-              disabled={busyAction === "security-save"}
-              onClick={() => void handleSecuritySave()}
             >
               Save
             </Button>

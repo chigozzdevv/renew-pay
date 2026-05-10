@@ -1,6 +1,10 @@
 type NotificationAudience = "merchant";
 
 export const notificationTemplateKeys = [
+  "merchant.payment.paid",
+  "merchant.payment.failed",
+  "merchant.settlement.settled",
+  "merchant.settlement.failed",
   "merchant.verification.owner_needs_action",
   "merchant.verification.owner_approved",
   "merchant.verification.owner_rejected",
@@ -20,6 +24,26 @@ export const notificationTemplateCatalog: Record<
     audience: NotificationAudience;
   }
 > = {
+  "merchant.payment.paid": {
+    label: "Payment received",
+    description: "Sent when a customer payment is confirmed.",
+    audience: "merchant",
+  },
+  "merchant.payment.failed": {
+    label: "Payment failed",
+    description: "Sent when a customer payment fails.",
+    audience: "merchant",
+  },
+  "merchant.settlement.settled": {
+    label: "Settlement completed",
+    description: "Sent when settled value reaches the destination.",
+    audience: "merchant",
+  },
+  "merchant.settlement.failed": {
+    label: "Settlement failed",
+    description: "Sent when settlement cannot be completed.",
+    audience: "merchant",
+  },
   "merchant.verification.owner_needs_action": {
     label: "Owner KYC needs action",
     description: "Sent when owner verification requires more information.",
@@ -104,8 +128,71 @@ function buildTemplateDocument(input: {
     normalizeOptionalValue(payload.appUrl) ??
     buildMailto(branding.supportEmail, `${merchantName} support`);
   const statusLabel = normalizeValue(payload.statusLabel, "pending");
+  const amountLabel = normalizeValue(payload.amountLabel, "the payment");
+  const referenceLabel = normalizeValue(payload.referenceLabel, "the collection");
+  const settlementAmountLabel = normalizeValue(
+    payload.settlementAmountLabel,
+    "the settlement"
+  );
+  const destinationLabel = normalizeOptionalValue(payload.destinationLabel);
 
   switch (input.templateKey) {
+    case "merchant.payment.paid":
+      return {
+        subject: `${merchantName} payment received`,
+        eyebrow: "Payment received",
+        heading: "Payment received.",
+        body: [
+          `${amountLabel} was collected for ${referenceLabel}.`,
+          "The collection is ready for settlement.",
+        ],
+        cta: {
+          label: "Open collections",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
+    case "merchant.payment.failed":
+      return {
+        subject: `${merchantName} payment failed`,
+        eyebrow: "Payment failed",
+        heading: "Payment could not be completed.",
+        body: [
+          `${amountLabel} could not be collected for ${referenceLabel}.`,
+          "Open collections to review the latest status.",
+        ],
+        cta: {
+          label: "Open collections",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
+    case "merchant.settlement.settled":
+      return {
+        subject: `${merchantName} settlement completed`,
+        eyebrow: "Settlement completed",
+        heading: "Settlement completed.",
+        body: [
+          `${settlementAmountLabel} settled for ${referenceLabel}.`,
+          ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
+        ],
+        cta: {
+          label: "Open settlement",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
+    case "merchant.settlement.failed":
+      return {
+        subject: `${merchantName} settlement failed`,
+        eyebrow: "Settlement failed",
+        heading: "Settlement could not be completed.",
+        body: [
+          `${settlementAmountLabel} could not settle for ${referenceLabel}.`,
+          "Open settlement to review the payout status.",
+        ],
+        cta: {
+          label: "Open settlement",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
     case "merchant.verification.owner_needs_action":
       return {
         subject: `${merchantName} owner verification needs action`,
@@ -264,6 +351,21 @@ export function buildNotificationTemplatePreviewPayload(
   templateKey: NotificationTemplateKey
 ) {
   switch (templateKey) {
+    case "merchant.payment.paid":
+    case "merchant.payment.failed":
+      return {
+        amountLabel: "NGN 26,500",
+        referenceLabel: "Order #1042",
+        appUrl: "https://app.renew.sh/dashboard/collections",
+      };
+    case "merchant.settlement.settled":
+    case "merchant.settlement.failed":
+      return {
+        settlementAmountLabel: "16.04 USDC",
+        referenceLabel: "Order #1042",
+        destinationLabel: "main-wallet",
+        appUrl: "https://app.renew.sh/dashboard/settlement",
+      };
     case "merchant.verification.owner_needs_action":
     case "merchant.verification.owner_approved":
     case "merchant.verification.owner_rejected":

@@ -13,6 +13,7 @@ import {
   hasActivePartnaPaymentProfile,
   startPartnaCustomerPaymentProfileVerification,
 } from "@/features/onramps/partna.service";
+import { queueMoneyMovementNotificationForStatusChange } from "@/features/notifications/notification.service";
 import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.factory";
 import { PaymentModel, type PaymentRecord } from "@/features/payments/payment.model";
 import type {
@@ -1012,11 +1013,18 @@ async function ensurePartnaVoucherForPayment(
   };
   await payment.save();
 
-  await emitPaymentWebhookEventForStatusChange({
-    previousStatus,
-    paymentId: payment._id.toString(),
-    nextStatus: payment.status,
-  }).catch(() => undefined);
+  await Promise.all([
+    emitPaymentWebhookEventForStatusChange({
+      previousStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+    queueMoneyMovementNotificationForStatusChange({
+      previousStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+  ]);
 }
 
 export async function submitPublicCheckoutCustomer(

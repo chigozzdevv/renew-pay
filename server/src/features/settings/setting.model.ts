@@ -112,6 +112,16 @@ const checkoutSettingsSchema = new Schema(
 
 const notificationSettingsSchema = new Schema(
   {
+    paymentAlerts: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
+    settlementAlerts: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
     developerAlerts: {
       type: Boolean,
       required: true,
