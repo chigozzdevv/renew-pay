@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { ApiError } from "@/lib/api";
+import { ApiError, readAccessToken } from "@/lib/api";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
 
 type ResourceState<T> = {
@@ -16,7 +16,7 @@ export function useResource<T>(
   loader: (input: { token: string; merchantId: string }) => Promise<T>,
   deps: readonly unknown[] = []
 ): ResourceState<T> {
-  const { token, user, isLoading: isSessionLoading, error: sessionError } =
+  const { token, user, isLoading: isSessionLoading, error: sessionError, refresh } =
     useDashboardSession();
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +40,34 @@ export function useResource<T>(
       setData(nextData);
       setError(null);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        const recovered = await refresh();
+
+        if (recovered) {
+          const recoveredToken = readAccessToken();
+
+          if (recoveredToken && user?.merchantId) {
+            try {
+              const nextData = await loader({
+                token: recoveredToken,
+                merchantId: user.merchantId,
+              });
+              setData(nextData);
+            } catch (retryError) {
+              setError(
+                retryError instanceof ApiError
+                  ? retryError.message
+                  : "Unable to load resource."
+              );
+              return;
+            }
+          }
+
+          setError(null);
+          return;
+        }
+      }
+
       setError(
         error instanceof ApiError ? error.message : "Unable to load resource."
       );
