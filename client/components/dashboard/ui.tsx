@@ -376,16 +376,7 @@ export function Table({
   bodyClassName?: string;
   gridClassName?: string;
 }) {
-  const columnClass =
-    columns.length === 3
-      ? "md:grid-cols-3"
-      : columns.length === 4
-        ? "md:grid-cols-4"
-        : columns.length === 5
-          ? "md:grid-cols-5"
-          : columns.length === 6
-            ? "md:grid-cols-6"
-            : "md:grid-cols-2";
+  const columnClass = getTableGridClass(columns.length);
 
   return (
     <div className="space-y-3">
@@ -427,6 +418,8 @@ export function TableRow({
   selected?: boolean;
   gridClassName?: string;
 }) {
+  const columnClass = getTableGridClass(columns);
+
   return (
     <div
       className={cn(
@@ -434,19 +427,32 @@ export function TableRow({
         selected
           ? "border-black/10 bg-[color:var(--soft)] shadow-[0_4px_20px_rgba(17,17,17,0.04)]"
           : "border-[color:var(--line)] bg-white hover:border-black/10 hover:bg-[color:var(--soft)]",
-        gridClassName ??
-          (columns === 3
-            ? "md:grid-cols-3"
-            : columns === 4
-              ? "md:grid-cols-4"
-              : columns === 5
-                ? "md:grid-cols-5"
-                : "md:grid-cols-6")
+        gridClassName ?? columnClass
       )}
     >
       {children}
     </div>
   );
+}
+
+function getTableGridClass(columns: number) {
+  if (columns === 3) {
+    return "md:grid-cols-3";
+  }
+
+  if (columns === 4) {
+    return "md:grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_minmax(6rem,0.7fr)_7rem]";
+  }
+
+  if (columns === 5) {
+    return "md:grid-cols-[minmax(0,1.45fr)_minmax(8rem,0.85fr)_minmax(0,1.2fr)_minmax(6rem,0.7fr)_7rem]";
+  }
+
+  if (columns === 6) {
+    return "md:grid-cols-[minmax(0,1.35fr)_minmax(7rem,0.75fr)_minmax(0,1.05fr)_minmax(8rem,0.95fr)_minmax(6rem,0.7fr)_7rem]";
+  }
+
+  return "md:grid-cols-2";
 }
 
 export function PaginationControls({
