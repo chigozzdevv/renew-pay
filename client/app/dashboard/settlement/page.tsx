@@ -31,35 +31,49 @@ import {
   loadSettlementRoutes,
   type SettlementRouteRecord,
 } from "@/lib/settlement";
+import { loadWorkspaceSettings } from "@/lib/settings";
+
+type SettlementType = "standard" | "private";
 
 type SettlementRouteDraft = {
   name: string;
-  routeCode: string;
-  provider: SettlementRouteRecord["provider"];
+  settlementType: SettlementType;
   assetSymbol: string;
-  assetMint: string;
-  assetDecimals: string;
+  useDefaultWallet: boolean;
   destinationAddress: string;
-  feeBps: string;
   isDefault: boolean;
 };
 
 const EMPTY_DRAFT: SettlementRouteDraft = {
   name: "",
-  routeCode: "",
-  provider: "direct" as const,
+  settlementType: "standard",
   assetSymbol: "USDC",
-  assetMint: "",
-  assetDecimals: "6",
+  useDefaultWallet: true,
   destinationAddress: "",
-  feeBps: "0",
   isDefault: false,
 };
+
+const SETTLEMENT_ASSETS: Record<SettlementType, Array<{ label: string; value: string }>> = {
+  standard: [{ label: "USDC", value: "USDC" }],
+  private: [{ label: "USDC", value: "USDC" }],
+};
+
+function formatSettlementType(value: SettlementType | SettlementRouteRecord["mode"]) {
+  return value === "private" ? "Private settlement" : "Standard settlement";
+}
+
+function formatAddress(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
+}
 
 export default function SettlementPage() {
   const { token, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
-  const [provider, setProvider] = useState<SettlementRouteRecord["provider"] | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<SettlementType | "all">("all");
   const [showCreate, setShowCreate] = useState(false);
   const [draft, setDraft] = useState<SettlementRouteDraft>({ ...EMPTY_DRAFT });
   const [detailRoute, setDetailRoute] = useState<SettlementRouteRecord | null>(null);
@@ -73,13 +87,23 @@ export default function SettlementPage() {
         token,
         merchantId,
         environment: mode,
-        provider,
+        mode: typeFilter,
         limit: 50,
       }),
-    [mode, provider]
+    [mode, typeFilter]
+  );
+  const { data: settingsData } = useResource(
+    async ({ token, merchantId }) =>
+      loadWorkspaceSettings({
+        token,
+        merchantId,
+        environment: mode,
+      }),
+    [mode]
   );
 
   const routes = data?.routes ?? [];
+  const defaultPayoutWallet = settingsData?.wallets.primaryWallet ?? "";
 
   useEffect(() => {
     if (!message && !errorMessage) return;
@@ -90,6 +114,14 @@ export default function SettlementPage() {
     return () => window.clearTimeout(timeout);
   }, [errorMessage, message]);
 
+  useEffect(() => {
+    if (!showCreate || defaultPayoutWallet) {
+      return;
+    }
+
+    setDraft((current) => ({ ...current, useDefaultWallet: false }));
+  }, [defaultPayoutWallet, showCreate]);
+
   const metrics = useMemo(() => {
     const active = routes.filter((route) => route.status === "active").length;
     const privateRoutes = routes.filter((route) => route.mode === "private").length;
@@ -99,9 +131,30 @@ export default function SettlementPage() {
       total: routes.length,
       active,
       privateRoutes,
-      defaultAsset: defaultRoute?.assetSymbol ?? "None",
+      defaultRoute: defaultRoute?.name ?? "None",
     };
   }, [routes]);
+
+  function openCreateModal() {
+    setDraft({
+      ...EMPTY_DRAFT,
+      useDefaultWallet: Boolean(defaultPayoutWallet),
+    });
+    setShowCreate(true);
+  }
+
+  function patchSettlementType(nextType: SettlementType) {
+    setDraft((current) => {
+      const options = SETTLEMENT_ASSETS[nextType];
+      const currentAssetIsSupported = options.some((option) => option.value === current.assetSymbol);
+
+      return {
+        ...current,
+        settlementType: nextType,
+        assetSymbol: currentAssetIsSupported ? current.assetSymbol : options[0]?.value ?? "USDC",
+      };
+    });
+  }
 
   async function handleCreate() {
     if (!token || !user?.merchantId) return;
@@ -116,15 +169,11 @@ export default function SettlementPage() {
         merchantId: user.merchantId,
         environment: mode,
         name: draft.name.trim(),
-        routeCode: draft.routeCode.trim() || undefined,
-        provider: draft.provider,
-        mode: draft.provider === "umbra" ? "private" : "standard",
-        chain: "solana",
-        assetSymbol: draft.assetSymbol.trim().toUpperCase(),
-        assetMint: draft.assetMint.trim() || null,
-        assetDecimals: Number(draft.assetDecimals),
-        destinationAddress: draft.destinationAddress.trim(),
-        feeBps: Number(draft.feeBps),
+        settlementType: draft.settlementType,
+        assetSymbol: draft.assetSymbol,
+        destinationAddress: draft.useDefaultWallet
+          ? defaultPayoutWallet
+          : draft.destinationAddress.trim(),
         isDefault: draft.isDefault,
       });
       setDraft({ ...EMPTY_DRAFT });
@@ -140,10 +189,8 @@ export default function SettlementPage() {
 
   const canCreate =
     draft.name.trim().length >= 2 &&
-    draft.destinationAddress.trim().length > 0 &&
     draft.assetSymbol.trim().length >= 2 &&
-    Number(draft.assetDecimals) >= 0 &&
-    Number(draft.feeBps) >= 0;
+    (draft.useDefaultWallet ? defaultPayoutWallet.length > 0 : draft.destinationAddress.trim().length > 0);
 
   if (isLoading && !data) {
     return <LoadingState />;
@@ -166,13 +213,13 @@ export default function SettlementPage() {
         <MetricCard label="Routes" value={String(metrics.total)} />
         <MetricCard label="Active" value={String(metrics.active)} />
         <MetricCard label="Private" value={String(metrics.privateRoutes)} />
-        <MetricCard label="Default asset" value={metrics.defaultAsset} />
+        <MetricCard label="Default route" value={metrics.defaultRoute} />
       </StatGrid>
 
       <Card
         title="Settlement"
         action={
-          <Button tone="brand" className="gap-2" onClick={() => setShowCreate(true)}>
+          <Button tone="brand" className="gap-2" onClick={openCreateModal}>
             <Plus className="h-4 w-4" strokeWidth={2.2} />
             New route
           </Button>
@@ -181,29 +228,30 @@ export default function SettlementPage() {
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
             <Select
-              value={provider}
+              value={typeFilter}
               wrapperClassName="w-44 max-w-full"
-              onChange={(event) => setProvider(event.target.value as SettlementRouteRecord["provider"] | "all")}
+              onChange={(event) => setTypeFilter(event.target.value as SettlementType | "all")}
             >
-              <option value="all">All providers</option>
-              <option value="direct">Standard</option>
-              <option value="umbra">Private</option>
+              <option value="all">All types</option>
+              <option value="standard">Standard settlement</option>
+              <option value="private">Private settlement</option>
             </Select>
           </div>
 
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#9a3a31]">{errorMessage}</p> : null}
 
-          <Table columns={["Route", "Asset", "Mode", "Destination", "Status", "Actions"]}>
+          <Table columns={["Route", "Type", "Asset", "Payout wallet", "Status", "Actions"]}>
             {routes.map((route) => (
               <TableRow key={route.id} columns={6}>
                 <button type="button" className="min-w-0 text-left" onClick={() => setDetailRoute(route)}>
                   <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{route.name}</p>
-                  <p className="mt-1 text-xs text-[color:var(--muted)]">{route.routeCode}</p>
                 </button>
+                <p className="self-center text-sm text-[color:var(--muted)]">{formatSettlementType(route.mode)}</p>
                 <p className="self-center text-sm font-semibold text-[color:var(--ink)]">{route.assetSymbol}</p>
-                <p className="self-center text-sm text-[color:var(--muted)]">{route.mode}</p>
-                <p className="truncate self-center text-sm text-[color:var(--muted)]">{route.destinationAddress}</p>
+                <p className="truncate self-center text-sm text-[color:var(--muted)]" title={route.destinationAddress ?? undefined}>
+                  {formatAddress(route.destinationAddress)}
+                </p>
                 <div className="flex items-center gap-2 self-center">
                   {route.isDefault ? <StatusBadge value="active">Default</StatusBadge> : null}
                   <StatusBadge value={route.status} />
@@ -236,44 +284,43 @@ export default function SettlementPage() {
         }
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Name</span>
+          <label className="space-y-1.5 md:col-span-2">
+            <span className="text-xs font-medium text-[color:var(--muted)]">Route name</span>
             <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Code</span>
-            <Input value={draft.routeCode} placeholder="optional" onChange={(event) => setDraft((current) => ({ ...current, routeCode: event.target.value }))} />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Provider</span>
-            <Select value={draft.provider} onChange={(event) => setDraft((current) => ({ ...current, provider: event.target.value as SettlementRouteDraft["provider"], assetSymbol: event.target.value === "umbra" ? "USDC" : current.assetSymbol }))}>
-              <option value="direct">Standard</option>
-              <option value="umbra">Private</option>
+            <span className="text-xs font-medium text-[color:var(--muted)]">Settlement type</span>
+            <Select value={draft.settlementType} onChange={(event) => patchSettlementType(event.target.value as SettlementType)}>
+              <option value="standard">Standard settlement</option>
+              <option value="private">Private settlement</option>
             </Select>
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Asset</span>
-            <Input value={draft.assetSymbol} disabled={draft.provider === "umbra"} onChange={(event) => setDraft((current) => ({ ...current, assetSymbol: event.target.value.toUpperCase() }))} />
+            <span className="text-xs font-medium text-[color:var(--muted)]">Settlement asset</span>
+            <Select value={draft.assetSymbol} onChange={(event) => setDraft((current) => ({ ...current, assetSymbol: event.target.value }))}>
+              {SETTLEMENT_ASSETS[draft.settlementType].map((asset) => (
+                <option key={asset.value} value={asset.value}>{asset.label}</option>
+              ))}
+            </Select>
           </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Mint</span>
-            <Input value={draft.assetMint} placeholder="Optional" disabled={draft.provider === "umbra"} onChange={(event) => setDraft((current) => ({ ...current, assetMint: event.target.value }))} />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Decimals</span>
-            <Input value={draft.assetDecimals} inputMode="numeric" onChange={(event) => setDraft((current) => ({ ...current, assetDecimals: event.target.value }))} />
-          </label>
+          {defaultPayoutWallet ? (
+            <label className="flex items-center gap-3 rounded-lg border border-[color:var(--line)] px-3 py-3 md:col-span-2">
+              <input type="checkbox" checked={draft.useDefaultWallet} onChange={(event) => setDraft((current) => ({ ...current, useDefaultWallet: event.target.checked }))} />
+              <span className="text-sm font-medium text-[color:var(--ink)]">Use default payout wallet</span>
+            </label>
+          ) : null}
           <label className="space-y-1.5 md:col-span-2">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Destination wallet</span>
-            <Input value={draft.destinationAddress} onChange={(event) => setDraft((current) => ({ ...current, destinationAddress: event.target.value }))} />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Fee bps</span>
-            <Input value={draft.feeBps} inputMode="numeric" onChange={(event) => setDraft((current) => ({ ...current, feeBps: event.target.value }))} />
+            <span className="text-xs font-medium text-[color:var(--muted)]">Payout wallet</span>
+            <Input
+              value={draft.useDefaultWallet ? defaultPayoutWallet : draft.destinationAddress}
+              disabled={draft.useDefaultWallet}
+              placeholder="Wallet address"
+              onChange={(event) => setDraft((current) => ({ ...current, destinationAddress: event.target.value }))}
+            />
           </label>
           <label className="flex items-center gap-3 rounded-lg border border-[color:var(--line)] px-3 py-3">
             <input type="checkbox" checked={draft.isDefault} onChange={(event) => setDraft((current) => ({ ...current, isDefault: event.target.checked }))} />
-            <span className="text-sm font-medium text-[color:var(--ink)]">Default</span>
+            <span className="text-sm font-medium text-[color:var(--ink)]">Make default</span>
           </label>
         </div>
       </Modal>
@@ -287,11 +334,11 @@ export default function SettlementPage() {
       >
         {detailRoute ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Provider" value={detailRoute.provider} />
-            <Field label="Mode" value={detailRoute.mode} />
+            <Field label="Settlement type" value={formatSettlementType(detailRoute.mode)} />
             <Field label="Asset" value={detailRoute.assetSymbol} />
-            <Field label="Mint" value={detailRoute.assetMint ?? "Default"} />
-            <Field label="Destination" value={detailRoute.destinationAddress ?? "Not set"} />
+            <Field label="Payout wallet" value={detailRoute.destinationAddress ?? "Not set"} />
+            <Field label="Default" value={detailRoute.isDefault ? "Yes" : "No"} />
+            <Field label="Status" value={detailRoute.status} />
             <Field label="Created" value={formatDateTime(detailRoute.createdAt)} />
           </div>
         ) : null}

@@ -88,15 +88,9 @@ export async function createSettlementRoute(input: {
   merchantId: string;
   environment: "test" | "live";
   name: string;
-  routeCode?: string;
-  mode: "standard" | "private";
-  provider: "direct" | "umbra";
-  chain: "solana" | "avalanche";
+  settlementType: "standard" | "private";
   assetSymbol: string;
-  assetMint?: string | null;
-  assetDecimals?: number;
   destinationAddress: string;
-  feeBps?: number;
   isDefault?: boolean;
 }) {
   const response = await fetchApi<SettlementRouteRecord>("/settlement/routes", {
@@ -106,15 +100,11 @@ export async function createSettlementRoute(input: {
       merchantId: input.merchantId,
       environment: input.environment,
       name: input.name,
-      routeCode: input.routeCode,
-      mode: input.mode,
-      provider: input.provider,
-      chain: input.chain,
+      mode: input.settlementType,
+      provider: input.settlementType === "private" ? "umbra" : "direct",
+      chain: "solana",
       assetSymbol: input.assetSymbol,
-      assetMint: input.assetMint ?? null,
-      assetDecimals: input.assetDecimals ?? 6,
       destinationAddress: input.destinationAddress,
-      feeBps: input.feeBps ?? 0,
       isDefault: input.isDefault ?? false,
       status: "active",
     }),
