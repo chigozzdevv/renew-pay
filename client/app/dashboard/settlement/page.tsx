@@ -39,8 +39,6 @@ type SettlementRouteDraft = {
   name: string;
   settlementType: SettlementType;
   assetSymbol: string;
-  useDefaultWallet: boolean;
-  destinationAddress: string;
   isDefault: boolean;
 };
 
@@ -48,13 +46,14 @@ const EMPTY_DRAFT: SettlementRouteDraft = {
   name: "",
   settlementType: "standard",
   assetSymbol: "USDC",
-  useDefaultWallet: true,
-  destinationAddress: "",
   isDefault: false,
 };
 
 const SETTLEMENT_ASSETS: Record<SettlementType, Array<{ label: string; value: string }>> = {
-  standard: [{ label: "USDC", value: "USDC" }],
+  standard: [
+    { label: "USDC", value: "USDC" },
+    { label: "PUSD", value: "PUSD" },
+  ],
   private: [{ label: "USDC", value: "USDC" }],
 };
 
@@ -114,14 +113,6 @@ export default function SettlementPage() {
     return () => window.clearTimeout(timeout);
   }, [errorMessage, message]);
 
-  useEffect(() => {
-    if (!showCreate || defaultPayoutWallet) {
-      return;
-    }
-
-    setDraft((current) => ({ ...current, useDefaultWallet: false }));
-  }, [defaultPayoutWallet, showCreate]);
-
   const metrics = useMemo(() => {
     const active = routes.filter((route) => route.status === "active").length;
     const privateRoutes = routes.filter((route) => route.mode === "private").length;
@@ -136,10 +127,7 @@ export default function SettlementPage() {
   }, [routes]);
 
   function openCreateModal() {
-    setDraft({
-      ...EMPTY_DRAFT,
-      useDefaultWallet: Boolean(defaultPayoutWallet),
-    });
+    setDraft({ ...EMPTY_DRAFT });
     setShowCreate(true);
   }
 
@@ -171,9 +159,7 @@ export default function SettlementPage() {
         name: draft.name.trim(),
         settlementType: draft.settlementType,
         assetSymbol: draft.assetSymbol,
-        destinationAddress: draft.useDefaultWallet
-          ? defaultPayoutWallet
-          : draft.destinationAddress.trim(),
+        destinationAddress: defaultPayoutWallet,
         isDefault: draft.isDefault,
       });
       setDraft({ ...EMPTY_DRAFT });
@@ -190,7 +176,7 @@ export default function SettlementPage() {
   const canCreate =
     draft.name.trim().length >= 2 &&
     draft.assetSymbol.trim().length >= 2 &&
-    (draft.useDefaultWallet ? defaultPayoutWallet.length > 0 : draft.destinationAddress.trim().length > 0);
+    defaultPayoutWallet.length > 0;
 
   if (isLoading && !data) {
     return <LoadingState />;
@@ -303,22 +289,7 @@ export default function SettlementPage() {
               ))}
             </Select>
           </label>
-          {defaultPayoutWallet ? (
-            <label className="flex items-center gap-3 rounded-lg border border-[color:var(--line)] px-3 py-3 md:col-span-2">
-              <input type="checkbox" checked={draft.useDefaultWallet} onChange={(event) => setDraft((current) => ({ ...current, useDefaultWallet: event.target.checked }))} />
-              <span className="text-sm font-medium text-[color:var(--ink)]">Use default payout wallet</span>
-            </label>
-          ) : null}
-          <label className="space-y-1.5 md:col-span-2">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Payout wallet</span>
-            <Input
-              value={draft.useDefaultWallet ? defaultPayoutWallet : draft.destinationAddress}
-              disabled={draft.useDefaultWallet}
-              placeholder="Wallet address"
-              onChange={(event) => setDraft((current) => ({ ...current, destinationAddress: event.target.value }))}
-            />
-          </label>
-          <label className="flex items-center gap-3 rounded-lg border border-[color:var(--line)] px-3 py-3">
+          <label className="flex items-center gap-3 md:col-span-2">
             <input type="checkbox" checked={draft.isDefault} onChange={(event) => setDraft((current) => ({ ...current, isDefault: event.target.checked }))} />
             <span className="text-sm font-medium text-[color:var(--ink)]">Make default</span>
           </label>
