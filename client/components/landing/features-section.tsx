@@ -158,24 +158,7 @@ function SettlementVisual() {
           <DashboardMetric label="Failed" value="0" />
         </div>
 
-        <div className="mt-4 grid gap-3 xl:grid-cols-[0.82fr_1.18fr]">
-          <div className="rounded-xl border border-[#e3e8e1] bg-[#fbfcf8] p-4">
-            <p className="text-xs font-medium text-[#68726b]">Default account</p>
-            <p className="mt-2 text-lg font-semibold text-[#111111]">main-wallet</p>
-            <div className="mt-5 space-y-3">
-              {["Customer paid", "Payment captured", "USDC settled"].map((item) => (
-                <div key={item} className="flex items-center gap-3">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#e9f5ec] text-[#225c39]">
-                    <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none">
-                      <path d="M4 8.2l2.2 2.2L12 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                  <span className="text-sm font-semibold text-[#111111]">{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
+        <div className="mt-4">
           <div className="rounded-xl border border-[#e3e8e1] bg-white p-4">
             <div className="flex items-center justify-between gap-4">
               <h4 className="text-base font-semibold text-[#111111]">Recent payouts</h4>
