@@ -232,6 +232,7 @@ export function FeaturesSection() {
         <div className="space-y-[10vh] pb-6 sm:pb-8 lg:pb-10">
           {featureCards.map((card, index) => {
             const visualFirst = card.visualSide === "left";
+            const compactCard = card.visual === "settlement";
 
             return (
               <Reveal
@@ -239,17 +240,26 @@ export function FeaturesSection() {
                 offset={18}
                 className={cn("sticky top-20", cardZIndexClasses[index])}
               >
-                <article className="relative min-h-[34rem] overflow-hidden rounded-xl border border-[#dfe9dd] bg-[#fbfdf8] px-5 py-6 sm:min-h-[38rem] sm:px-7 sm:py-8 lg:min-h-[42rem] lg:px-10 lg:py-10">
+                <article
+                  className={cn(
+                    "relative overflow-hidden rounded-xl border border-[#dfe9dd] bg-[#fbfdf8] px-5 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-10",
+                    compactCard
+                      ? "min-h-0"
+                      : "min-h-[34rem] sm:min-h-[38rem] lg:min-h-[42rem]"
+                  )}
+                >
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,rgba(17,17,17,0),rgba(47,125,60,0.38),rgba(17,17,17,0))]" />
                   <div
                     className={cn(
-                      "relative grid h-full gap-8 lg:min-h-[34rem] lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center",
+                      "relative grid h-full gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center",
+                      !compactCard && "lg:min-h-[34rem]",
                       visualFirst && "lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]"
                     )}
                   >
                     <div
                       className={cn(
-                        "flex min-h-[19rem] items-center justify-center",
+                        "flex items-center justify-center",
+                        compactCard ? "min-h-0" : "min-h-[19rem]",
                         visualFirst ? "lg:order-1" : "lg:order-2"
                       )}
                     >
