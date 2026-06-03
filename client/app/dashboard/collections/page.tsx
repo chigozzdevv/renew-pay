@@ -33,7 +33,7 @@ import {
   loadCollectionPage,
   type CollectionRecord,
 } from "@/lib/collections";
-import { loadSettlementRoutes } from "@/lib/settlement";
+import { loadSettlementAccounts } from "@/lib/settlement";
 
 type CollectionStatusFilter = CollectionRecord["status"] | "all";
 type RecurringFilter = "all" | "true" | "false";
@@ -80,9 +80,9 @@ export default function CollectionsPage() {
       }),
     [mode, page, recurring, search, status]
   );
-  const { data: routesData } = useResource(
+  const { data: settlementData } = useResource(
     async ({ token, merchantId }) =>
-      loadSettlementRoutes({
+      loadSettlementAccounts({
         token,
         merchantId,
         environment: mode,
@@ -93,7 +93,7 @@ export default function CollectionsPage() {
   );
 
   const collections = data?.collections ?? [];
-  const routes = routesData?.routes ?? [];
+  const settlementAccounts = settlementData?.accounts ?? [];
   const pagination = data?.pagination ?? {
     page,
     limit: pageSize,
@@ -305,9 +305,9 @@ export default function CollectionsPage() {
             <span className="text-xs font-medium text-[color:var(--muted)]">Settlement</span>
             <Select value={draft.settlement} onChange={(event) => setDraft((current) => ({ ...current, settlement: event.target.value }))}>
               <option value="">Default</option>
-              {routes.map((route) => (
-                <option key={route.id} value={route.id}>
-                  {route.name} · {route.assetSymbol} · {route.mode}
+              {settlementAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} · Stellar USDC
                 </option>
               ))}
             </Select>

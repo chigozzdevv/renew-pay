@@ -15,7 +15,7 @@ const faqs = [
   },
   {
     question: "What do merchants settle in?",
-    answer: "Merchants settle in stable value, with USDC routes for standard or private settlement.",
+    answer: "Merchants settle in Stellar USDC after the release window.",
   },
   {
     question: "Do customers need crypto wallets?",
@@ -26,8 +26,8 @@ const faqs = [
     answer: "Create a collection, send the checkout URL, and listen for the paid event before fulfilling.",
   },
   {
-    question: "Can settlement be private?",
-    answer: "Yes. Merchants can use private USDC settlement routes when that destination is configured.",
+    question: "When does settlement release?",
+    answer: "Renew schedules release for the next day and can hold settlement if a payment issue is reported before release.",
   },
 ] as const;
 

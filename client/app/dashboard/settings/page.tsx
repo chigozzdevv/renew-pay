@@ -386,10 +386,10 @@ export default function SettingsPage() {
       {activeTab === "wallets" ? (
         <Card>
           <div className="space-y-4 max-w-xl">
-            <SettingsField label="Payout wallet">
+            <SettingsField label="Stellar payout wallet">
               <Input
                 value={walletDraft.primaryWallet}
-                placeholder="Wallet address"
+                placeholder="Stellar wallet address"
                 onChange={(event) =>
                   setWalletDraft((current) => ({
                     ...current,

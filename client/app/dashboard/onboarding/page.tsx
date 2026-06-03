@@ -544,7 +544,7 @@ function PayoutStep({
         <Input
           value={payoutWallet}
           onChange={(event) => setPayoutWallet(event.target.value)}
-          placeholder="Solana wallet address"
+          placeholder="Stellar wallet address"
         />
       </label>
       <Button
@@ -1031,7 +1031,7 @@ function OnboardingSurface() {
       busyAction === "register" ||
       user?.role !== "owner",
     signerLabel: formatAddress(data?.payout.payoutWallet ?? null),
-    signerNote: "This payout wallet receives stable settlement for the workspace.",
+    signerNote: "This payout wallet receives Stellar USDC settlement for the workspace.",
     onRegister: () =>
       void runAction("register", async () => {
         if (!token || !user) {

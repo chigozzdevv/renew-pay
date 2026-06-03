@@ -9,7 +9,7 @@ import {
   formatCurrency,
   formatDateTime,
   formatTxHash,
-  getSolanaTxUrl,
+  getStellarTxUrl,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -218,7 +218,7 @@ export default function PayoutsPage() {
               value={
                 detailPayout.creditTxHash ? (
                   <a
-                    href={getSolanaTxUrl(mode, detailPayout.creditTxHash)}
+                    href={getStellarTxUrl(mode, detailPayout.creditTxHash)}
                     target="_blank"
                     rel="noreferrer"
                     className="underline decoration-black/20 underline-offset-4"

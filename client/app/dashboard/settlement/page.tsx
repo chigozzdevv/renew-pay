@@ -21,45 +21,26 @@ import {
   Modal,
   PageState,
   RowActionButton,
-  Select,
   StatGrid,
   Table,
   TableRow,
 } from "@/components/dashboard/ui";
 import {
-  createSettlementRoute,
-  loadSettlementRoutes,
-  type SettlementRouteRecord,
+  createSettlementAccount,
+  loadSettlementAccounts,
+  type SettlementAccountRecord,
 } from "@/lib/settlement";
 import { loadWorkspaceSettings } from "@/lib/settings";
 
-type SettlementType = "standard" | "private";
-
-type SettlementRouteDraft = {
+type SettlementAccountDraft = {
   name: string;
-  settlementType: SettlementType;
-  assetSymbol: string;
   isDefault: boolean;
 };
 
-const EMPTY_DRAFT: SettlementRouteDraft = {
+const EMPTY_DRAFT: SettlementAccountDraft = {
   name: "",
-  settlementType: "standard",
-  assetSymbol: "USDC",
   isDefault: false,
 };
-
-const SETTLEMENT_ASSETS: Record<SettlementType, Array<{ label: string; value: string }>> = {
-  standard: [
-    { label: "USDC", value: "USDC" },
-    { label: "PUSD", value: "PUSD" },
-  ],
-  private: [{ label: "USDC", value: "USDC" }],
-};
-
-function formatSettlementType(value: SettlementType | SettlementRouteRecord["mode"]) {
-  return value === "private" ? "Private settlement" : "Standard settlement";
-}
 
 function formatAddress(value: string | null) {
   if (!value) {
@@ -72,24 +53,22 @@ function formatAddress(value: string | null) {
 export default function SettlementPage() {
   const { token, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
-  const [typeFilter, setTypeFilter] = useState<SettlementType | "all">("all");
   const [showCreate, setShowCreate] = useState(false);
-  const [draft, setDraft] = useState<SettlementRouteDraft>({ ...EMPTY_DRAFT });
-  const [detailRoute, setDetailRoute] = useState<SettlementRouteRecord | null>(null);
+  const [draft, setDraft] = useState<SettlementAccountDraft>({ ...EMPTY_DRAFT });
+  const [detailAccount, setDetailAccount] = useState<SettlementAccountRecord | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data, isLoading, error, reload } = useResource(
     async ({ token, merchantId }) =>
-      loadSettlementRoutes({
+      loadSettlementAccounts({
         token,
         merchantId,
         environment: mode,
-        mode: typeFilter,
         limit: 50,
       }),
-    [mode, typeFilter]
+    [mode]
   );
   const { data: settingsData } = useResource(
     async ({ token, merchantId }) =>
@@ -100,9 +79,9 @@ export default function SettlementPage() {
       }),
     [mode]
   );
-
-  const routes = data?.routes ?? [];
+  const accounts = data?.accounts ?? [];
   const defaultPayoutWallet = settingsData?.wallets.primaryWallet ?? "";
+  const canUseSettlementWallet = defaultPayoutWallet.length > 0;
 
   useEffect(() => {
     if (!message && !errorMessage) return;
@@ -114,34 +93,24 @@ export default function SettlementPage() {
   }, [errorMessage, message]);
 
   const metrics = useMemo(() => {
-    const active = routes.filter((route) => route.status === "active").length;
-    const privateRoutes = routes.filter((route) => route.mode === "private").length;
-    const defaultRoute = routes.find((route) => route.isDefault);
+    const active = accounts.filter((account) => account.status === "active").length;
+    const defaultAccount = accounts.find((account) => account.isDefault);
 
     return {
-      total: routes.length,
+      total: accounts.length,
       active,
-      privateRoutes,
-      defaultRoute: defaultRoute?.name ?? "None",
+      defaultAccount: defaultAccount?.name ?? "None",
     };
-  }, [routes]);
+  }, [accounts]);
 
   function openCreateModal() {
+    if (!canUseSettlementWallet) {
+      setErrorMessage("Add a Stellar payout wallet in Settings first.");
+      return;
+    }
+
     setDraft({ ...EMPTY_DRAFT });
     setShowCreate(true);
-  }
-
-  function patchSettlementType(nextType: SettlementType) {
-    setDraft((current) => {
-      const options = SETTLEMENT_ASSETS[nextType];
-      const currentAssetIsSupported = options.some((option) => option.value === current.assetSymbol);
-
-      return {
-        ...current,
-        settlementType: nextType,
-        assetSymbol: currentAssetIsSupported ? current.assetSymbol : options[0]?.value ?? "USDC",
-      };
-    });
   }
 
   async function handleCreate() {
@@ -152,19 +121,17 @@ export default function SettlementPage() {
     setErrorMessage(null);
 
     try {
-      await createSettlementRoute({
+      await createSettlementAccount({
         token,
         merchantId: user.merchantId,
         environment: mode,
         name: draft.name.trim(),
-        settlementType: draft.settlementType,
-        assetSymbol: draft.assetSymbol,
         destinationAddress: defaultPayoutWallet,
         isDefault: draft.isDefault,
       });
       setDraft({ ...EMPTY_DRAFT });
       setShowCreate(false);
-      setMessage("Settlement route created.");
+      setMessage("Settlement account created.");
       await reload();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -175,8 +142,7 @@ export default function SettlementPage() {
 
   const canCreate =
     draft.name.trim().length >= 2 &&
-    draft.assetSymbol.trim().length >= 2 &&
-    defaultPayoutWallet.length > 0;
+    canUseSettlementWallet;
 
   if (isLoading && !data) {
     return <LoadingState />;
@@ -186,7 +152,7 @@ export default function SettlementPage() {
     return (
       <PageState
         title="Settlement unavailable"
-        message={error ?? "Unable to load settlement routes."}
+        message={error ?? "Unable to load settlement accounts."}
         tone="danger"
         action={<button className="text-sm font-semibold" onClick={() => void reload()}>Retry</button>}
       />
@@ -196,56 +162,43 @@ export default function SettlementPage() {
   return (
     <div className="space-y-5">
       <StatGrid>
-        <MetricCard label="Routes" value={String(metrics.total)} />
+        <MetricCard label="Accounts" value={String(metrics.total)} />
         <MetricCard label="Active" value={String(metrics.active)} />
-        <MetricCard label="Private" value={String(metrics.privateRoutes)} />
-        <MetricCard label="Default route" value={metrics.defaultRoute} />
+        <MetricCard label="Asset" value="USDC" />
+        <MetricCard label="Default account" value={metrics.defaultAccount} />
       </StatGrid>
 
       <Card
         title="Settlement"
         action={
-          <Button tone="brand" className="gap-2" onClick={openCreateModal}>
+          <Button tone="brand" className="gap-2" disabled={!canUseSettlementWallet} onClick={openCreateModal}>
             <Plus className="h-4 w-4" strokeWidth={2.2} />
-            New route
+            New account
           </Button>
         }
       >
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-            <Select
-              value={typeFilter}
-              wrapperClassName="w-44 max-w-full"
-              onChange={(event) => setTypeFilter(event.target.value as SettlementType | "all")}
-            >
-              <option value="all">All types</option>
-              <option value="standard">Standard settlement</option>
-              <option value="private">Private settlement</option>
-            </Select>
-          </div>
-
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#9a3a31]">{errorMessage}</p> : null}
 
-          <Table columns={["Route", "Type", "Asset", "Payout wallet", "Status", "Actions"]}>
-            {routes.map((route) => (
-              <TableRow key={route.id} columns={6}>
-                <button type="button" className="min-w-0 text-left" onClick={() => setDetailRoute(route)}>
-                  <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{route.name}</p>
+          <Table columns={["Account", "Asset", "Payout wallet", "Status", "Actions"]}>
+            {accounts.map((account) => (
+              <TableRow key={account.id} columns={5}>
+                <button type="button" className="min-w-0 text-left" onClick={() => setDetailAccount(account)}>
+                  <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{account.name}</p>
                 </button>
-                <p className="self-center text-sm text-[color:var(--muted)]">{formatSettlementType(route.mode)}</p>
-                <p className="self-center text-sm font-semibold text-[color:var(--ink)]">{route.assetSymbol}</p>
-                <p className="truncate self-center text-sm text-[color:var(--muted)]" title={route.destinationAddress ?? undefined}>
-                  {formatAddress(route.destinationAddress)}
+                <p className="self-center text-sm font-semibold text-[color:var(--ink)]">Stellar USDC</p>
+                <p className="truncate self-center text-sm text-[color:var(--muted)]" title={account.destinationAddress ?? undefined}>
+                  {formatAddress(account.destinationAddress)}
                 </p>
                 <div className="flex items-center gap-2 self-center">
-                  {route.isDefault ? <StatusBadge value="active">Default</StatusBadge> : null}
-                  <StatusBadge value={route.status} />
+                  {account.isDefault ? <StatusBadge value="active">Default</StatusBadge> : null}
+                  <StatusBadge value={account.status} />
                 </div>
                 <div className="flex items-center gap-2 self-center">
                   <RowActionButton
-                    label="View route"
-                    onClick={() => setDetailRoute(route)}
+                    label="View account"
+                    onClick={() => setDetailAccount(account)}
                   >
                     <Eye className="h-4 w-4" strokeWidth={2.1} />
                   </RowActionButton>
@@ -259,7 +212,7 @@ export default function SettlementPage() {
       <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        title="New settlement route"
+        title="New settlement account"
         footer={
           <div className="flex items-center justify-end gap-3">
             <Button onClick={() => setShowCreate(false)}>Cancel</Button>
@@ -271,24 +224,11 @@ export default function SettlementPage() {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 md:col-span-2">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Route name</span>
+            <span className="text-xs font-medium text-[color:var(--muted)]">Account name</span>
             <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
           </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Settlement type</span>
-            <Select value={draft.settlementType} onChange={(event) => patchSettlementType(event.target.value as SettlementType)}>
-              <option value="standard">Standard settlement</option>
-              <option value="private">Private settlement</option>
-            </Select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Settlement asset</span>
-            <Select value={draft.assetSymbol} onChange={(event) => setDraft((current) => ({ ...current, assetSymbol: event.target.value }))}>
-              {SETTLEMENT_ASSETS[draft.settlementType].map((asset) => (
-                <option key={asset.value} value={asset.value}>{asset.label}</option>
-              ))}
-            </Select>
-          </label>
+          <Field label="Settlement" value="Stellar USDC" />
+          <Field label="Payout wallet" value={formatAddress(defaultPayoutWallet)} />
           <label className="flex items-center gap-3 md:col-span-2">
             <input type="checkbox" checked={draft.isDefault} onChange={(event) => setDraft((current) => ({ ...current, isDefault: event.target.checked }))} />
             <span className="text-sm font-medium text-[color:var(--ink)]">Make default</span>
@@ -297,20 +237,19 @@ export default function SettlementPage() {
       </Modal>
 
       <Modal
-        open={!!detailRoute}
-        onClose={() => setDetailRoute(null)}
-        title={detailRoute?.name ?? "Settlement route"}
+        open={!!detailAccount}
+        onClose={() => setDetailAccount(null)}
+        title={detailAccount?.name ?? "Settlement account"}
         size="lg"
-        footer={<div className="flex justify-end"><Button onClick={() => setDetailRoute(null)}>Close</Button></div>}
+        footer={<div className="flex justify-end"><Button onClick={() => setDetailAccount(null)}>Close</Button></div>}
       >
-        {detailRoute ? (
+        {detailAccount ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Settlement type" value={formatSettlementType(detailRoute.mode)} />
-            <Field label="Asset" value={detailRoute.assetSymbol} />
-            <Field label="Payout wallet" value={detailRoute.destinationAddress ?? "Not set"} />
-            <Field label="Default" value={detailRoute.isDefault ? "Yes" : "No"} />
-            <Field label="Status" value={detailRoute.status} />
-            <Field label="Created" value={formatDateTime(detailRoute.createdAt)} />
+            <Field label="Settlement" value="Stellar USDC" />
+            <Field label="Payout wallet" value={detailAccount.destinationAddress ?? "Not set"} />
+            <Field label="Default" value={detailAccount.isDefault ? "Yes" : "No"} />
+            <Field label="Status" value={detailAccount.status} />
+            <Field label="Created" value={formatDateTime(detailAccount.createdAt)} />
           </div>
         ) : null}
       </Modal>

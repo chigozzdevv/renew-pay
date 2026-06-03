@@ -54,9 +54,9 @@ export function formatTxHash(value: string) {
   return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
 
-export function getSolanaTxUrl(mode: WorkspaceMode, txHash: string) {
-  const cluster = mode === "live" ? "mainnet-beta" : "devnet";
-  return `https://explorer.solana.com/tx/${txHash}?cluster=${cluster}`;
+export function getStellarTxUrl(mode: WorkspaceMode, txHash: string) {
+  const network = mode === "live" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${network}/tx/${txHash}`;
 }
 
 export function statusTone(

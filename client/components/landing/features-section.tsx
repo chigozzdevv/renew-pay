@@ -24,8 +24,8 @@ const featureCards: Array<{
     visualSide: "left",
   },
   {
-    title: ["Public or private", "settlement."],
-    body: "Get standard or private settlement, depending on how your business wants to receive funds.",
+    title: ["Stellar", "settlement."],
+    body: "Settle collected value as Stellar USDC, with a release window that gives Renew time to handle payment issues before payout.",
     visual: "settlement",
     visualSide: "right",
   },
@@ -160,7 +160,7 @@ function SettlementVisual() {
 
         <div className="mt-4 grid gap-3 xl:grid-cols-[0.82fr_1.18fr]">
           <div className="rounded-xl border border-[#e3e8e1] bg-[#fbfcf8] p-4">
-            <p className="text-xs font-medium text-[#68726b]">Default route</p>
+            <p className="text-xs font-medium text-[#68726b]">Default account</p>
             <p className="mt-2 text-lg font-semibold text-[#111111]">main-wallet</p>
             <div className="mt-5 space-y-3">
               {["Customer paid", "Payment captured", "USDC settled"].map((item) => (
