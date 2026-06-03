@@ -1,6 +1,6 @@
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
-import { normalizeSolanaAddress } from "@/shared/constants/solana";
+import { normalizeStellarAddress } from "@/shared/constants/stellar";
 
 import { appendAuditLog } from "@/features/audit/audit.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
@@ -149,7 +149,7 @@ export async function updateSettingsByMerchantId(
 
   if (input.wallets) {
     if (input.wallets.primaryWallet !== undefined) {
-      const primaryWallet = normalizeSolanaAddress(input.wallets.primaryWallet);
+      const primaryWallet = normalizeStellarAddress(input.wallets.primaryWallet);
       setting.wallets.primaryWallet = primaryWallet;
       merchant.payoutWallet = primaryWallet;
     }
@@ -241,7 +241,7 @@ export async function saveWalletSettings(
   );
 
   const { merchant, setting } = await getOrCreateSetting(merchantId);
-  const primaryWallet = normalizeSolanaAddress(input.primaryWallet);
+  const primaryWallet = normalizeStellarAddress(input.primaryWallet);
 
   setting.wallets.primaryWallet = primaryWallet;
   merchant.payoutWallet = primaryWallet;

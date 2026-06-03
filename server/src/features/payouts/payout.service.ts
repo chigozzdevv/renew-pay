@@ -3,7 +3,10 @@ import { Types, type HydratedDocument } from "mongoose";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import { queueMoneyMovementNotificationForStatusChange } from "@/features/notifications/notification.service";
+import {
+  queueCustomerReceiptForStatusChange,
+  queueMoneyMovementNotificationForStatusChange,
+} from "@/features/notifications/notification.service";
 import { PaymentModel } from "@/features/payments/payment.model";
 import { PayoutModel, type PayoutDocument } from "@/features/payouts/payout.model";
 import type {
@@ -11,13 +14,15 @@ import type {
   ListPayoutsQuery,
   UpdatePayoutInput,
 } from "@/features/payouts/payout.validation";
-import { executeDirectSolanaPayout } from "@/features/settlement/providers/direct/direct-solana.service";
-import { executeUmbraPayout } from "@/features/settlement/providers/umbra/umbra.service";
 import {
-  SettlementRouteModel,
-  type SettlementRouteRecord,
-} from "@/features/settlement/settlement-route.model";
-import { normalizeSolanaAddress } from "@/shared/constants/solana";
+  depositToStellarVault,
+  releaseStellarVaultBatch,
+} from "@/features/settlement/providers/stellar/vault.service";
+import {
+  SettlementAccountModel,
+  type SettlementAccountRecord,
+} from "@/features/settlement/settlement-account.model";
+import { normalizeStellarAddress } from "@/shared/constants/stellar";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import { createRuntimeModeCondition, toStoredRuntimeMode } from "@/shared/utils/runtime-environment";
@@ -44,6 +49,10 @@ function toPayoutResponse(document: {
   bridgeSourceTxHash?: string | null;
   bridgeReceiveTxHash?: string | null;
   creditTxHash?: string | null;
+  vaultBatchId?: string | null;
+  vaultDepositTxHash?: string | null;
+  vaultReleaseTxHash?: string | null;
+  vaultHeldAt?: Date | null;
   submittedAt?: Date | null;
   bridgeAttestedAt?: Date | null;
   scheduledFor: Date;
@@ -71,6 +80,10 @@ function toPayoutResponse(document: {
     bridgeSourceTxHash: document.bridgeSourceTxHash ?? null,
     bridgeReceiveTxHash: document.bridgeReceiveTxHash ?? null,
     creditTxHash: document.creditTxHash ?? null,
+    vaultBatchId: document.vaultBatchId ?? null,
+    vaultDepositTxHash: document.vaultDepositTxHash ?? null,
+    vaultReleaseTxHash: document.vaultReleaseTxHash ?? null,
+    vaultHeldAt: document.vaultHeldAt ?? null,
     submittedAt: document.submittedAt ?? null,
     bridgeAttestedAt: document.bridgeAttestedAt ?? null,
     scheduledFor: document.scheduledFor,
@@ -132,10 +145,15 @@ async function syncLinkedPaymentFromPayout(payout: {
       paymentId: payment._id.toString(),
       nextStatus: payment.status,
     }).catch(() => undefined),
+    queueCustomerReceiptForStatusChange({
+      previousStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
   ]);
 }
 
-async function resolvePayoutSettlementRoute(payout: {
+async function resolvePayoutSettlementAccount(payout: {
   sourcePaymentId?: { toString(): string } | null;
 }) {
   if (!payout.sourcePaymentId) {
@@ -143,20 +161,20 @@ async function resolvePayoutSettlementRoute(payout: {
   }
 
   const payment = await PaymentModel.findById(payout.sourcePaymentId)
-    .select({ settlementRouteId: 1 })
+    .select({ settlementAccountId: 1 })
     .exec();
 
-  if (!payment?.settlementRouteId) {
+  if (!payment?.settlementAccountId) {
     return null;
   }
 
-  const route = await SettlementRouteModel.findById(payment.settlementRouteId).exec();
+  const account = await SettlementAccountModel.findById(payment.settlementAccountId).exec();
 
-  if (!route) {
-    throw new HttpError(404, "Settlement route was not found.");
+  if (!account) {
+    throw new HttpError(404, "Settlement account was not found.");
   }
 
-  return route;
+  return account;
 }
 
 function toPayoutProcessingResult(payout: PayoutRecord, payoutReady: boolean) {
@@ -166,98 +184,114 @@ function toPayoutProcessingResult(payout: PayoutRecord, payoutReady: boolean) {
     bridgeSourceTxHash: payout.bridgeSourceTxHash ?? null,
     bridgeReceiveTxHash: payout.bridgeReceiveTxHash ?? null,
     creditTxHash: payout.creditTxHash ?? null,
+    vaultBatchId: payout.vaultBatchId ?? null,
+    vaultDepositTxHash: payout.vaultDepositTxHash ?? null,
+    vaultReleaseTxHash: payout.vaultReleaseTxHash ?? null,
     payoutReady,
   };
 }
 
-async function processUmbraPayout(input: {
-  payout: PayoutRecord;
-  route: SettlementRouteRecord;
-  runtimeEnvironment: RuntimeMode;
-}) {
-  const { payout, route, runtimeEnvironment } = input;
-  const routeDestinationAddress = normalizeSolanaAddress(route.destinationAddress);
-  const payoutDestinationAddress = normalizeSolanaAddress(payout.destinationWallet);
-
-  if (!route.assetMint || !routeDestinationAddress) {
-    throw new HttpError(409, "Umbra settlement route is not configured.");
-  }
-
-  if (payoutDestinationAddress !== routeDestinationAddress) {
-    throw new HttpError(
-      409,
-      "Payout destination must match the selected settlement route."
-    );
-  }
-
-  const execution = await executeUmbraPayout({
-    payoutId: payout._id.toString(),
-    merchantId: payout.merchantId.toString(),
-    environment: runtimeEnvironment,
-    routeId: route._id.toString(),
-    amount: payout.netUsdc,
-    assetSymbol: route.assetSymbol,
-    assetMint: route.assetMint,
-    assetDecimals: route.assetDecimals,
-    destinationAddress: routeDestinationAddress,
-  });
-
-  payout.status = execution.status;
-  payout.txHash = execution.txHash;
-  payout.bridgeSourceTxHash = execution.createProofAccountTxHash;
-  payout.bridgeReceiveTxHash = execution.closeProofAccountTxHash ?? null;
-  payout.creditTxHash = execution.txHash;
-  payout.bridgeAttestedAt = new Date();
-  payout.submittedAt = payout.submittedAt ?? new Date();
-  payout.settledAt = execution.settledAt;
-  payout.reversalReason = null;
-  await payout.save();
-
-  await syncLinkedPaymentFromPayout(payout);
-
-  return toPayoutProcessingResult(payout, true);
+function getPayoutProcessingDelay(payout: { scheduledFor: Date }) {
+  return Math.max(0, payout.scheduledFor.getTime() - Date.now());
 }
 
-async function processDirectSolanaPayout(input: {
+async function enqueuePayoutProcessingJob(input: {
+  payoutId: string;
+  delayMs?: number;
+}) {
+  const delayMs = input.delayMs ?? 0;
+
+  return enqueueQueueJob(
+    queueNames.payoutProcessing,
+    "payout-processing",
+    { payoutId: input.payoutId },
+    {
+      jobId:
+        delayMs > 0
+          ? `payout-processing-${input.payoutId}-release`
+          : `payout-processing-${input.payoutId}-now`,
+      attempts: 3,
+      ...(delayMs > 0 ? { delayMs } : {}),
+    }
+  );
+}
+
+async function processStellarVaultPayout(input: {
   payout: PayoutRecord;
-  route: SettlementRouteRecord;
+  account: SettlementAccountRecord;
   runtimeEnvironment: RuntimeMode;
 }) {
-  const { payout, route, runtimeEnvironment } = input;
-  const routeDestinationAddress = normalizeSolanaAddress(route.destinationAddress);
-  const payoutDestinationAddress = normalizeSolanaAddress(payout.destinationWallet);
+  const { payout, account, runtimeEnvironment } = input;
+  const accountDestinationAddress = normalizeStellarAddress(account.destinationAddress);
+  const payoutDestinationAddress = normalizeStellarAddress(payout.destinationWallet);
 
-  if (!route.assetMint || !routeDestinationAddress) {
-    throw new HttpError(409, "Direct Solana settlement route is not configured.");
+  if (!accountDestinationAddress) {
+    throw new HttpError(409, "Stellar settlement account is not configured.");
   }
 
-  if (payoutDestinationAddress !== routeDestinationAddress) {
+  if (payoutDestinationAddress !== accountDestinationAddress) {
     throw new HttpError(
       409,
-      "Payout destination must match the selected settlement route."
+      "Payout destination must match the Stellar settlement wallet."
     );
   }
 
-  const execution = await executeDirectSolanaPayout({
-    payoutId: payout._id.toString(),
-    merchantId: payout.merchantId.toString(),
+  if (!payout.vaultDepositTxHash) {
+    const deposit = await depositToStellarVault({
+      payoutId: payout._id.toString(),
+      merchantId: payout.merchantId.toString(),
+      environment: runtimeEnvironment,
+      accountId: account._id.toString(),
+      amount: payout.netUsdc,
+      destinationAddress: accountDestinationAddress,
+      releaseAt: payout.scheduledFor,
+    });
+
+    payout.status = "confirming";
+    payout.vaultBatchId = deposit.vaultBatchId;
+    payout.vaultDepositTxHash = deposit.txHash;
+    if (deposit.releaseAt.getTime() > payout.scheduledFor.getTime()) {
+      payout.scheduledFor = deposit.releaseAt;
+    }
+    payout.vaultHeldAt = new Date();
+    payout.txHash = deposit.txHash;
+    payout.bridgeSourceTxHash = null;
+    payout.bridgeReceiveTxHash = deposit.txHash;
+    payout.creditTxHash = null;
+    payout.bridgeAttestedAt = null;
+    payout.submittedAt = payout.submittedAt ?? new Date();
+    payout.settledAt = null;
+    payout.reversalReason = null;
+    await payout.save();
+
+    await syncLinkedPaymentFromPayout(payout);
+  }
+
+  const delayMs = getPayoutProcessingDelay(payout);
+
+  if (delayMs > 0) {
+    await enqueuePayoutProcessingJob({
+      payoutId: payout._id.toString(),
+      delayMs,
+    });
+
+    return toPayoutProcessingResult(payout, false);
+  }
+
+  if (!payout.vaultBatchId) {
+    throw new HttpError(409, "Stellar vault batch is not configured.");
+  }
+
+  const release = await releaseStellarVaultBatch({
     environment: runtimeEnvironment,
-    routeId: route._id.toString(),
-    amount: payout.netUsdc,
-    assetSymbol: route.assetSymbol,
-    assetMint: route.assetMint,
-    assetDecimals: route.assetDecimals,
-    destinationAddress: routeDestinationAddress,
+    vaultBatchId: payout.vaultBatchId,
   });
 
-  payout.status = execution.status;
-  payout.txHash = execution.txHash;
-  payout.bridgeSourceTxHash = null;
-  payout.bridgeReceiveTxHash = null;
-  payout.creditTxHash = execution.txHash;
-  payout.bridgeAttestedAt = new Date();
-  payout.submittedAt = payout.submittedAt ?? new Date();
-  payout.settledAt = execution.settledAt;
+  payout.status = "settled";
+  payout.vaultReleaseTxHash = release.txHash;
+  payout.txHash = release.txHash;
+  payout.creditTxHash = release.txHash;
+  payout.settledAt = new Date();
   payout.reversalReason = null;
   await payout.save();
 
@@ -305,36 +339,36 @@ export async function createPayout(input: CreatePayoutInput) {
       merchantId: input.merchantId,
       ...createRuntimeModeCondition("environment", input.environment),
     })
-      .select({ settlementRouteId: 1 })
+      .select({ settlementAccountId: 1 })
       .exec();
 
     if (!sourcePayment) {
       throw new HttpError(404, "Source payment was not found.");
     }
 
-    if (sourcePayment.settlementRouteId) {
-      const route = await SettlementRouteModel.findById(
-        sourcePayment.settlementRouteId
+    if (sourcePayment.settlementAccountId) {
+      const account = await SettlementAccountModel.findById(
+        sourcePayment.settlementAccountId
       ).exec();
 
-      if (!route) {
-        throw new HttpError(404, "Settlement route was not found.");
+      if (!account) {
+        throw new HttpError(404, "Settlement account was not found.");
       }
 
-      const routeDestinationAddress = normalizeSolanaAddress(
-        route.destinationAddress
+      const accountDestinationAddress = normalizeStellarAddress(
+        account.destinationAddress
       );
-      const payoutDestinationAddress = normalizeSolanaAddress(
+      const payoutDestinationAddress = normalizeStellarAddress(
         input.destinationWallet
       );
 
       if (
-        routeDestinationAddress &&
-        payoutDestinationAddress !== routeDestinationAddress
+        accountDestinationAddress &&
+        payoutDestinationAddress !== accountDestinationAddress
       ) {
         throw new HttpError(
           409,
-          "Payout destination must match the selected settlement route."
+          "Payout destination must match the Stellar settlement wallet."
         );
       }
     }
@@ -358,12 +392,16 @@ export async function createPayout(input: CreatePayoutInput) {
     grossUsdc: input.grossUsdc,
     feeUsdc: input.feeUsdc,
     netUsdc: input.netUsdc,
-    destinationWallet: normalizeSolanaAddress(input.destinationWallet) ?? input.destinationWallet,
+    destinationWallet: normalizeStellarAddress(input.destinationWallet) ?? input.destinationWallet,
     status: input.status,
     txHash: input.txHash ?? null,
     bridgeSourceTxHash: input.bridgeSourceTxHash ?? null,
     bridgeReceiveTxHash: input.bridgeReceiveTxHash ?? null,
     creditTxHash: input.creditTxHash ?? null,
+    vaultBatchId: input.vaultBatchId ?? null,
+    vaultDepositTxHash: input.vaultDepositTxHash ?? null,
+    vaultReleaseTxHash: input.vaultReleaseTxHash ?? null,
+    vaultHeldAt: input.vaultHeldAt ?? null,
     submittedAt: input.submittedAt ?? null,
     scheduledFor: input.scheduledFor,
     settledAt: input.settledAt ?? null,
@@ -484,6 +522,22 @@ export async function updatePayout(
     payout.creditTxHash = input.creditTxHash ?? null;
   }
 
+  if (input.vaultBatchId !== undefined) {
+    payout.vaultBatchId = input.vaultBatchId ?? null;
+  }
+
+  if (input.vaultDepositTxHash !== undefined) {
+    payout.vaultDepositTxHash = input.vaultDepositTxHash ?? null;
+  }
+
+  if (input.vaultReleaseTxHash !== undefined) {
+    payout.vaultReleaseTxHash = input.vaultReleaseTxHash ?? null;
+  }
+
+  if (input.vaultHeldAt !== undefined) {
+    payout.vaultHeldAt = input.vaultHeldAt ?? null;
+  }
+
   if (input.submittedAt !== undefined) {
     payout.submittedAt = input.submittedAt ?? null;
   }
@@ -568,6 +622,27 @@ export async function queuePayoutProcessing(
     };
   }
 
+  const delayMs = getPayoutProcessingDelay(payout);
+
+  if (delayMs > 0 && payout.vaultDepositTxHash) {
+    const queuedJob = await enqueuePayoutProcessingJob({
+      payoutId,
+      delayMs,
+    });
+
+    return {
+      queued: Boolean(queuedJob),
+      processedInline: false,
+      payoutId,
+      result: {
+        skipped: true,
+        status: payout.status,
+        scheduledFor: payout.scheduledFor,
+        vaultDepositTxHash: payout.vaultDepositTxHash,
+      },
+    };
+  }
+
   if (toStoredRuntimeMode(payout.environment) === "test") {
     console.log(
       `[payout-processing] inline-start ${JSON.stringify({
@@ -586,15 +661,7 @@ export async function queuePayoutProcessing(
     };
   }
 
-  const queuedJob = await enqueueQueueJob(
-    queueNames.payoutProcessing,
-    "payout-processing",
-    { payoutId },
-    {
-      jobId: `payout-processing-${payoutId}`,
-      attempts: 3,
-    }
-  );
+  const queuedJob = await enqueuePayoutProcessingJob({ payoutId });
 
   if (!queuedJob) {
     console.log(
@@ -647,7 +714,32 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
       bridgeSourceTxHash: payout.bridgeSourceTxHash ?? null,
       bridgeReceiveTxHash: payout.bridgeReceiveTxHash ?? null,
       creditTxHash: payout.creditTxHash ?? null,
-      payoutReady: payout.status === "confirming",
+      vaultBatchId: payout.vaultBatchId ?? null,
+      vaultDepositTxHash: payout.vaultDepositTxHash ?? null,
+      vaultReleaseTxHash: payout.vaultReleaseTxHash ?? null,
+      payoutReady: true,
+    };
+  }
+
+  const delayMs = getPayoutProcessingDelay(payout);
+
+  if (delayMs > 0 && payout.vaultDepositTxHash) {
+    await enqueuePayoutProcessingJob({
+      payoutId: input.payoutId,
+      delayMs,
+    });
+
+    return {
+      payoutId: input.payoutId,
+      status: payout.status,
+      bridgeSourceTxHash: payout.bridgeSourceTxHash ?? null,
+      bridgeReceiveTxHash: payout.bridgeReceiveTxHash ?? null,
+      creditTxHash: payout.creditTxHash ?? null,
+      vaultBatchId: payout.vaultBatchId ?? null,
+      vaultDepositTxHash: payout.vaultDepositTxHash ?? null,
+      vaultReleaseTxHash: payout.vaultReleaseTxHash ?? null,
+      payoutReady: false,
+      scheduledFor: payout.scheduledFor,
     };
   }
 
@@ -658,23 +750,15 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
   }
 
   const runtimeEnvironment = toStoredRuntimeMode(payout.environment);
-  const settlementRoute = await resolvePayoutSettlementRoute(payout);
-
-  if (settlementRoute?.provider === "umbra") {
-    return processUmbraPayout({
-      payout,
-      route: settlementRoute,
-      runtimeEnvironment,
-    });
-  }
+  const settlementAccount = await resolvePayoutSettlementAccount(payout);
 
   if (
-    settlementRoute?.provider === "direct" &&
-    settlementRoute.chain === "solana"
+    settlementAccount?.provider === "stellar_vault" &&
+    settlementAccount.chain === "stellar"
   ) {
-    return processDirectSolanaPayout({
+    return processStellarVaultPayout({
       payout,
-      route: settlementRoute,
+      account: settlementAccount,
       runtimeEnvironment,
     });
   }
@@ -686,18 +770,18 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
   payout.bridgeAttestedAt = null;
   payout.submittedAt = payout.submittedAt ?? new Date();
   payout.settledAt = null;
-  payout.reversalReason = "Unsupported settlement route for automated payout.";
+  payout.reversalReason = "Stellar settlement account is not configured for automated payout.";
   await payout.save();
 
   await syncLinkedPaymentFromPayout(payout);
 
   console.log(
-    `[payout-processing] unsupported-route ${JSON.stringify({
+    `[payout-processing] unsupported-settlement-account ${JSON.stringify({
       payoutId: input.payoutId,
       status: payout.status,
-      routeId: settlementRoute?._id.toString() ?? null,
-      provider: settlementRoute?.provider ?? null,
-      chain: settlementRoute?.chain ?? null,
+      accountId: settlementAccount?._id.toString() ?? null,
+      provider: settlementAccount?.provider ?? null,
+      chain: settlementAccount?.chain ?? null,
     })}`
   );
 

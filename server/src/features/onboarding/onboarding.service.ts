@@ -16,9 +16,9 @@ import type {
   OnboardingVerificationStartInput,
 } from "@/features/onboarding/onboarding.validation";
 import {
-  isConfiguredWalletAddress,
-  normalizeSolanaAddress,
-} from "@/shared/constants/solana";
+  isStellarAddress,
+  normalizeStellarAddress,
+} from "@/shared/constants/stellar";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 
@@ -70,7 +70,7 @@ async function resolveOnboardingState(input: {
   const merchantKybRequired = input.environment === "live";
   const merchantKybComplete = !merchantKybRequired || merchantKyb.status === "approved";
   const verificationComplete = ownerKycComplete && merchantKybComplete;
-  const payoutConfigured = isConfiguredWalletAddress(merchant.payoutWallet);
+  const payoutConfigured = isStellarAddress(merchant.payoutWallet);
 
   const currentStepKey = !businessComplete
     ? "business"
@@ -167,7 +167,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
     },
     payout: {
       payoutWallet: input.merchant.payoutWallet ?? "",
-      payoutConfigured: isConfiguredWalletAddress(input.merchant.payoutWallet),
+      payoutConfigured: isStellarAddress(input.merchant.payoutWallet),
       bankTransferStatus: "coming_soon" as const,
     },
   };
@@ -329,7 +329,7 @@ export async function saveOnboardingPayout(input: {
     getOrCreateSetting(input.merchantId),
   ]);
 
-  const payoutWallet = normalizeSolanaAddress(input.payload.payoutWallet);
+  const payoutWallet = normalizeStellarAddress(input.payload.payoutWallet);
 
   if (!payoutWallet) {
     throw new HttpError(400, "Payout wallet is invalid.");

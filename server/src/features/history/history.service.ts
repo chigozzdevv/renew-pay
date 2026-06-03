@@ -123,6 +123,9 @@ export async function listHistory(query: ListHistoryQuery) {
           { destinationWallet: pattern },
           { txHash: pattern },
           { creditTxHash: pattern },
+          { vaultBatchId: pattern },
+          { vaultDepositTxHash: pattern },
+          { vaultReleaseTxHash: pattern },
         ],
       });
     }
@@ -141,11 +144,17 @@ export async function listHistory(query: ListHistoryQuery) {
             status: document.status,
             amount: document.netUsdc,
             currency: "USDC",
-            reference: document.creditTxHash ?? document.txHash ?? document.batchRef,
+            reference:
+              document.vaultReleaseTxHash ??
+              document.creditTxHash ??
+              document.vaultDepositTxHash ??
+              document.txHash ??
+              document.batchRef,
             createdAt: document.createdAt,
             metadata: {
               destinationWallet: document.destinationWallet,
               scheduledFor: document.scheduledFor,
+              vaultBatchId: document.vaultBatchId ?? null,
             },
           }))
         )

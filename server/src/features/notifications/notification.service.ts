@@ -12,6 +12,7 @@ import {
   type NotificationTemplateKey,
   type NotificationTemplatePayload,
 } from "@/features/notifications/notification.template";
+import { CustomerModel } from "@/features/customers/customer.model";
 import {
   resendEmailReceivedWebhookSchema,
   resendWebhookEnvelopeSchema,
@@ -128,6 +129,18 @@ function formatMoney(amount: number | null | undefined, currency: string) {
       maximumFractionDigits: 2,
     })} ${normalizedCurrency}`;
   }
+}
+
+function formatReleaseDate(value: Date) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(value);
 }
 
 function shortenValue(value: string | null | undefined) {
@@ -907,4 +920,79 @@ export async function queueMoneyMovementNotificationForStatusChange(input: {
   }
 
   return queuedNotifications;
+}
+
+export async function queueCustomerReceiptForStatusChange(input: {
+  previousStatus?: string | null;
+  paymentId: string;
+  nextStatus: string;
+}) {
+  const previousWasPaid = ["paid", "settling", "settled"].includes(
+    input.previousStatus ?? ""
+  );
+
+  if (
+    previousWasPaid ||
+    !["paid", "settling", "settled"].includes(input.nextStatus)
+  ) {
+    return [];
+  }
+
+  const payment = await PaymentModel.findById(input.paymentId).exec();
+
+  if (!payment?.customerId) {
+    return [];
+  }
+
+  const customer = await CustomerModel.findById(payment.customerId).exec();
+
+  if (!customer?.email) {
+    return [];
+  }
+
+  const payout = await PayoutModel.findOne({ sourcePaymentId: payment._id })
+    .sort({ createdAt: -1 })
+    .exec();
+  const metadata = asRecord(payment.metadata);
+  const reference = readString(metadata.reference) ?? payment.payId;
+  const releaseAt =
+    payout?.scheduledFor ??
+    new Date(
+      (payment.collection.paidAt ?? payment.updatedAt ?? new Date()).getTime() +
+        24 * 60 * 60 * 1000
+    );
+  const record = await createNotificationRecord({
+    merchantId: payment.merchantId.toString(),
+    environment: payment.environment === "live" ? "live" : "test",
+    templateKey: "customer.payment.receipt",
+    audience: "customer",
+    category: "payment",
+    recipient: {
+      email: customer.email,
+      name: customer.name,
+    },
+    payload: {
+      amountLabel: formatMoney(payment.amount, payment.currency),
+      referenceLabel: reference,
+      paymentReference: payment.payId,
+      releaseAtLabel: formatReleaseDate(releaseAt),
+      appUrl: getAppUrl(`/pay/${payment.payId}`),
+    },
+    metadata: {
+      paymentId: payment._id.toString(),
+      payId: payment.payId,
+      customerId: customer._id.toString(),
+      previousStatus: input.previousStatus ?? null,
+      nextStatus: input.nextStatus,
+    },
+    idempotencyKey: createNotificationIdempotencyKey([
+      "customer.payment.receipt",
+      payment._id.toString(),
+      customer.email,
+    ]),
+  });
+
+  await queueNotificationRecord(record._id.toString());
+
+  return [record];
 }

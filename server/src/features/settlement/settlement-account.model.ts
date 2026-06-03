@@ -8,35 +8,7 @@ import {
   models,
 } from "mongoose";
 
-const settlementRoutePrivacySchema = new Schema(
-  {
-    provider: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    strategy: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    poolMint: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    viewingKeyPolicy: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-  },
-  {
-    _id: false,
-  }
-);
-
-const settlementRouteSchema = new Schema(
+const settlementAccountSchema = new Schema(
   {
     merchantId: {
       type: Schema.Types.ObjectId,
@@ -49,7 +21,7 @@ const settlementRouteSchema = new Schema(
       trim: true,
       default: "test",
     },
-    routeCode: {
+    accountCode: {
       type: String,
       required: true,
       trim: true,
@@ -70,13 +42,13 @@ const settlementRouteSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "direct",
+      default: "stellar_vault",
     },
     chain: {
       type: String,
       required: true,
       trim: true,
-      default: "solana",
+      default: "stellar",
     },
     assetSymbol: {
       type: String,
@@ -85,28 +57,10 @@ const settlementRouteSchema = new Schema(
       uppercase: true,
       default: "USDC",
     },
-    assetMint: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    assetDecimals: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 6,
-    },
     destinationAddress: {
       type: String,
       trim: true,
       default: null,
-    },
-    feeBps: {
-      type: Number,
-      required: true,
-      min: 0,
-      max: 10000,
-      default: 0,
     },
     isDefault: {
       type: Boolean,
@@ -119,10 +73,6 @@ const settlementRouteSchema = new Schema(
       trim: true,
       default: "active",
     },
-    privacy: {
-      type: settlementRoutePrivacySchema,
-      default: null,
-    },
     metadata: {
       type: Schema.Types.Mixed,
       default: {},
@@ -134,12 +84,12 @@ const settlementRouteSchema = new Schema(
   }
 );
 
-settlementRouteSchema.index(
-  { merchantId: 1, environment: 1, routeCode: 1 },
+settlementAccountSchema.index(
+  { merchantId: 1, environment: 1, accountCode: 1 },
   { unique: true }
 );
-settlementRouteSchema.index({ merchantId: 1, environment: 1, status: 1 });
-settlementRouteSchema.index(
+settlementAccountSchema.index({ merchantId: 1, environment: 1, status: 1 });
+settlementAccountSchema.index(
   { merchantId: 1, environment: 1, isDefault: 1 },
   {
     unique: true,
@@ -149,15 +99,15 @@ settlementRouteSchema.index(
   }
 );
 
-type SettlementRouteEntry = InferSchemaType<typeof settlementRouteSchema> & {
+type SettlementAccountEntry = InferSchemaType<typeof settlementAccountSchema> & {
   _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type SettlementRouteDocument = SettlementRouteEntry;
-export type SettlementRouteRecord = HydratedDocument<SettlementRouteEntry>;
+export type SettlementAccountDocument = SettlementAccountEntry;
+export type SettlementAccountRecord = HydratedDocument<SettlementAccountEntry>;
 
-export const SettlementRouteModel =
-  (models.SettlementRoute as Model<SettlementRouteRecord> | undefined) ??
-  model<SettlementRouteRecord>("SettlementRoute", settlementRouteSchema);
+export const SettlementAccountModel =
+  (models.SettlementAccount as Model<SettlementAccountRecord> | undefined) ??
+  model<SettlementAccountRecord>("SettlementAccount", settlementAccountSchema);

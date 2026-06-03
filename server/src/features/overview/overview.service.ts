@@ -7,7 +7,7 @@ import {
   quoteUsdAmountInCollectionCurrency,
 } from "@/features/onramps/onramp.service";
 import { PaymentModel } from "@/features/payments/payment.model";
-import { SettlementRouteModel } from "@/features/settlement/settlement-route.model";
+import { SettlementAccountModel } from "@/features/settlement/settlement-account.model";
 import { PayoutModel } from "@/features/payouts/payout.model";
 import { SettingModel } from "@/features/settings/setting.model";
 import type {
@@ -62,7 +62,7 @@ export async function getOverview(query: OverviewQuery) {
     paidPaymentsToday,
     failedPayments,
     pendingPayouts,
-    activeSettlementRoutes,
+    activeSettlementAccounts,
     payoutReadyAggregation,
     settledAggregation,
     marketMixAggregation,
@@ -87,7 +87,7 @@ export async function getOverview(query: OverviewQuery) {
       ...scopedMerchantMatch,
       status: { $in: ["queued", "confirming", "pending"] },
     }).exec(),
-    SettlementRouteModel.countDocuments({
+    SettlementAccountModel.countDocuments({
       ...scopedMerchantMatch,
       status: "active",
     }).exec(),
@@ -165,7 +165,7 @@ export async function getOverview(query: OverviewQuery) {
       paidPaymentsToday,
       failedPayments,
       pendingPayouts,
-      activeSettlementRoutes,
+      activeSettlementAccounts,
       payoutReadyUsdc: payoutReadyAggregation[0]?.total ?? 0,
       settledUsdc30d: settledAggregation[0]?.total ?? 0,
     },

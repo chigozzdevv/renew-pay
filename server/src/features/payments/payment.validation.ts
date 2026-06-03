@@ -63,7 +63,7 @@ export const createPaymentSchema = z.object({
   merchantId: objectIdSchema,
   environment: environmentInputSchema.default("test"),
   customerId: objectIdSchema.nullable().optional(),
-  settlementRouteId: objectIdSchema.nullable().optional(),
+  settlementAccountId: objectIdSchema.nullable().optional(),
   amount: z.coerce.number().positive(),
   currency: currencySchema,
   description: z.string().trim().min(2).max(240),
@@ -120,7 +120,7 @@ export const listCollectionsQuerySchema = z
 
 export const updatePaymentSchema = z.object({
   customerId: objectIdSchema.nullable().optional(),
-  settlementRouteId: objectIdSchema.nullable().optional(),
+  settlementAccountId: objectIdSchema.nullable().optional(),
   amount: z.coerce.number().positive().optional(),
   currency: currencySchema.optional(),
   description: z.string().trim().min(2).max(240).optional(),

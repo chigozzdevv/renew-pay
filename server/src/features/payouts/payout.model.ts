@@ -95,6 +95,25 @@ const payoutSchema = new Schema(
       trim: true,
       default: null,
     },
+    vaultBatchId: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    vaultDepositTxHash: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    vaultReleaseTxHash: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    vaultHeldAt: {
+      type: Date,
+      default: null,
+    },
     submittedAt: {
       type: Date,
       default: null,
@@ -131,6 +150,7 @@ payoutSchema.index({ merchantId: 1, environment: 1, status: 1, createdAt: -1 });
 payoutSchema.index({ merchantId: 1, payoutBatchId: 1, status: 1 });
 payoutSchema.index({ payoutBatchId: 1 }, { sparse: true });
 payoutSchema.index({ sourcePaymentId: 1 }, { sparse: true });
+payoutSchema.index({ vaultBatchId: 1 }, { sparse: true });
 
 type PayoutEntry = InferSchemaType<typeof payoutSchema> & {
   _id: Types.ObjectId;

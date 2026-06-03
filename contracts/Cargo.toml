@@ -1,12 +1,11 @@
 [workspace]
-members = ["programs/renew_protocol"]
+members = ["settlement_vault"]
 resolver = "2"
 
-[workspace.dependencies]
-anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
-solana-system-interface = "1.0.0"
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/chigozzdevv/renew.sh"
 
-[profile.release]
-overflow-checks = true
-lto = "fat"
-codegen-units = 1
+[workspace.dependencies]
+soroban-sdk = "23"

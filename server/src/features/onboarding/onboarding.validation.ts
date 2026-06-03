@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { isSolanaAddress } from "@/shared/constants/solana";
+import { isStellarAddress } from "@/shared/constants/stellar";
 import { environmentInputSchema } from "@/shared/utils/runtime-environment";
 
 const addressSchema = z
   .string()
   .trim()
-  .refine(isSolanaAddress, "Must be a valid Solana address.");
+  .refine(isStellarAddress, "Must be a valid Stellar address.");
 const marketSchema = z.string().trim().min(2).max(8).toUpperCase();
 
 export const onboardingQuerySchema = z.object({

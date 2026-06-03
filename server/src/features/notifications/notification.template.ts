@@ -1,8 +1,12 @@
-type NotificationAudience = "merchant";
+type NotificationAudience = "customer" | "merchant";
 
 export const notificationTemplateKeys = [
+  "customer.payment.receipt",
+  "customer.payment.issue_received",
   "merchant.payment.paid",
   "merchant.payment.failed",
+  "merchant.settlement.scheduled",
+  "merchant.settlement.held",
   "merchant.settlement.settled",
   "merchant.settlement.failed",
   "merchant.verification.owner_needs_action",
@@ -24,6 +28,16 @@ export const notificationTemplateCatalog: Record<
     audience: NotificationAudience;
   }
 > = {
+  "customer.payment.receipt": {
+    label: "Customer receipt",
+    description: "Sent when a customer payment is confirmed.",
+    audience: "customer",
+  },
+  "customer.payment.issue_received": {
+    label: "Issue received",
+    description: "Sent when a customer reports a payment issue.",
+    audience: "customer",
+  },
   "merchant.payment.paid": {
     label: "Payment received",
     description: "Sent when a customer payment is confirmed.",
@@ -32,6 +46,16 @@ export const notificationTemplateCatalog: Record<
   "merchant.payment.failed": {
     label: "Payment failed",
     description: "Sent when a customer payment fails.",
+    audience: "merchant",
+  },
+  "merchant.settlement.scheduled": {
+    label: "Settlement scheduled",
+    description: "Sent when settlement is scheduled for release.",
+    audience: "merchant",
+  },
+  "merchant.settlement.held": {
+    label: "Settlement held",
+    description: "Sent when a reported issue holds settlement.",
     audience: "merchant",
   },
   "merchant.settlement.settled": {
@@ -130,21 +154,56 @@ function buildTemplateDocument(input: {
   const statusLabel = normalizeValue(payload.statusLabel, "pending");
   const amountLabel = normalizeValue(payload.amountLabel, "the payment");
   const referenceLabel = normalizeValue(payload.referenceLabel, "the collection");
+  const paymentReference = normalizeValue(payload.paymentReference, referenceLabel);
+  const releaseAtLabel = normalizeValue(payload.releaseAtLabel, "the next release window");
   const settlementAmountLabel = normalizeValue(
     payload.settlementAmountLabel,
     "the settlement"
   );
   const destinationLabel = normalizeOptionalValue(payload.destinationLabel);
+  const issueUrl =
+    normalizeOptionalValue(payload.issueUrl) ??
+    buildMailto(branding.supportEmail, `Payment issue: ${paymentReference}`);
 
   switch (input.templateKey) {
+    case "customer.payment.receipt":
+      return {
+        subject: `Your payment to ${merchantName} was successful`,
+        eyebrow: "Payment successful",
+        heading: "Payment received.",
+        body: [
+          `${amountLabel} was paid to ${merchantName} for ${referenceLabel}.`,
+          `Payment reference: ${paymentReference}.`,
+          `If something looks wrong, report it before settlement is released on ${releaseAtLabel}.`,
+        ],
+        cta: {
+          label: "Report an issue",
+          url: issueUrl,
+        },
+      } satisfies NotificationTemplateDocument;
+    case "customer.payment.issue_received":
+      return {
+        subject: "We received your payment report",
+        eyebrow: "Issue reported",
+        heading: "We are reviewing your report.",
+        body: [
+          `We received your report for ${referenceLabel}.`,
+          "Settlement for this payment is held while Renew reviews the issue.",
+          "We will email you when there is an update.",
+        ],
+        cta: {
+          label: "View payment",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
     case "merchant.payment.paid":
       return {
-        subject: `${merchantName} payment received`,
+        subject: `Payment received for ${referenceLabel}`,
         eyebrow: "Payment received",
         heading: "Payment received.",
         body: [
           `${amountLabel} was collected for ${referenceLabel}.`,
-          "The collection is ready for settlement.",
+          `Settlement is scheduled for ${releaseAtLabel}.`,
         ],
         cta: {
           label: "Open collections",
@@ -165,31 +224,59 @@ function buildTemplateDocument(input: {
           url: appUrl,
         },
       } satisfies NotificationTemplateDocument;
-    case "merchant.settlement.settled":
+    case "merchant.settlement.scheduled":
       return {
-        subject: `${merchantName} settlement completed`,
-        eyebrow: "Settlement completed",
-        heading: "Settlement completed.",
+        subject: `Settlement scheduled for ${referenceLabel}`,
+        eyebrow: "Settlement scheduled",
+        heading: "Settlement scheduled.",
         body: [
-          `${settlementAmountLabel} settled for ${referenceLabel}.`,
+          `${settlementAmountLabel} is scheduled for release on ${releaseAtLabel}.`,
           ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
         ],
         cta: {
-          label: "Open settlement",
+          label: "Open payouts",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
+    case "merchant.settlement.held":
+      return {
+        subject: `Settlement held for ${referenceLabel}`,
+        eyebrow: "Settlement held",
+        heading: "Settlement is held for review.",
+        body: [
+          `Settlement for ${referenceLabel} is held because a payment issue was reported before release.`,
+          "Renew will review the report and update the payout status.",
+        ],
+        cta: {
+          label: "Open payouts",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
+    case "merchant.settlement.settled":
+      return {
+        subject: `Stellar settlement released for ${referenceLabel}`,
+        eyebrow: "Settlement released",
+        heading: "Settlement released.",
+        body: [
+          `${settlementAmountLabel} was released to your Stellar wallet.`,
+          ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
+        ],
+        cta: {
+          label: "Open payouts",
           url: appUrl,
         },
       } satisfies NotificationTemplateDocument;
     case "merchant.settlement.failed":
       return {
-        subject: `${merchantName} settlement failed`,
+        subject: `Settlement failed for ${referenceLabel}`,
         eyebrow: "Settlement failed",
         heading: "Settlement could not be completed.",
         body: [
           `${settlementAmountLabel} could not settle for ${referenceLabel}.`,
-          "Open settlement to review the payout status.",
+          "Open payouts to review the latest status.",
         ],
         cta: {
-          label: "Open settlement",
+          label: "Open payouts",
           url: appUrl,
         },
       } satisfies NotificationTemplateDocument;
@@ -351,20 +438,38 @@ export function buildNotificationTemplatePreviewPayload(
   templateKey: NotificationTemplateKey
 ) {
   switch (templateKey) {
+    case "customer.payment.receipt":
+      return {
+        amountLabel: "NGN 26,500",
+        referenceLabel: "Order #1042",
+        paymentReference: "pay_1042",
+        releaseAtLabel: "May 8, 2026 at 10:00",
+        issueUrl: "https://app.renew.sh/pay/pay_1042/report",
+        appUrl: "https://app.renew.sh/pay/pay_1042",
+      };
+    case "customer.payment.issue_received":
+      return {
+        referenceLabel: "Order #1042",
+        appUrl: "https://app.renew.sh/pay/pay_1042",
+      };
     case "merchant.payment.paid":
     case "merchant.payment.failed":
       return {
         amountLabel: "NGN 26,500",
         referenceLabel: "Order #1042",
+        releaseAtLabel: "May 8, 2026 at 10:00",
         appUrl: "https://app.renew.sh/dashboard/collections",
       };
+    case "merchant.settlement.scheduled":
+    case "merchant.settlement.held":
     case "merchant.settlement.settled":
     case "merchant.settlement.failed":
       return {
         settlementAmountLabel: "16.04 USDC",
         referenceLabel: "Order #1042",
-        destinationLabel: "main-wallet",
-        appUrl: "https://app.renew.sh/dashboard/settlement",
+        destinationLabel: "GB2NKG6W...7UPO6KD",
+        releaseAtLabel: "May 8, 2026 at 10:00",
+        appUrl: "https://app.renew.sh/dashboard/payouts",
       };
     case "merchant.verification.owner_needs_action":
     case "merchant.verification.owner_approved":

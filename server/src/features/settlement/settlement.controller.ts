@@ -1,17 +1,19 @@
 import type { Request, Response } from "express";
 
 import {
-  createSettlementRoute,
-  getDefaultSettlementRoute,
-  getSettlementRouteById,
-  listSettlementRoutes,
-  updateSettlementRoute,
+  createSettlementAccount,
+  getDefaultSettlementAccount,
+  getSettlementAccountById,
+  listSettlementAssets,
+  listSettlementAccounts,
+  updateSettlementAccount,
 } from "@/features/settlement/settlement.service";
 import {
-  createSettlementRouteSchema,
-  listSettlementRoutesQuerySchema,
-  settlementRouteParamSchema,
-  updateSettlementRouteSchema,
+  createSettlementAccountSchema,
+  listSettlementAccountsQuerySchema,
+  settlementAssetCatalogQuerySchema,
+  settlementAccountParamSchema,
+  updateSettlementAccountSchema,
 } from "@/features/settlement/settlement.validation";
 import { asyncHandler } from "@/shared/utils/async-handler";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
@@ -29,26 +31,26 @@ function resolveEnvironmentScope(request: Request) {
   );
 }
 
-export const createSettlementRouteController = asyncHandler(
+export const createSettlementAccountController = asyncHandler(
   async (request: Request, response: Response) => {
-    const input = createSettlementRouteSchema.parse({
+    const input = createSettlementAccountSchema.parse({
       ...request.body,
       merchantId: resolveMerchantScope(request, request.body?.merchantId),
       environment: resolveEnvironmentScope(request),
     });
-    const route = await createSettlementRoute(input);
+    const account = await createSettlementAccount(input);
 
     response.status(201).json({
       success: true,
-      message: "Settlement route created.",
-      data: route,
+      message: "Settlement account created.",
+      data: account,
     });
   }
 );
 
-export const listSettlementRoutesController = asyncHandler(
+export const listSettlementAccountsController = asyncHandler(
   async (request: Request, response: Response) => {
-    const query = listSettlementRoutesQuerySchema.parse({
+    const query = listSettlementAccountsQuerySchema.parse({
       ...request.query,
       merchantId: resolveMerchantScope(
         request,
@@ -58,33 +60,54 @@ export const listSettlementRoutesController = asyncHandler(
       ),
       environment: resolveEnvironmentScope(request),
     });
-    const routes = await listSettlementRoutes(query);
+    const accounts = await listSettlementAccounts(query);
 
     response.status(200).json({
       success: true,
-      data: routes.items,
-      ...(routes.pagination ? { pagination: routes.pagination } : {}),
+      data: accounts.items,
+      ...(accounts.pagination ? { pagination: accounts.pagination } : {}),
     });
   }
 );
 
-export const getSettlementRouteController = asyncHandler(
+export const listSettlementAssetsController = asyncHandler(
   async (request: Request, response: Response) => {
-    const params = settlementRouteParamSchema.parse(request.params);
-    const route = await getSettlementRouteById(
-      params.routeId,
+    const query = settlementAssetCatalogQuerySchema.parse({
+      ...request.query,
+      merchantId: resolveMerchantScope(
+        request,
+        typeof request.query.merchantId === "string"
+          ? request.query.merchantId
+          : undefined
+      ),
+      environment: resolveEnvironmentScope(request),
+    });
+    const assets = listSettlementAssets(query.environment ?? "test");
+
+    response.status(200).json({
+      success: true,
+      data: assets,
+    });
+  }
+);
+
+export const getSettlementAccountController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const params = settlementAccountParamSchema.parse(request.params);
+    const account = await getSettlementAccountById(
+      params.accountId,
       resolveMerchantScope(request),
       resolveEnvironmentScope(request)
     );
 
     response.status(200).json({
       success: true,
-      data: route,
+      data: account,
     });
   }
 );
 
-export const getDefaultSettlementRouteController = asyncHandler(
+export const getDefaultSettlementAccountController = asyncHandler(
   async (request: Request, response: Response) => {
     const merchantId = resolveMerchantScope(
       request,
@@ -101,24 +124,24 @@ export const getDefaultSettlementRouteController = asyncHandler(
       return;
     }
 
-    const route = await getDefaultSettlementRoute({
+    const account = await getDefaultSettlementAccount({
       merchantId,
       environment: resolveEnvironmentScope(request),
     });
 
     response.status(200).json({
       success: true,
-      data: route,
+      data: account,
     });
   }
 );
 
-export const updateSettlementRouteController = asyncHandler(
+export const updateSettlementAccountController = asyncHandler(
   async (request: Request, response: Response) => {
-    const params = settlementRouteParamSchema.parse(request.params);
-    const input = updateSettlementRouteSchema.parse(request.body);
-    const route = await updateSettlementRoute(
-      params.routeId,
+    const params = settlementAccountParamSchema.parse(request.params);
+    const input = updateSettlementAccountSchema.parse(request.body);
+    const account = await updateSettlementAccount(
+      params.accountId,
       input,
       resolveMerchantScope(request),
       resolveEnvironmentScope(request)
@@ -126,8 +149,8 @@ export const updateSettlementRouteController = asyncHandler(
 
     response.status(200).json({
       success: true,
-      message: "Settlement route updated.",
-      data: route,
+      message: "Settlement account updated.",
+      data: account,
     });
   }
 );

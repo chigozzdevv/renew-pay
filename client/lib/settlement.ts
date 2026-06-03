@@ -2,36 +2,36 @@
 
 import { fetchApi, type ApiPagination } from "@/lib/api";
 
-export type SettlementRouteRecord = {
+export type SettlementAccountRecord = {
   id: string;
   merchantId: string;
   environment: "test" | "live";
-  routeCode: string;
+  accountCode: string;
   name: string;
-  mode: "standard" | "private";
-  provider: "direct" | "umbra";
-  chain: "solana" | "avalanche";
-  assetSymbol: string;
-  assetMint: string | null;
-  assetDecimals: number;
+  assetSymbol: "USDC";
   destinationAddress: string | null;
-  feeBps: number;
   isDefault: boolean;
   status: "active" | "disabled";
-  privacy: {
-    provider: string | null;
-    strategy: string | null;
-    poolMint: string | null;
-    viewingKeyPolicy: string | null;
-  } | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
 
-export type SettlementRoutePage = {
-  routes: SettlementRouteRecord[];
+export type SettlementAccountPage = {
+  accounts: SettlementAccountRecord[];
   pagination: ApiPagination;
+};
+
+export type SettlementAssetOption = {
+  network: "stellar";
+  symbol: "USDC";
+  label: string;
+  decimals: number;
+};
+
+export type SettlementAssetCatalog = {
+  environment: "test" | "live";
+  assets: SettlementAssetOption[];
 };
 
 function resolvePagination(
@@ -50,26 +50,29 @@ function resolvePagination(
   );
 }
 
-export async function loadSettlementRoutes(input: {
+function toSettlementAccount(record: SettlementAccountRecord): SettlementAccountRecord {
+  return {
+    ...record,
+    accountCode: record.accountCode ?? record.id,
+  };
+}
+
+export async function loadSettlementAccounts(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
-  provider?: SettlementRouteRecord["provider"] | "all";
-  mode?: SettlementRouteRecord["mode"] | "all";
-  status?: SettlementRouteRecord["status"] | "all";
+  status?: SettlementAccountRecord["status"] | "all";
   search?: string;
   page?: number;
   limit?: number;
 }) {
   const page = input.page ?? 1;
   const limit = input.limit ?? 50;
-  const response = await fetchApi<SettlementRouteRecord[]>("/settlement/routes", {
+  const response = await fetchApi<SettlementAccountRecord[]>("/settlement/accounts", {
     token: input.token,
     query: {
       merchantId: input.merchantId,
       environment: input.environment,
-      provider: input.provider && input.provider !== "all" ? input.provider : undefined,
-      mode: input.mode && input.mode !== "all" ? input.mode : undefined,
       status: input.status && input.status !== "all" ? input.status : undefined,
       search: input.search?.trim() || undefined,
       page,
@@ -78,37 +81,48 @@ export async function loadSettlementRoutes(input: {
   });
 
   return {
-    routes: response.data,
+    accounts: response.data.map(toSettlementAccount),
     pagination: resolvePagination(response.pagination, page, limit, response.data.length),
-  } satisfies SettlementRoutePage;
+  } satisfies SettlementAccountPage;
 }
 
-export async function createSettlementRoute(input: {
+export async function loadSettlementAssets(input: {
+  token: string;
+  merchantId: string;
+  environment: "test" | "live";
+}) {
+  const response = await fetchApi<SettlementAssetCatalog>("/settlement/assets", {
+    token: input.token,
+    query: {
+      merchantId: input.merchantId,
+      environment: input.environment,
+    },
+  });
+
+  return response.data;
+}
+
+export async function createSettlementAccount(input: {
   token: string;
   merchantId: string;
   environment: "test" | "live";
   name: string;
-  settlementType: "standard" | "private";
-  assetSymbol: string;
   destinationAddress: string;
   isDefault?: boolean;
 }) {
-  const response = await fetchApi<SettlementRouteRecord>("/settlement/routes", {
+  const response = await fetchApi<SettlementAccountRecord>("/settlement/accounts", {
     method: "POST",
     token: input.token,
     body: JSON.stringify({
       merchantId: input.merchantId,
       environment: input.environment,
       name: input.name,
-      mode: input.settlementType,
-      provider: input.settlementType === "private" ? "umbra" : "direct",
-      chain: "solana",
-      assetSymbol: input.assetSymbol,
+      assetSymbol: "USDC",
       destinationAddress: input.destinationAddress,
       isDefault: input.isDefault ?? false,
       status: "active",
     }),
   });
 
-  return response.data;
+  return toSettlementAccount(response.data);
 }

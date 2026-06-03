@@ -112,9 +112,9 @@ const paymentSchema = new Schema(
       ref: "Customer",
       default: null,
     },
-    settlementRouteId: {
+    settlementAccountId: {
       type: Schema.Types.ObjectId,
-      ref: "SettlementRoute",
+      ref: "SettlementAccount",
       default: null,
     },
     amount: {

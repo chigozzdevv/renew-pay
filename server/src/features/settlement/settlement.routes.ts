@@ -1,28 +1,30 @@
 import { Router } from "express";
 
 import {
-  createSettlementRouteController,
-  getDefaultSettlementRouteController,
-  getSettlementRouteController,
-  listSettlementRoutesController,
-  updateSettlementRouteController,
+  createSettlementAccountController,
+  getDefaultSettlementAccountController,
+  getSettlementAccountController,
+  listSettlementAssetsController,
+  listSettlementAccountsController,
+  updateSettlementAccountController,
 } from "@/features/settlement/settlement.controller";
 import { requireMerchantKybApproved } from "@/shared/middleware/merchant-kyb";
 
 const settlementRouter = Router();
 
-settlementRouter.get("/routes", listSettlementRoutesController);
+settlementRouter.get("/accounts", listSettlementAccountsController);
+settlementRouter.get("/assets", listSettlementAssetsController);
 settlementRouter.post(
-  "/routes",
-  requireMerchantKybApproved("creating settlement routes in live mode"),
-  createSettlementRouteController
+  "/accounts",
+  requireMerchantKybApproved("creating settlement accounts in live mode"),
+  createSettlementAccountController
 );
-settlementRouter.get("/routes/default", getDefaultSettlementRouteController);
-settlementRouter.get("/routes/:routeId", getSettlementRouteController);
+settlementRouter.get("/accounts/default", getDefaultSettlementAccountController);
+settlementRouter.get("/accounts/:accountId", getSettlementAccountController);
 settlementRouter.patch(
-  "/routes/:routeId",
-  requireMerchantKybApproved("updating settlement routes in live mode"),
-  updateSettlementRouteController
+  "/accounts/:accountId",
+  requireMerchantKybApproved("updating settlement accounts in live mode"),
+  updateSettlementAccountController
 );
 
 export { settlementRouter };

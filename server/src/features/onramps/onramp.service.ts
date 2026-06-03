@@ -263,7 +263,7 @@ async function createPartnaWidgetQuote(input: CreateWidgetQuoteInput) {
   if (input.network.trim().toUpperCase() !== "SOLANA") {
     throw new HttpError(
       400,
-      "Partna quotes currently support SOLANA settlement only."
+      "Partna quotes currently support Renew's configured USDC source rail only."
     );
   }
 
@@ -632,7 +632,7 @@ export async function createWidgetQuote(input: CreateWidgetQuoteInput) {
   return {
     ...(await createPartnaWidgetQuote(input)),
     settlementAsset: "USDC",
-    settlementNetwork: "SOLANA",
+    settlementNetwork: "STELLAR",
   };
 }
 
@@ -728,7 +728,7 @@ export async function quoteUsdAmountInCollectionCurrency(input: {
     feeAmount,
     expiresAt: null,
     settlementAsset: "USDC" as const,
-    settlementNetwork: "SOLANA" as const,
+    settlementNetwork: "STELLAR" as const,
     channel: {
       externalId: buildPartnaChannelId(input.currency, marketAsset.network),
       country: marketMetadata.countryCodes[0] ?? input.currency,
@@ -790,7 +790,7 @@ export async function quoteLocalAmountInSettlementAsset(input: {
     feeAmount,
     expiresAt: null,
     settlementAsset: "USDC" as const,
-    settlementNetwork: "SOLANA" as const,
+    settlementNetwork: "STELLAR" as const,
     channel: {
       externalId: buildPartnaChannelId(input.currency, marketAsset.network),
       country: marketMetadata.countryCodes[0] ?? input.currency,

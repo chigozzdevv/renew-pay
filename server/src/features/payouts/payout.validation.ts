@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isSolanaAddress } from "@/shared/constants/solana";
+import { isStellarAddress } from "@/shared/constants/stellar";
 import { environmentInputSchema } from "@/shared/utils/runtime-environment";
 
 const objectIdSchema = z
@@ -11,7 +11,7 @@ const objectIdSchema = z
 const addressSchema = z
   .string()
   .trim()
-  .refine(isSolanaAddress, "Must be a valid Solana address.");
+  .refine(isStellarAddress, "Must be a valid Stellar address.");
 
 const payoutStatusSchema = z.enum([
   "queued",
@@ -40,6 +40,10 @@ export const createPayoutSchema = z.object({
   bridgeSourceTxHash: z.string().trim().min(1).nullable().optional(),
   bridgeReceiveTxHash: z.string().trim().min(1).nullable().optional(),
   creditTxHash: z.string().trim().min(1).nullable().optional(),
+  vaultBatchId: z.string().trim().min(1).nullable().optional(),
+  vaultDepositTxHash: z.string().trim().min(1).nullable().optional(),
+  vaultReleaseTxHash: z.string().trim().min(1).nullable().optional(),
+  vaultHeldAt: z.coerce.date().nullable().optional(),
   submittedAt: z.coerce.date().nullable().optional(),
   bridgeAttestedAt: z.coerce.date().nullable().optional(),
   scheduledFor: z.coerce.date(),
@@ -73,6 +77,10 @@ export const updatePayoutSchema = z.object({
   bridgeSourceTxHash: z.string().trim().min(1).nullable().optional(),
   bridgeReceiveTxHash: z.string().trim().min(1).nullable().optional(),
   creditTxHash: z.string().trim().min(1).nullable().optional(),
+  vaultBatchId: z.string().trim().min(1).nullable().optional(),
+  vaultDepositTxHash: z.string().trim().min(1).nullable().optional(),
+  vaultReleaseTxHash: z.string().trim().min(1).nullable().optional(),
+  vaultHeldAt: z.coerce.date().nullable().optional(),
   submittedAt: z.coerce.date().nullable().optional(),
   bridgeAttestedAt: z.coerce.date().nullable().optional(),
   sourcePaymentId: objectIdSchema.nullable().optional(),

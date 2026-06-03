@@ -19,8 +19,6 @@ const envSchema = z
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
     SOLANA_COLLECTION_WALLET_TEST: z.string().trim().default(""),
     SOLANA_COLLECTION_WALLET_LIVE: z.string().trim().default(""),
-    UMBRA_NETWORK_TEST: z.enum(["mainnet", "devnet", "localnet"]).default("devnet"),
-    UMBRA_NETWORK_LIVE: z.enum(["mainnet", "devnet", "localnet"]).default("mainnet"),
     SOLANA_RPC_URL_TEST: z
       .string()
       .trim()
@@ -41,12 +39,38 @@ const envSchema = z
       .trim()
       .min(1)
       .default("wss://api.mainnet-beta.solana.com"),
-    SOLANA_SETTLEMENT_PRIVATE_KEY_TEST: z.string().trim().default(""),
-    SOLANA_SETTLEMENT_PRIVATE_KEY_LIVE: z.string().trim().default(""),
-    UMBRA_INDEXER_API_URL_TEST: z.string().trim().default(""),
-    UMBRA_INDEXER_API_URL_LIVE: z.string().trim().default(""),
-    UMBRA_SETTLEMENT_PRIVATE_KEY_TEST: z.string().trim().default(""),
-    UMBRA_SETTLEMENT_PRIVATE_KEY_LIVE: z.string().trim().default(""),
+    STELLAR_RPC_URL_TEST: z
+      .string()
+      .trim()
+      .min(1)
+      .default("https://soroban-testnet.stellar.org"),
+    STELLAR_RPC_URL_LIVE: z.string().trim().default(""),
+    STELLAR_NETWORK_PASSPHRASE_TEST: z
+      .string()
+      .trim()
+      .min(1)
+      .default("Test SDF Network ; September 2015"),
+    STELLAR_NETWORK_PASSPHRASE_LIVE: z
+      .string()
+      .trim()
+      .min(1)
+      .default("Public Global Stellar Network ; September 2015"),
+    STELLAR_USDC_CONTRACT_ID_TEST: z.string().trim().default(""),
+    STELLAR_USDC_CONTRACT_ID_LIVE: z.string().trim().default(""),
+    STELLAR_SETTLEMENT_VAULT_CONTRACT_ID_TEST: z.string().trim().default(""),
+    STELLAR_SETTLEMENT_VAULT_CONTRACT_ID_LIVE: z.string().trim().default(""),
+    STELLAR_SETTLEMENT_OPERATOR_SECRET_TEST: z.string().trim().default(""),
+    STELLAR_SETTLEMENT_OPERATOR_SECRET_LIVE: z.string().trim().default(""),
+    CIRCLE_IRIS_API_URL_TEST: z
+      .string()
+      .trim()
+      .min(1)
+      .default("https://iris-api-sandbox.circle.com"),
+    CIRCLE_IRIS_API_URL_LIVE: z
+      .string()
+      .trim()
+      .min(1)
+      .default("https://iris-api.circle.com"),
     ENABLE_WORKERS: booleanEnv.default(true),
     REDIS_URL: z.string().trim().min(1).default("redis://127.0.0.1:6379"),
     REDIS_QUEUE_PREFIX: z.string().trim().min(1).default("renew"),

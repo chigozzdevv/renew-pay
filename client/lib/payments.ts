@@ -8,7 +8,7 @@ export type PaymentRecord = {
   environment: "test" | "live";
   payId: string;
   customerId: string | null;
-  settlementRouteId: string | null;
+  settlementAccountId: string | null;
   amount: number;
   currency: string;
   description: string;
@@ -92,7 +92,7 @@ export async function createPayment(input: {
   merchantId: string;
   environment: "test" | "live";
   customerId?: string | null;
-  settlementRouteId?: string | null;
+  settlementAccountId?: string | null;
   amount: number;
   currency: string;
   description: string;
@@ -111,7 +111,7 @@ export async function createPayment(input: {
       merchantId: input.merchantId,
       environment: input.environment,
       customerId: input.customerId ?? null,
-      settlementRouteId: input.settlementRouteId ?? null,
+      settlementAccountId: input.settlementAccountId ?? null,
       amount: input.amount,
       currency: input.currency,
       description: input.description,

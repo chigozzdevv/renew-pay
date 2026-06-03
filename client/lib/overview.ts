@@ -9,7 +9,7 @@ export type DashboardOverview = {
     paidPaymentsToday: number;
     failedPayments: number;
     pendingPayouts: number;
-    activeSettlementRoutes: number;
+    activeSettlementAccounts: number;
     payoutReadyUsdc: number;
     settledUsdc30d: number;
   };

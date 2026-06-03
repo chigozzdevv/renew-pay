@@ -20,6 +20,10 @@ export type PayoutRecord = {
   bridgeSourceTxHash: string | null;
   bridgeReceiveTxHash: string | null;
   creditTxHash: string | null;
+  vaultBatchId: string | null;
+  vaultDepositTxHash: string | null;
+  vaultReleaseTxHash: string | null;
+  vaultHeldAt: string | null;
   submittedAt: string | null;
   bridgeAttestedAt: string | null;
   scheduledFor: string;

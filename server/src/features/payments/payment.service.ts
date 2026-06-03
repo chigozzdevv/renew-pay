@@ -13,7 +13,10 @@ import {
   hasActivePartnaPaymentProfile,
   startPartnaCustomerPaymentProfileVerification,
 } from "@/features/onramps/partna.service";
-import { queueMoneyMovementNotificationForStatusChange } from "@/features/notifications/notification.service";
+import {
+  queueCustomerReceiptForStatusChange,
+  queueMoneyMovementNotificationForStatusChange,
+} from "@/features/notifications/notification.service";
 import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.factory";
 import { PaymentModel, type PaymentRecord } from "@/features/payments/payment.model";
 import type {
@@ -30,7 +33,7 @@ import type {
   UpdatePaymentInput,
 } from "@/features/payments/payment.validation";
 import { SettingModel } from "@/features/settings/setting.model";
-import { SettlementRouteModel } from "@/features/settlement/settlement-route.model";
+import { SettlementAccountModel } from "@/features/settlement/settlement-account.model";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import {
@@ -100,7 +103,7 @@ function toPaymentResponse(document: PaymentRecord) {
     environment: document.environment,
     payId: document.payId,
     customerId: document.customerId?.toString() ?? null,
-    settlementRouteId: document.settlementRouteId?.toString() ?? null,
+    settlementAccountId: document.settlementAccountId?.toString() ?? null,
     amount: document.amount,
     currency: document.currency,
     description: document.description,
@@ -163,9 +166,9 @@ function toCollectionResponse(payment: PaymentResponse) {
     status: mapCollectionStatus(payment.status),
     checkoutUrl: payment.paymentUrl,
     recurring: payment.recurring,
-    settlement: payment.settlementRouteId
+    settlement: payment.settlementAccountId
       ? {
-          id: payment.settlementRouteId,
+          id: payment.settlementAccountId,
         }
       : null,
     customer: Object.keys(customer).length > 0
@@ -540,37 +543,37 @@ async function ensureCustomerScope(input: {
   }
 }
 
-async function ensureSettlementRouteScope(input: {
-  settlementRouteId?: string | null;
+async function ensureSettlementAccountScope(input: {
+  settlementAccountId?: string | null;
   merchantId: string;
   environment: RuntimeMode;
 }) {
-  if (!input.settlementRouteId) {
+  if (!input.settlementAccountId) {
     return;
   }
 
-  const route = await SettlementRouteModel.exists({
-    _id: input.settlementRouteId,
+  const account = await SettlementAccountModel.exists({
+    _id: input.settlementAccountId,
     merchantId: input.merchantId,
     ...createRuntimeModeCondition("environment", input.environment),
   });
 
-  if (!route) {
-    throw new HttpError(404, "Settlement route was not found.");
+  if (!account) {
+    throw new HttpError(404, "Settlement account was not found.");
   }
 }
 
-async function resolvePaymentSettlementRouteId(input: {
-  settlementRouteId?: string | null;
+async function resolvePaymentSettlementAccountId(input: {
+  settlementAccountId?: string | null;
   merchantId: string;
   environment: RuntimeMode;
 }) {
-  if (input.settlementRouteId) {
-    await ensureSettlementRouteScope(input);
-    return new Types.ObjectId(input.settlementRouteId);
+  if (input.settlementAccountId) {
+    await ensureSettlementAccountScope(input);
+    return new Types.ObjectId(input.settlementAccountId);
   }
 
-  const defaultRoute = await SettlementRouteModel.findOne({
+  const defaultAccount = await SettlementAccountModel.findOne({
     merchantId: input.merchantId,
     ...createRuntimeModeCondition("environment", input.environment),
     isDefault: true,
@@ -579,17 +582,17 @@ async function resolvePaymentSettlementRouteId(input: {
     .select({ _id: 1 })
     .exec();
 
-  if (!defaultRoute) {
+  if (!defaultAccount) {
     throw new HttpError(
       409,
-      "Create an active default settlement route before creating payments."
+      "Create an active default settlement account before creating payments."
     );
   }
 
-  return defaultRoute._id;
+  return defaultAccount._id;
 }
 
-async function resolveCollectionSettlementRouteId(input: {
+async function resolveCollectionSettlementAccountId(input: {
   settlement?: string;
   merchantId: string;
   environment: RuntimeMode;
@@ -605,13 +608,13 @@ async function resolveCollectionSettlementRouteId(input: {
   }
 
   const normalized = settlement.toLowerCase();
-  const route = await SettlementRouteModel.findOne({
+  const account = await SettlementAccountModel.findOne({
     merchantId: input.merchantId,
     ...createRuntimeModeCondition("environment", input.environment),
     status: "active",
     $or: [
-      { routeCode: normalized },
-      ...(normalized === "standard" || normalized === "private"
+      { accountCode: normalized },
+      ...(normalized === "standard"
         ? [{ mode: normalized }]
         : []),
     ],
@@ -620,11 +623,11 @@ async function resolveCollectionSettlementRouteId(input: {
     .select({ _id: 1 })
     .exec();
 
-  if (!route) {
+  if (!account) {
     throw new HttpError(404, "Settlement was not found.");
   }
 
-  return route._id.toString();
+  return account._id.toString();
 }
 
 async function ensurePaymentScope(
@@ -657,14 +660,14 @@ async function ensurePaymentScope(
 
 export async function createPayment(input: CreatePaymentInput) {
   await ensureMerchant(input.merchantId);
-  const [, settlementRouteId] = await Promise.all([
+  const [, settlementAccountId] = await Promise.all([
     ensureCustomerScope({
       customerId: input.customerId,
       merchantId: input.merchantId,
       environment: input.environment,
     }),
-    resolvePaymentSettlementRouteId({
-      settlementRouteId: input.settlementRouteId,
+    resolvePaymentSettlementAccountId({
+      settlementAccountId: input.settlementAccountId,
       merchantId: input.merchantId,
       environment: input.environment,
     }),
@@ -676,7 +679,7 @@ export async function createPayment(input: CreatePaymentInput) {
     environment: input.environment,
     payId,
     customerId: input.customerId ?? null,
-    settlementRouteId,
+    settlementAccountId,
     amount: input.amount,
     currency: input.currency,
     description: input.description,
@@ -700,7 +703,7 @@ export async function createPayment(input: CreatePaymentInput) {
 }
 
 export async function createCollection(input: CreateCollectionInput) {
-  const settlementRouteId = await resolveCollectionSettlementRouteId({
+  const settlementAccountId = await resolveCollectionSettlementAccountId({
     settlement: input.settlement,
     merchantId: input.merchantId,
     environment: input.environment,
@@ -713,7 +716,7 @@ export async function createCollection(input: CreateCollectionInput) {
   const payment = await createPayment({
     merchantId: input.merchantId,
     environment: input.environment,
-    settlementRouteId,
+    settlementAccountId,
     amount: input.amount,
     currency: input.currency,
     description: input.description ?? input.reference,
@@ -1024,6 +1027,11 @@ async function ensurePartnaVoucherForPayment(
       paymentId: payment._id.toString(),
       nextStatus: payment.status,
     }).catch(() => undefined),
+    queueCustomerReceiptForStatusChange({
+      previousStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
   ]);
 }
 
@@ -1176,8 +1184,8 @@ export async function updatePayment(
       merchantId: scopedMerchantId,
       environment: paymentEnvironment,
     }),
-    ensureSettlementRouteScope({
-      settlementRouteId: input.settlementRouteId,
+    ensureSettlementAccountScope({
+      settlementAccountId: input.settlementAccountId,
       merchantId: scopedMerchantId,
       environment: paymentEnvironment,
     }),
@@ -1187,9 +1195,9 @@ export async function updatePayment(
     payment.customerId = input.customerId ? new Types.ObjectId(input.customerId) : null;
   }
 
-  if (input.settlementRouteId !== undefined) {
-    payment.settlementRouteId = input.settlementRouteId
-      ? new Types.ObjectId(input.settlementRouteId)
+  if (input.settlementAccountId !== undefined) {
+    payment.settlementAccountId = input.settlementAccountId
+      ? new Types.ObjectId(input.settlementAccountId)
       : null;
   }
 

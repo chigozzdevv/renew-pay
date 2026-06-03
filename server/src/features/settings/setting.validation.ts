@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isSolanaAddress } from "@/shared/constants/solana";
+import { isStellarAddress } from "@/shared/constants/stellar";
 import { environmentInputSchema } from "@/shared/utils/runtime-environment";
 
 const objectIdSchema = z
@@ -11,7 +11,7 @@ const objectIdSchema = z
 const addressSchema = z
   .string()
   .trim()
-  .refine(isSolanaAddress, "Must be a valid Solana address.");
+  .refine(isStellarAddress, "Must be a valid Stellar address.");
 
 const nullableUrlSchema = z
   .union([z.string().trim().url(), z.literal(""), z.null()])

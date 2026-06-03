@@ -12,10 +12,14 @@ import type {
 } from "@/features/onramps/providers/partna/partna.types";
 import { CustomerModel } from "@/features/customers/customer.model";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
+import {
+  queueCustomerReceiptForStatusChange,
+  queueMoneyMovementNotificationForStatusChange,
+} from "@/features/notifications/notification.service";
 import { PaymentModel, type PaymentRecord } from "@/features/payments/payment.model";
 import { queuePayoutProcessing } from "@/features/payouts/payout.service";
 import { PayoutModel } from "@/features/payouts/payout.model";
-import { SettlementRouteModel } from "@/features/settlement/settlement-route.model";
+import { SettlementAccountModel } from "@/features/settlement/settlement-account.model";
 import { isSolanaAddress } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
@@ -63,7 +67,7 @@ function getSolanaCollectionWallet(mode: RuntimeMode) {
       : env.SOLANA_COLLECTION_WALLET_TEST;
 
   if (!isSolanaAddress(wallet)) {
-    throw new HttpError(503, "Solana collection wallet is not configured.");
+    throw new HttpError(503, "Collection wallet is not configured.");
   }
 
   return wallet.trim();
@@ -72,6 +76,12 @@ function getSolanaCollectionWallet(mode: RuntimeMode) {
 function readPartnaFeeBearer(value: unknown) {
   const normalized = readString(value)?.toLowerCase() ?? null;
   return normalized === "merchant" || normalized === "client" ? normalized : null;
+}
+
+function getSettlementReleaseAt(payment: PaymentRecord) {
+  const paidAt = payment.collection.paidAt ?? new Date();
+
+  return new Date(paidAt.getTime() + 24 * 60 * 60 * 1000);
 }
 
 function toRoundedFee(value: number) {
@@ -666,14 +676,16 @@ async function createPayoutForPartnaPayment(
     return existingPayout;
   }
 
-  if (!payment.settlementRouteId) {
-    throw new HttpError(409, "Payment does not have a settlement route.");
+  if (!payment.settlementAccountId) {
+    throw new HttpError(409, "Payment does not have a settlement account.");
   }
 
-  const route = await SettlementRouteModel.findById(payment.settlementRouteId).exec();
+  const account = await SettlementAccountModel.findById(
+    payment.settlementAccountId
+  ).exec();
 
-  if (!route?.destinationAddress) {
-    throw new HttpError(409, "Payment settlement route is not configured.");
+  if (!account?.destinationAddress) {
+    throw new HttpError(409, "Payment settlement account is not configured.");
   }
 
   const grossUsdc = Number((payment.collection.stableAmount ?? 0).toFixed(6));
@@ -701,9 +713,9 @@ async function createPayoutForPartnaPayment(
     grossUsdc,
     feeUsdc,
     netUsdc,
-    destinationWallet: route.destinationAddress,
+    destinationWallet: account.destinationAddress,
     status: "queued",
-    scheduledFor: new Date(),
+    scheduledFor: getSettlementReleaseAt(payment),
   });
 }
 
@@ -942,11 +954,23 @@ export async function processPartnaWebhook(
     await payment.save();
   }
 
-  await emitPaymentWebhookEventForStatusChange({
-    previousStatus: previousPaymentStatus,
-    paymentId: payment._id.toString(),
-    nextStatus: payment.status,
-  });
+  await Promise.all([
+    emitPaymentWebhookEventForStatusChange({
+      previousStatus: previousPaymentStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+    queueMoneyMovementNotificationForStatusChange({
+      previousStatus: previousPaymentStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+    queueCustomerReceiptForStatusChange({
+      previousStatus: previousPaymentStatus,
+      paymentId: payment._id.toString(),
+      nextStatus: payment.status,
+    }).catch(() => undefined),
+  ]);
 
   const result = {
     processed: true,
