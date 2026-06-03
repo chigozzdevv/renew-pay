@@ -38,7 +38,7 @@ export type RenewPaymentRecord = {
   readonly environment: RenewRuntimeMode;
   readonly payId: string;
   readonly customerId: string | null;
-  readonly settlementRouteId: string | null;
+  readonly settlementAccountId: string | null;
   readonly amount: number;
   readonly currency: string;
   readonly description: string;
@@ -151,7 +151,7 @@ export type RenewPublicPaymentRecord = {
 
 export type CreateRenewPaymentInput = {
   readonly customerId?: string | null;
-  readonly settlementRouteId?: string | null;
+  readonly settlementAccountId?: string | null;
   readonly amount: number;
   readonly currency: string;
   readonly description: string;

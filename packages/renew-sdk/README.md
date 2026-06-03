@@ -3,7 +3,7 @@
 Renew SDK for:
 
 - collection creation
-- settlement routes
+- Stellar settlement accounts
 - checkout links
 - browser checkout
 - webhook signing and verification helpers
@@ -25,7 +25,7 @@ Use `environment` or `apiOrigin` only for advanced overrides. The API host and k
 
 ## One-Time Settlement Setup
 
-Create a default route from the dashboard or server SDK.
+Connect the Stellar wallet that should receive settlement.
 
 ```ts
 import { renew } from "@renew.sh/sdk";
@@ -34,8 +34,8 @@ const client = renew({
   secretKey: process.env.RENEW_SECRET_KEY!,
 });
 
-await client.settlement.routes.create({
-  routeCode: "main-wallet",
+await client.settlement.accounts.create({
+  accountCode: "main-wallet",
   name: "Main wallet",
   destinationAddress: process.env.SETTLEMENT_WALLET!,
   isDefault: true,
@@ -121,7 +121,7 @@ const isValid = verifyRenewWebhookSignature({
   - `renew(...)`
   - `checkout.open(...)`
   - collection client
-  - settlement route client
+  - settlement account client
 - `@renew.sh/sdk/server`
   - server integration helpers
   - webhook signing and verification

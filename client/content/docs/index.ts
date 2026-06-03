@@ -96,7 +96,7 @@ export const docsPages: DocsPage[] = [
         steps: [
           "Create test keys in Settings > Developers.",
           "Set checkout mode, site domains, and return page in Settings > Checkout.",
-          "Create or select a default settlement route with the API or dashboard.",
+          "Connect a default Stellar settlement account with the API or dashboard.",
           "Create a collection with amount, currency, and reference.",
           "Open the returned checkout URL with the SDK or redirect the customer to it.",
           "Listen for `collection.paid` before fulfilling the order.",
@@ -111,7 +111,7 @@ export const docsPages: DocsPage[] = [
           { label: "Object", value: "Collection", detail: "Money-in request for an order, invoice, subscription, or link." },
           { label: "Object", value: "Checkout", detail: "Renew-hosted customer payment flow for a collection." },
           { label: "Object", value: "Customer", detail: "Payer profile Renew creates or updates from checkout details." },
-          { label: "Object", value: "Settlement", detail: "Route and payout state for collected stable value." },
+          { label: "Object", value: "Settlement", detail: "Stellar USDC release and payout state for collected value." },
         ],
       },
     ],
@@ -249,13 +249,13 @@ export const docsPages: DocsPage[] = [
         id: "api-collections-payload",
         title: "Request shape",
         paragraphs: [
-          "`settlement` can be `default`, a route code, or a route id. `customer` is optional and only pre-fills details you already know. Renew still creates or updates the customer from checkout.",
+          "`settlement` can be `default`, an account code, or an account id. `customer` is optional and only pre-fills details you already know. Renew still creates or updates the customer from checkout.",
         ],
         references: [
           { label: "Required", value: "amount", detail: "Local amount to collect." },
           { label: "Required", value: "currency", detail: "Local collection currency, for example `NGN`, `KES`, or `GHS`." },
           { label: "Required", value: "reference", detail: "Your internal id for the order or invoice." },
-          { label: "Optional", value: "settlement", detail: "`default`, route code, route id, `standard`, or `private`." },
+          { label: "Optional", value: "settlement", detail: "`default`, account code, or account id." },
           { label: "Optional", value: "customer", detail: "Known customer reference, email, or name for prefill." },
           { label: "Optional", value: "recurring", detail: "Recurring cadence when the collection is for a subscription." },
         ],
@@ -364,58 +364,52 @@ export const docsPages: DocsPage[] = [
     group: "Settle",
     navTitle: "Settlement",
     title: "Settlement API",
-    description: "Create settlement routes and choose where collected value lands.",
+    description: "Connect the Stellar wallet that receives released settlement.",
     sections: [
       {
         id: "api-settlement-endpoints",
         title: "Endpoints",
-        paragraphs: ["Use settlement route endpoints from your server or manage the same routes in Dashboard > Settlement."],
+        paragraphs: ["Use settlement account endpoints from your server or manage the same account in Dashboard > Settlement."],
         references: [
-          { label: "POST", value: "/v1/settlement/routes", detail: "Create a settlement route." },
-          { label: "GET", value: "/v1/settlement/routes", detail: "List settlement routes." },
-          { label: "GET", value: "/v1/settlement/routes/default", detail: "Fetch the active default route." },
-          { label: "GET", value: "/v1/settlement/routes/:routeId", detail: "Fetch one route by id." },
-          { label: "PATCH", value: "/v1/settlement/routes/:routeId", detail: "Update route details, default state, or status." },
+          { label: "POST", value: "/v1/settlement/accounts", detail: "Create a Stellar settlement account." },
+          { label: "GET", value: "/v1/settlement/accounts", detail: "List settlement accounts." },
+          { label: "GET", value: "/v1/settlement/accounts/default", detail: "Fetch the active default account." },
+          { label: "GET", value: "/v1/settlement/accounts/:accountId", detail: "Fetch one account by id." },
+          { label: "PATCH", value: "/v1/settlement/accounts/:accountId", detail: "Update account details, default state, or status." },
         ],
       },
       {
         id: "api-settlement-create",
-        title: "Create route",
+        title: "Create account",
         paragraphs: [
-          "Create at least one active default route before creating live collections. Standard routes settle directly to your destination wallet.",
+          "Create one active default account before creating live collections. Renew releases Stellar USDC to this wallet after the settlement window.",
         ],
         sample: {
-          label: "Create standard route",
+          label: "Create settlement account",
           language: "bash",
-          filename: "create-route.sh",
-          code: `curl https://staging-pay.renew.sh/v1/settlement/routes \\
+          filename: "create-settlement-account.sh",
+          code: `curl https://staging-pay.renew.sh/v1/settlement/accounts \\
   -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "routeCode": "main-wallet",
+    "accountCode": "main-wallet",
     "name": "Main wallet",
-    "provider": "direct",
-    "chain": "solana",
-    "assetSymbol": "USDC",
-    "destinationAddress": "YOUR_SOLANA_WALLET",
+    "destinationAddress": "YOUR_STELLAR_WALLET",
     "isDefault": true
   }'`,
         },
       },
       {
         id: "api-settlement-response",
-        title: "Route response",
-        paragraphs: ["Use the route `id` or `routeCode` when a collection should settle somewhere other than the default route."],
+        title: "Account response",
+        paragraphs: ["Use the account `id` or `accountCode` when a collection should settle somewhere other than the default account."],
         samples: [
-          createJsonSample("Settlement route", "settlement-route.response.json", {
+          createJsonSample("Settlement account", "settlement-account.response.json", {
             id: "66f1d2c11d0e63b8a1",
-            routeCode: "main-wallet",
+            accountCode: "main-wallet",
             name: "Main wallet",
-            mode: "standard",
-            provider: "direct",
-            chain: "solana",
             assetSymbol: "USDC",
-            destinationAddress: "YOUR_SOLANA_WALLET",
+            destinationAddress: "YOUR_STELLAR_WALLET",
             isDefault: true,
             status: "active",
           }),
@@ -423,9 +417,9 @@ export const docsPages: DocsPage[] = [
       },
       {
         id: "api-settlement-select",
-        title: "Use a route",
+        title: "Use an account",
         paragraphs: [
-          "Collections use the default route when `settlement` is omitted or set to `default`. Pass a route code or route id only when that collection needs a specific destination.",
+          "Collections use the default account when `settlement` is omitted or set to `default`. Pass an account code or account id only when that collection needs a specific destination.",
         ],
         sample: {
           label: "Collection settlement",
@@ -444,16 +438,16 @@ export const docsPages: DocsPage[] = [
         },
       },
       {
-        id: "api-settlement-private",
-        title: "Private routes",
+        id: "api-settlement-release",
+        title: "Release window",
         paragraphs: [
-          "Use `provider: \"umbra\"` and `mode: \"private\"` when the merchant wants private USDC settlement. Private settlement is still selected from the collection with the same `settlement` field.",
+          "Confirmed payments settle as Stellar USDC after the next-day release window. If a customer reports an issue before release, Renew can hold the settlement for review.",
         ],
       },
       {
         id: "api-settlement-payouts",
         title: "Payouts",
-        paragraphs: ["Payouts track settlement execution for collected value. Use settlement webhooks for automation and Dashboard > Settlement for operations."],
+        paragraphs: ["Payouts track vault release for collected value. Use settlement webhooks for automation and Dashboard > Payouts for operations."],
       },
     ],
   },
@@ -504,9 +498,9 @@ export const docsPages: DocsPage[] = [
       {
         id: "sdk-quickstart-settlement",
         title: "One-time setup",
-        paragraphs: ["Create a default settlement route once from the dashboard or server SDK."],
+        paragraphs: ["Create a default Stellar settlement account once from the dashboard or server SDK."],
         sample: {
-          label: "Create default route",
+          label: "Create default account",
           language: "ts",
           filename: "setup.ts",
           code: `import { renew } from "@renew.sh/sdk";
@@ -515,8 +509,8 @@ const client = renew({
   secretKey: process.env.RENEW_SECRET_KEY!,
 });
 
-await client.settlement.routes.create({
-  routeCode: "main-wallet",
+await client.settlement.accounts.create({
+  accountCode: "main-wallet",
   name: "Main wallet",
   destinationAddress: process.env.SETTLEMENT_WALLET!,
   isDefault: true,
@@ -663,17 +657,17 @@ await client.collections.cancel(collectionId);`,
       },
       {
         id: "sdk-server-settlement",
-        title: "Settlement routes",
-        paragraphs: ["Use settlement route methods for setup and route management."],
+        title: "Settlement accounts",
+        paragraphs: ["Use settlement account methods for setup and account management."],
         sample: {
           label: "Settlement methods",
           language: "ts",
           filename: "settlement.ts",
-          code: `await client.settlement.routes.create(input);
-await client.settlement.routes.list();
-await client.settlement.routes.getDefault();
-await client.settlement.routes.get(routeId);
-await client.settlement.routes.update(routeId, input);`,
+          code: `await client.settlement.accounts.create(input);
+await client.settlement.accounts.list();
+await client.settlement.accounts.getDefault();
+await client.settlement.accounts.get(accountId);
+await client.settlement.accounts.update(accountId, input);`,
         },
       },
       {

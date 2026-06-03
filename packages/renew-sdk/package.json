@@ -1,7 +1,7 @@
 {
   "name": "@renew.sh/sdk",
   "version": "0.1.11",
-  "description": "Renew SDK for collections, settlement routes, checkout, and webhook verification.",
+  "description": "Renew SDK for collections, Stellar settlement accounts, checkout, and webhook verification.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "renew",
     "payments",
     "stablecoins",
-    "solana",
+    "stellar",
     "usdc"
   ],
   "engines": {
@@ -61,6 +61,14 @@
   "peerDependencies": {
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "24.3.1",

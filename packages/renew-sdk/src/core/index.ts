@@ -28,12 +28,9 @@ export type {
   UpdateRenewPaymentInput,
 } from "../types/payment.js";
 export type {
-  CreateRenewSettlementRouteInput,
-  ListRenewSettlementRoutesQuery,
-  RenewSettlementChain,
-  RenewSettlementMode,
-  RenewSettlementProvider,
-  RenewSettlementRouteRecord,
-  RenewSettlementRouteStatus,
-  UpdateRenewSettlementRouteInput,
+  CreateRenewSettlementAccountInput,
+  ListRenewSettlementAccountsQuery,
+  RenewSettlementAccountRecord,
+  RenewSettlementAccountStatus,
+  UpdateRenewSettlementAccountInput,
 } from "../types/settlement.js";

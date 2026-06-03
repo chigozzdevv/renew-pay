@@ -12,10 +12,10 @@ import type {
   UpdateRenewPaymentInput,
 } from "../types/payment.js";
 import type {
-  CreateRenewSettlementRouteInput,
-  ListRenewSettlementRoutesQuery,
-  RenewSettlementRouteRecord,
-  UpdateRenewSettlementRouteInput,
+  CreateRenewSettlementAccountInput,
+  ListRenewSettlementAccountsQuery,
+  RenewSettlementAccountRecord,
+  UpdateRenewSettlementAccountInput,
 } from "../types/settlement.js";
 
 type FetchImplementation = typeof fetch;
@@ -56,6 +56,21 @@ function resolveSecretKey(options: SecretKeyOptions) {
   }
 
   return token;
+}
+
+function normalizeSettlementAccountInput(
+  input: CreateRenewSettlementAccountInput | UpdateRenewSettlementAccountInput
+) {
+  return { ...input };
+}
+
+function toSettlementAccountRecord(
+  input: RenewSettlementAccountRecord
+): RenewSettlementAccountRecord {
+  return {
+    ...input,
+    accountCode: input.accountCode ?? input.id,
+  };
 }
 
 function truncateErrorMessage(value: string, maxLength = 240) {
@@ -159,26 +174,26 @@ export type RenewPaymentClient = {
     collectionId: string,
     options: SecretKeyOptions
   ): Promise<RenewCollectionRecord>;
-  createSettlementRoute(
-    input: CreateRenewSettlementRouteInput,
+  createSettlementAccount(
+    input: CreateRenewSettlementAccountInput,
     options: SecretKeyOptions
-  ): Promise<RenewSettlementRouteRecord>;
-  listSettlementRoutes(
-    query: ListRenewSettlementRoutesQuery | undefined,
+  ): Promise<RenewSettlementAccountRecord>;
+  listSettlementAccounts(
+    query: ListRenewSettlementAccountsQuery | undefined,
     options: SecretKeyOptions
-  ): Promise<readonly RenewSettlementRouteRecord[]>;
-  getDefaultSettlementRoute(
+  ): Promise<readonly RenewSettlementAccountRecord[]>;
+  getDefaultSettlementAccount(
     options: SecretKeyOptions
-  ): Promise<RenewSettlementRouteRecord>;
-  getSettlementRoute(
-    routeId: string,
+  ): Promise<RenewSettlementAccountRecord>;
+  getSettlementAccount(
+    accountId: string,
     options: SecretKeyOptions
-  ): Promise<RenewSettlementRouteRecord>;
-  updateSettlementRoute(
-    routeId: string,
-    input: UpdateRenewSettlementRouteInput,
+  ): Promise<RenewSettlementAccountRecord>;
+  updateSettlementAccount(
+    accountId: string,
+    input: UpdateRenewSettlementAccountInput,
     options: SecretKeyOptions
-  ): Promise<RenewSettlementRouteRecord>;
+  ): Promise<RenewSettlementAccountRecord>;
   createPayment(
     input: CreateRenewPaymentInput,
     options: SecretKeyOptions
@@ -257,52 +272,52 @@ export function createRenewPaymentClient(
       });
     },
 
-    createSettlementRoute(input, options) {
-      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+    createSettlementAccount(input, options) {
+      return request<RenewSettlementAccountRecord>(fetchImplementation, {
         apiOrigin,
-        path: "/settlement/routes",
+        path: "/settlement/accounts",
         method: "POST",
         secretKey: resolveSecretKey(options),
-        body: input,
-      });
+        body: normalizeSettlementAccountInput(input),
+      }).then(toSettlementAccountRecord);
     },
 
-    listSettlementRoutes(query, options) {
-      return request<readonly RenewSettlementRouteRecord[]>(fetchImplementation, {
+    listSettlementAccounts(query, options) {
+      return request<readonly RenewSettlementAccountRecord[]>(fetchImplementation, {
         apiOrigin,
-        path: "/settlement/routes",
+        path: "/settlement/accounts",
         method: "GET",
         secretKey: resolveSecretKey(options),
         query,
-      });
+      }).then((accounts) => accounts.map(toSettlementAccountRecord));
     },
 
-    getDefaultSettlementRoute(options) {
-      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+    getDefaultSettlementAccount(options) {
+      return request<RenewSettlementAccountRecord>(fetchImplementation, {
         apiOrigin,
-        path: "/settlement/routes/default",
+        path: "/settlement/accounts/default",
         method: "GET",
         secretKey: resolveSecretKey(options),
-      });
+      }).then(toSettlementAccountRecord);
     },
 
-    getSettlementRoute(routeId, options) {
-      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+    getSettlementAccount(accountId, options) {
+      return request<RenewSettlementAccountRecord>(fetchImplementation, {
         apiOrigin,
-        path: `/settlement/routes/${encodeURIComponent(routeId)}`,
+        path: `/settlement/accounts/${encodeURIComponent(accountId)}`,
         method: "GET",
         secretKey: resolveSecretKey(options),
-      });
+      }).then(toSettlementAccountRecord);
     },
 
-    updateSettlementRoute(routeId, input, options) {
-      return request<RenewSettlementRouteRecord>(fetchImplementation, {
+    updateSettlementAccount(accountId, input, options) {
+      return request<RenewSettlementAccountRecord>(fetchImplementation, {
         apiOrigin,
-        path: `/settlement/routes/${encodeURIComponent(routeId)}`,
+        path: `/settlement/accounts/${encodeURIComponent(accountId)}`,
         method: "PATCH",
         secretKey: resolveSecretKey(options),
-        body: input,
-      });
+        body: normalizeSettlementAccountInput(input),
+      }).then(toSettlementAccountRecord);
     },
 
     createPayment(input, options) {

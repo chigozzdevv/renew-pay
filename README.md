@@ -2,13 +2,13 @@
 
 **Local fiat collection with stable settlement.**
 
-Renew helps merchants collect local payments and settle in stable assets. Merchants create a collection, open Renew checkout, and Renew handles local collection, reconciliation, fees, payout tracking, and settlement.
+Renew helps merchants collect local payments and settle in stable assets. Merchants create a collection, open Renew checkout, and Renew handles local collection, reconciliation, fees, payout tracking, and Stellar USDC settlement.
 
-Renew uses Partna for local collection, Privy for authentication, Sumsub for KYC/KYB, direct Solana settlement for standard payouts, and Umbra for private USDC settlement routes.
+Renew uses Partna for local collection, Privy for authentication, Sumsub for KYC/KYB, and a Stellar settlement vault for released USDC payouts.
 
 ## Runtime Status
 
-Renew runs in test mode on Solana devnet with Partna test collection and Sumsub test verification during onboarding.
+Renew runs in test mode with Partna test collection, Sumsub test verification, and Stellar testnet settlement configuration.
 
 Live mode follows mainnet settlement configuration and production compliance controls.
 
@@ -28,8 +28,7 @@ Live mode follows mainnet settlement configuration and production compliance con
 | Onboarding | Owner, business, markets, payout wallet, verification |
 | Collection | Partna |
 | Local markets | `GHS`, `KES`, `NGN` |
-| Standard settlement | Direct Solana SPL transfer |
-| Private settlement | Umbra USDC |
+| Settlement | Stellar USDC |
 | Verification | Sumsub |
 
 ## How Renew Works
@@ -40,22 +39,22 @@ Live mode follows mainnet settlement configuration and production compliance con
 4. Renew returns a hosted checkout URL.
 5. The customer pays through Renew checkout.
 6. Renew reconciles the collection, fees, and stable amount.
-7. Renew queues a payout against the collection’s settlement route.
-8. Settlement executes through direct Solana or Umbra private settlement.
+7. Renew queues settlement against the merchant’s settlement account.
+8. The Stellar vault releases USDC to the merchant wallet after the release window.
 
 ## Architecture
 
 Off-chain handles product logic, customer data, collection orchestration, payout state, notifications, webhooks, and dashboard aggregation.
 
-On-chain activity is limited to stable settlement transactions and privacy-provider transactions where the selected route uses Umbra.
+On-chain activity is limited to Stellar USDC vault settlement and release transactions.
 
 ### Server
 
 - Auth and workspace sessions
 - Onboarding and verification
-- Collections, customers, settlement routes, payouts, and history
+- Collections, customers, settlement accounts, payouts, and history
 - Partna collection, quotes, and webhooks
-- Direct Solana and Umbra payout execution
+- Stellar settlement vault payout execution
 - Developer keys and webhook delivery
 
 ### Client
@@ -93,7 +92,7 @@ await checkout.open(collection.checkoutUrl);
 renew-pay/
 ├── client/                # Next.js app
 ├── server/                # Express API, workers, webhooks
-├── contracts/             # Solana commitment program workspace
+├── contracts/             # Stellar settlement vault contract workspace
 └── packages/
     └── renew-sdk/         # Published SDK (@renew.sh/sdk)
 ```
@@ -107,7 +106,7 @@ renew-pay/
 | Auth | Privy |
 | Verification | Sumsub |
 | Collection | Partna |
-| Settlement | Solana, SPL Token, Umbra |
+| Settlement | Stellar, Soroban, USDC |
 | SDK | TypeScript, npm |
 
 ## Getting Started
@@ -117,7 +116,7 @@ renew-pay/
 - Node.js `20.x`
 - MongoDB
 - Redis
-- Rust, Solana CLI, and Anchor if working in `contracts/`
+- Rust and Stellar CLI if working in `contracts/`
 
 ### Client
 

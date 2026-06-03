@@ -20,10 +20,10 @@ import type {
   UpdateRenewPaymentInput,
 } from "../types/payment.js";
 import type {
-  CreateRenewSettlementRouteInput,
-  ListRenewSettlementRoutesQuery,
-  RenewSettlementRouteRecord,
-  UpdateRenewSettlementRouteInput,
+  CreateRenewSettlementAccountInput,
+  ListRenewSettlementAccountsQuery,
+  RenewSettlementAccountRecord,
+  UpdateRenewSettlementAccountInput,
 } from "../types/settlement.js";
 
 type FetchImplementation = typeof fetch;
@@ -43,19 +43,19 @@ export type RenewServerClient = {
     cancel(collectionId: string): Promise<RenewCollectionRecord>;
   };
   settlement: {
-    routes: {
+    accounts: {
       create(
-        input: CreateRenewSettlementRouteInput
-      ): Promise<RenewSettlementRouteRecord>;
+        input: CreateRenewSettlementAccountInput
+      ): Promise<RenewSettlementAccountRecord>;
       list(
-        query?: ListRenewSettlementRoutesQuery
-      ): Promise<readonly RenewSettlementRouteRecord[]>;
-      getDefault(): Promise<RenewSettlementRouteRecord>;
-      get(routeId: string): Promise<RenewSettlementRouteRecord>;
+        query?: ListRenewSettlementAccountsQuery
+      ): Promise<readonly RenewSettlementAccountRecord[]>;
+      getDefault(): Promise<RenewSettlementAccountRecord>;
+      get(accountId: string): Promise<RenewSettlementAccountRecord>;
       update(
-        routeId: string,
-        input: UpdateRenewSettlementRouteInput
-      ): Promise<RenewSettlementRouteRecord>;
+        accountId: string,
+        input: UpdateRenewSettlementAccountInput
+      ): Promise<RenewSettlementAccountRecord>;
     };
   };
   createPayment(input: CreateRenewPaymentInput): Promise<RenewPaymentRecord>;
@@ -120,29 +120,29 @@ export function createRenewServerClient(
       },
     },
     settlement: {
-      routes: {
+      accounts: {
         create(input) {
-          return paymentClient.createSettlementRoute(input, {
+          return paymentClient.createSettlementAccount(input, {
             secretKey: config.secretKey,
           });
         },
         list(query) {
-          return paymentClient.listSettlementRoutes(query, {
+          return paymentClient.listSettlementAccounts(query, {
             secretKey: config.secretKey,
           });
         },
         getDefault() {
-          return paymentClient.getDefaultSettlementRoute({
+          return paymentClient.getDefaultSettlementAccount({
             secretKey: config.secretKey,
           });
         },
-        get(routeId) {
-          return paymentClient.getSettlementRoute(routeId, {
+        get(accountId) {
+          return paymentClient.getSettlementAccount(accountId, {
             secretKey: config.secretKey,
           });
         },
-        update(routeId, input) {
-          return paymentClient.updateSettlementRoute(routeId, input, {
+        update(accountId, input) {
+          return paymentClient.updateSettlementAccount(accountId, input, {
             secretKey: config.secretKey,
           });
         },

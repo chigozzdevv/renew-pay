@@ -20,7 +20,7 @@ test("uses server key headers for payment creation", async () => {
             environment: "test",
             payId: "pay_123",
             customerId: null,
-            settlementRouteId: "route_123",
+            settlementAccountId: "account_123",
             amount: 25000,
             currency: "NGN",
             description: "Website order",
@@ -154,7 +154,7 @@ test("creates collections through the collections endpoint", async () => {
   });
 });
 
-test("creates settlement routes with server key scope", async () => {
+test("creates settlement accounts with server key scope", async () => {
   let captured = null;
 
   const client = createRenewPaymentClient({
@@ -166,22 +166,15 @@ test("creates settlement routes with server key scope", async () => {
         JSON.stringify({
           success: true,
           data: {
-            id: "route_123",
+            id: "account_123",
             merchantId: "merchant_123",
             environment: "test",
-            routeCode: "main-wallet",
+            accountCode: "main-wallet",
             name: "Main wallet",
-            mode: "standard",
-            provider: "direct",
-            chain: "solana",
             assetSymbol: "USDC",
-            assetMint: "EPjFWdd5AufqSSqeM2q7hF8uVjPgnjK4s7t1v6Xh4Jz",
-            assetDecimals: 6,
-            destinationAddress: "11111111111111111111111111111111",
-            feeBps: 0,
+            destinationAddress: "GB2NKG6WLBJ3MYHI47GJ6YAMNZ4JQORVCRU2YAXYISOL3U3RV7UPO6KD",
             isDefault: true,
             status: "active",
-            privacy: null,
             metadata: {},
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -197,23 +190,23 @@ test("creates settlement routes with server key scope", async () => {
     },
   });
 
-  await client.createSettlementRoute(
+  await client.createSettlementAccount(
     {
-      routeCode: "main-wallet",
+      accountCode: "main-wallet",
       name: "Main wallet",
-      destinationAddress: "11111111111111111111111111111111",
+      destinationAddress: "GB2NKG6WLBJ3MYHI47GJ6YAMNZ4JQORVCRU2YAXYISOL3U3RV7UPO6KD",
       isDefault: true,
     },
     { secretKey: "rw_test_example" }
   );
 
-  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/settlement/routes");
+  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/settlement/accounts");
   assert.equal(captured.init.method, "POST");
   assert.equal(captured.init.headers["x-renew-secret-key"], "rw_test_example");
   assert.deepEqual(JSON.parse(captured.init.body), {
-    routeCode: "main-wallet",
+    accountCode: "main-wallet",
     name: "Main wallet",
-    destinationAddress: "11111111111111111111111111111111",
+    destinationAddress: "GB2NKG6WLBJ3MYHI47GJ6YAMNZ4JQORVCRU2YAXYISOL3U3RV7UPO6KD",
     isDefault: true,
   });
 });
