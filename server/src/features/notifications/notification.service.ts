@@ -18,6 +18,7 @@ import {
   resendWebhookEnvelopeSchema,
 } from "@/features/notifications/notification.validation";
 import { PaymentModel } from "@/features/payments/payment.model";
+import { PaymentIssueModel } from "@/features/payments/payment-issue.model";
 import { PayoutModel } from "@/features/payouts/payout.model";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
@@ -442,7 +443,7 @@ async function loadMerchantBranding(merchantId: string) {
       }),
       supportEmail: setting.business.supportEmail,
       brandAccent: setting.business.brandAccent,
-      emailLogoUrl: setting.business.logoUrl ?? null,
+      renewLogoUrl: getAppUrl("/renew-logo.png"),
     } satisfies NotificationTemplateBranding,
   };
 }
@@ -563,6 +564,7 @@ async function sendWithResend(input: {
   text: string;
   replyToEmail: string;
 }) {
+  const replyToEmail = input.replyToEmail.trim();
   const response = await fetch(`${RESEND_API_BASE_URL}/emails`, {
     method: "POST",
     headers: getResendApiHeaders({
@@ -575,7 +577,7 @@ async function sendWithResend(input: {
       subject: input.subject,
       html: input.html,
       text: input.text,
-      reply_to: env.RESEND_REPLY_TO_EMAIL.trim() || input.replyToEmail,
+      ...(replyToEmail ? { reply_to: replyToEmail } : {}),
     }),
   });
 
@@ -976,6 +978,7 @@ export async function queueCustomerReceiptForStatusChange(input: {
       referenceLabel: reference,
       paymentReference: payment.payId,
       releaseAtLabel: formatReleaseDate(releaseAt),
+      issueUrl: getAppUrl(`/pay/${payment.payId}/report`),
       appUrl: getAppUrl(`/pay/${payment.payId}`),
     },
     metadata: {
@@ -995,4 +998,107 @@ export async function queueCustomerReceiptForStatusChange(input: {
   await queueNotificationRecord(record._id.toString());
 
   return [record];
+}
+
+export async function queuePaymentIssueNotifications(input: {
+  issueId: string;
+  paymentId: string;
+  heldPayoutId?: string | null;
+}) {
+  const [issue, payment] = await Promise.all([
+    PaymentIssueModel.findById(input.issueId).exec(),
+    PaymentModel.findById(input.paymentId).exec(),
+  ]);
+
+  if (!issue || !payment) {
+    return [];
+  }
+
+  const metadata = asRecord(payment.metadata);
+  const reference = readString(metadata.reference) ?? payment.payId;
+  const queuedNotifications = [];
+
+  if (issue.reporterEmail) {
+    const record = await createNotificationRecord({
+      merchantId: payment.merchantId.toString(),
+      environment: payment.environment === "live" ? "live" : "test",
+      templateKey: "customer.payment.issue_received",
+      audience: "customer",
+      category: "payment",
+      recipient: {
+        email: issue.reporterEmail,
+        name: issue.reporterName ?? null,
+      },
+      payload: {
+        referenceLabel: reference,
+        appUrl: getAppUrl(`/pay/${payment.payId}`),
+      },
+      metadata: {
+        paymentId: payment._id.toString(),
+        payId: payment.payId,
+        issueId: issue._id.toString(),
+      },
+      idempotencyKey: createNotificationIdempotencyKey([
+        "customer.payment.issue_received",
+        issue._id.toString(),
+        issue.reporterEmail,
+      ]),
+    });
+    await queueNotificationRecord(record._id.toString());
+    queuedNotifications.push(record);
+  }
+
+  if (!input.heldPayoutId) {
+    return queuedNotifications;
+  }
+
+  const merchantId = payment.merchantId.toString();
+  const setting = await getOrCreateMerchantSetting(merchantId);
+
+  if (setting.notifications.settlementAlerts === false) {
+    return queuedNotifications;
+  }
+
+  const payout = await PayoutModel.findById(input.heldPayoutId).exec();
+
+  if (!payout) {
+    return queuedNotifications;
+  }
+
+  const recipients = await resolveMerchantRecipients({
+    merchantId,
+    group: "settlement",
+  });
+
+  for (const recipient of recipients) {
+    const record = await createNotificationRecord({
+      merchantId,
+      environment: payment.environment === "live" ? "live" : "test",
+      templateKey: "merchant.settlement.held",
+      audience: "merchant",
+      category: "settlement",
+      recipient,
+      payload: {
+        referenceLabel: reference,
+        settlementAmountLabel: formatMoney(payout.netUsdc, "USDC"),
+        destinationLabel: shortenValue(payout.destinationWallet),
+        appUrl: getAppUrl("/dashboard/payouts"),
+      },
+      metadata: {
+        paymentId: payment._id.toString(),
+        payId: payment.payId,
+        payoutId: payout._id.toString(),
+        issueId: issue._id.toString(),
+      },
+      idempotencyKey: createNotificationIdempotencyKey([
+        "merchant.settlement.held",
+        issue._id.toString(),
+        recipient.email,
+      ]),
+    });
+    await queueNotificationRecord(record._id.toString());
+    queuedNotifications.push(record);
+  }
+
+  return queuedNotifications;
 }

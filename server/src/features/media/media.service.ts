@@ -43,3 +43,31 @@ export function createMerchantLogoUploadSignature(input: { merchantId: string })
     signature: signCloudinaryParams(params, config.apiSecret),
   };
 }
+
+export function createPaymentIssueFileUploadSignature(input: {
+  merchantId: string;
+  payId: string;
+}) {
+  const config = getCloudinaryConfig();
+
+  if (!config.cloudName || !config.apiKey || !config.apiSecret) {
+    throw new HttpError(503, "File uploads are not configured.");
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const normalizedPayId = input.payId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const folder = `${config.uploadFolder.replace(/\/+$/, "")}/merchant-${input.merchantId}/payment-issues/${normalizedPayId}`;
+  const params = {
+    folder,
+    timestamp,
+  } as const;
+
+  return {
+    cloudName: config.cloudName,
+    apiKey: config.apiKey,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${config.cloudName}/auto/upload`,
+    folder: params.folder,
+    timestamp,
+    signature: signCloudinaryParams(params, config.apiSecret),
+  };
+}

@@ -5,6 +5,7 @@ import { env } from "@/config/env.config";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { CustomerModel, type CustomerDocument } from "@/features/customers/customer.model";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import { createPaymentIssueFileUploadSignature } from "@/features/media/media.service";
 import { quoteLocalAmountInSettlementAsset } from "@/features/onramps/onramp.service";
 import {
   completePartnaCustomerPaymentProfileVerification,
@@ -14,15 +15,19 @@ import {
   startPartnaCustomerPaymentProfileVerification,
 } from "@/features/onramps/partna.service";
 import {
+  queuePaymentIssueNotifications,
   queueCustomerReceiptForStatusChange,
   queueMoneyMovementNotificationForStatusChange,
 } from "@/features/notifications/notification.service";
 import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.factory";
+import { PaymentIssueModel } from "@/features/payments/payment-issue.model";
 import { PaymentModel, type PaymentRecord } from "@/features/payments/payment.model";
+import { PayoutModel } from "@/features/payouts/payout.model";
 import type {
   ConfirmPublicCheckoutOtpInput,
   ConfirmPublicCheckoutPhoneInput,
   CreateCollectionInput,
+  CreatePublicPaymentIssueInput,
   CreatePaymentInput,
   ListCollectionsQuery,
   ListPaymentsQuery,
@@ -68,6 +73,63 @@ function readString(value: unknown) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function readPartnaNetwork(value: unknown) {
+  const network = readString(value);
+
+  return network?.replace(/^partna-network:/, "") ?? null;
+}
+
+function getPartnaRampDestinationAddress(mode: RuntimeMode) {
+  const address =
+    mode === "live" ? env.COLLECTION_WALLET_LIVE : env.COLLECTION_WALLET_TEST;
+  const normalized = address.trim();
+
+  if (!normalized) {
+    throw new HttpError(503, "Collection wallet is not configured.");
+  }
+
+  return normalized;
+}
+
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function readOrderItems(metadata: Record<string, unknown>) {
+  const rawItems = Array.isArray(metadata.items) ? metadata.items : [];
+
+  return rawItems
+    .map((item) => {
+      const record = asRecord(item);
+      const name = readString(record.name);
+      const quantity = readNumber(record.quantity) ?? 1;
+      const amount = readNumber(record.amount);
+
+      if (!name || amount === null) {
+        return null;
+      }
+
+      return {
+        name,
+        quantity: Math.max(1, Math.trunc(quantity)),
+        amount,
+      };
+    })
+    .filter((item): item is { name: string; quantity: number; amount: number } => item !== null);
+}
+
+const PARTNA_SANDBOX_PHONE = "08030013843";
+const PARTNA_SANDBOX_OTP = "123456";
+
 type CustomerRecord = HydratedDocument<CustomerDocument>;
 
 type PublicCheckoutState =
@@ -95,6 +157,50 @@ type PublicCheckoutCustomerInput = {
     name?: string | null;
   } | null;
 };
+
+function toPaymentIssueResponse(document: {
+  _id: { toString(): string };
+  payId: string;
+  paymentId: { toString(): string };
+  payoutId?: { toString(): string } | null;
+  issueType: string;
+  details: string;
+  reporterEmail?: string | null;
+  reporterName?: string | null;
+  files?: Array<{
+    url: string;
+    name: string;
+    type?: string | null;
+    size?: number | null;
+    publicId?: string | null;
+  }> | null;
+  status: string;
+  heldAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: document._id.toString(),
+    payId: document.payId,
+    paymentId: document.paymentId.toString(),
+    payoutId: document.payoutId?.toString() ?? null,
+    issueType: document.issueType,
+    details: document.details,
+    reporterEmail: document.reporterEmail ?? null,
+    reporterName: document.reporterName ?? null,
+    files: (document.files ?? []).map((file) => ({
+      url: file.url,
+      name: file.name,
+      type: file.type ?? null,
+      size: file.size ?? null,
+      publicId: file.publicId ?? null,
+    })),
+    status: document.status,
+    heldAt: document.heldAt ?? null,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+  };
+}
 
 function toPaymentResponse(document: PaymentRecord) {
   return {
@@ -155,6 +261,7 @@ function mapCollectionStatus(status: PaymentResponse["status"]) {
 function toCollectionResponse(payment: PaymentResponse) {
   const metadata = asRecord(payment.metadata);
   const customer = asRecord(metadata.customer);
+  const items = readOrderItems(metadata);
 
   return {
     id: payment.payId,
@@ -163,6 +270,7 @@ function toCollectionResponse(payment: PaymentResponse) {
     amount: payment.amount,
     currency: payment.currency,
     description: payment.description,
+    items,
     status: mapCollectionStatus(payment.status),
     checkoutUrl: payment.paymentUrl,
     recurring: payment.recurring,
@@ -440,6 +548,7 @@ async function toPublicPaymentResponse(document: PaymentRecord) {
     findPublicCheckoutCustomer(document),
   ]);
   const metadata = asRecord(document.metadata);
+  const items = readOrderItems(metadata);
   const customerDetails = readPublicCheckoutCustomerDetails(
     document,
     undefined,
@@ -452,13 +561,26 @@ async function toPublicPaymentResponse(document: PaymentRecord) {
       : document.description;
   const checkoutState = resolvePublicCheckoutState(document, customerDocument);
   const partnaRaw = asRecord(customerDocument?.paymentProfile?.partna?.raw);
-  const bankTransfer = customerDocument?.paymentProfile?.bankTransfer ?? null;
+  const rampBankTransfer = asRecord(metadata.partnaRamp);
+  const bankTransfer =
+    readString(rampBankTransfer.accountNumber) ||
+    readString(rampBankTransfer.accountName) ||
+    readString(rampBankTransfer.bankName)
+      ? {
+          bankCode: readString(rampBankTransfer.bankCode),
+          bankName: readString(rampBankTransfer.bankName),
+          accountName: readString(rampBankTransfer.accountName),
+          accountNumber: readString(rampBankTransfer.accountNumber),
+          currency: readString(rampBankTransfer.fromCurrency) ?? document.currency,
+        }
+      : customerDocument?.paymentProfile?.bankTransfer ?? null;
 
   return {
     payId: document.payId,
     amount: document.amount,
     currency: document.currency,
     description,
+    items,
     status: document.status,
     paymentUrl: document.paymentUrl,
     merchant: {
@@ -491,6 +613,20 @@ async function toPublicPaymentResponse(document: PaymentRecord) {
         phoneConfirmationRequired: checkoutState === "needs_phone",
         message: readString(partnaRaw.otpDispatchMessage),
         bvnLast4: readString(customerDocument?.paymentProfile?.partna?.bvnLast4),
+        sandbox:
+          document.environment === "test"
+            ? {
+                phone:
+                  checkoutState === "needs_phone" ? PARTNA_SANDBOX_PHONE : null,
+                otp:
+                  checkoutState === "needs_otp"
+                    ? readString(partnaRaw.sandboxOtp) ?? PARTNA_SANDBOX_OTP
+                    : null,
+              }
+            : {
+                phone: null,
+                otp: null,
+              },
       },
       returnPage: setting?.checkout?.returnPage ?? null,
       bankTransfer: bankTransfer
@@ -696,7 +832,10 @@ export async function createPayment(input: CreatePaymentInput) {
       provider: "partna",
       status: "not_started",
     },
-    metadata: input.metadata ?? {},
+    metadata: {
+      ...(input.metadata ?? {}),
+      ...(input.items ? { items: input.items } : {}),
+    },
   });
 
   return toPaymentResponse(payment);
@@ -711,6 +850,7 @@ export async function createCollection(input: CreateCollectionInput) {
   const metadata = {
     ...(input.metadata ?? {}),
     reference: input.reference,
+    ...(input.items ? { items: input.items } : {}),
     ...(input.customer ? { customer: input.customer } : {}),
   };
   const payment = await createPayment({
@@ -957,7 +1097,7 @@ async function ensureCheckoutCustomerOrThrow(
   return customer;
 }
 
-async function ensurePartnaVoucherForPayment(
+async function ensurePartnaRampForPayment(
   payment: PaymentRecord,
   customer: CustomerRecord
 ) {
@@ -969,50 +1109,75 @@ async function ensurePartnaVoucherForPayment(
     return;
   }
 
-  const merchant = await MerchantModel.findById(payment.merchantId)
-    .select({ name: 1 })
-    .lean()
-    .exec();
-
-  if (!merchant) {
-    throw new HttpError(404, "Merchant was not found.");
-  }
-
   const environment = getPaymentRuntimeMode(payment);
   const quote = await quoteLocalAmountInSettlementAsset({
     environment,
     currency: payment.currency,
     localAmount: payment.amount,
   });
-  const voucher = await getPartnaProvider(environment).createVoucher({
-    email: customer.email,
-    fullName: customer.name,
-    amount: payment.amount,
-    currency: payment.currency,
-    merchant: merchant.name ?? "Renew merchant",
+  const rateKey = readString(asRecord(quote.raw).rateKey);
+  const accountName =
+    readString(customer.paymentProfile?.partna?.accountName) ??
+    readString(asRecord(customer.paymentProfile?.partna?.raw).accountName);
+  const fromNetwork =
+    readString(asRecord(quote.raw).onrampNetwork) ??
+    readPartnaNetwork(quote.network.externalId);
+
+  if (!rateKey) {
+    throw new HttpError(502, "Partna quote did not include a ramp rate key.");
+  }
+
+  if (!accountName) {
+    throw new HttpError(409, "Customer payment account is not ready.");
+  }
+
+  if (!fromNetwork) {
+    throw new HttpError(502, "Partna quote did not include a collection network.");
+  }
+
+  const ramp = await getPartnaProvider(environment).createRamp({
+    accountName,
+    cancelPendingRampRequest: true,
+    cryptoAddress: getPartnaRampDestinationAddress(environment),
+    expireAction: "useCurrentRate",
+    fromAmount: payment.amount,
+    fromCurrency: payment.currency,
+    fromNetwork,
+    rampReference: payment.payId,
+    rateKey,
+    toCurrency: "USDC",
+    toNetwork: "solana",
+    type: "fiatToCrypto",
   });
   const previousStatus = payment.status;
   const metadata = asRecord(payment.metadata);
+  const rampFeeAmount = ramp.totalFeesInToCurrency ?? ramp.feeInToCurrency ?? quote.feeAmount;
+  const rampStableAmount = ramp.toAmount ?? quote.usdcAmount;
 
-  payment.status = voucher.status === "success" ? "paid" : "pending";
+  payment.status = "pending";
   payment.collection.provider = "partna";
-  payment.collection.status = voucher.status === "success" ? "paid" : "pending";
-  payment.collection.externalId = voucher.voucherId;
-  payment.collection.localAmount = quote.localAmount;
+  payment.collection.status = "pending";
+  payment.collection.externalId = ramp.rampReference;
+  payment.collection.localAmount = ramp.fromAmount ?? quote.localAmount;
   payment.collection.fxRate = quote.fxRate;
-  payment.collection.stableAmount = quote.usdcAmount;
-  payment.collection.feeAmount = quote.feeAmount;
-  payment.collection.paidAt =
-    payment.collection.status === "paid" ? payment.collection.paidAt ?? new Date() : null;
+  payment.collection.stableAmount = rampStableAmount;
+  payment.collection.feeAmount = rampFeeAmount;
+  payment.collection.paidAt = null;
   payment.metadata = {
     ...metadata,
     email: customer.email,
     payerEmail: customer.email,
     payerName: customer.name,
-    voucherCode: voucher.voucherCode,
-    voucherStatus: voucher.status,
     channelId: quote.channel.externalId,
     networkId: quote.network.externalId,
+    partnaRamp: {
+      ...ramp.raw,
+      rampReference: ramp.rampReference,
+      accountName: ramp.accountName,
+      accountNumber: ramp.accountNumber,
+      bankName: ramp.bankName,
+      status: ramp.status,
+    },
   };
   await payment.save();
 
@@ -1048,6 +1213,104 @@ export async function submitPublicCheckoutCustomer(
   await ensurePublicCheckoutCustomer(payment, input);
 
   return toPublicPaymentResponse(payment);
+}
+
+export async function listPublicCheckoutBanks(payId: string) {
+  const payment = await ensurePublicPaymentScope(payId);
+  const banks = await getPartnaProvider(getPaymentRuntimeMode(payment)).listBanks({
+    currency: payment.currency,
+    onlyValidators: true,
+  });
+
+  return banks.map((bank) => ({
+    code: bank.code,
+    name: bank.name,
+  }));
+}
+
+export async function createPublicPaymentIssueFileUpload(payId: string) {
+  const payment = await ensurePublicPaymentScope(payId);
+
+  return createPaymentIssueFileUploadSignature({
+    merchantId: payment.merchantId.toString(),
+    payId: payment.payId,
+  });
+}
+
+export async function createPublicPaymentIssue(
+  payId: string,
+  input: CreatePublicPaymentIssueInput
+) {
+  const payment = await ensurePublicPaymentScope(payId);
+
+  if (["failed", "cancelled"].includes(payment.status)) {
+    throw new HttpError(409, "This payment can no longer receive reports.");
+  }
+
+  const customer = await findPublicCheckoutCustomer(payment);
+  const metadata = asRecord(payment.metadata);
+  const customerMetadata = asRecord(metadata.customer);
+  const reporterEmail =
+    input.reporterEmail ??
+    readString(customer?.email) ??
+    readString(customerMetadata.email) ??
+    readString(metadata.payerEmail) ??
+    readString(metadata.email);
+  const reporterName =
+    input.reporterName ??
+    readString(customer?.name) ??
+    readString(customerMetadata.name) ??
+    readString(metadata.payerName);
+  const holdablePayout = await PayoutModel.findOne({
+    sourcePaymentId: payment._id,
+    status: { $in: ["queued", "confirming", "held"] },
+    creditTxHash: null,
+    settledAt: null,
+  })
+    .sort({ createdAt: -1 })
+    .exec();
+  let heldPayoutId: string | null = null;
+
+  if (holdablePayout && holdablePayout.status !== "held") {
+    holdablePayout.status = "held";
+    holdablePayout.vaultHeldAt = holdablePayout.vaultHeldAt ?? new Date();
+    holdablePayout.reversalReason = "Payment issue reported.";
+    await holdablePayout.save();
+    heldPayoutId = holdablePayout._id.toString();
+  } else if (holdablePayout?.status === "held") {
+    heldPayoutId = holdablePayout._id.toString();
+  }
+
+  const issue = await PaymentIssueModel.create({
+    merchantId: payment.merchantId,
+    environment: getPaymentRuntimeMode(payment),
+    paymentId: payment._id,
+    payId: payment.payId,
+    customerId: customer?._id ?? payment.customerId ?? null,
+    payoutId: holdablePayout?._id ?? null,
+    issueType: input.issueType,
+    details: input.details,
+    reporterEmail: reporterEmail ?? null,
+    reporterName: reporterName ?? null,
+    files: input.files ?? [],
+    status: "open",
+    heldAt: holdablePayout ? new Date() : null,
+  });
+
+  payment.metadata = {
+    ...metadata,
+    issueReportedAt: new Date().toISOString(),
+    latestIssueId: issue._id.toString(),
+  };
+  await payment.save();
+
+  await queuePaymentIssueNotifications({
+    issueId: issue._id.toString(),
+    paymentId: payment._id.toString(),
+    heldPayoutId,
+  }).catch(() => undefined);
+
+  return toPaymentIssueResponse(issue);
 }
 
 export async function startPublicCheckoutKyc(
@@ -1144,7 +1407,7 @@ export async function confirmPublicCheckoutOtp(
   });
 
   const verifiedCustomer = await ensureCheckoutCustomerOrThrow(payment);
-  await ensurePartnaVoucherForPayment(payment, verifiedCustomer);
+  await ensurePartnaRampForPayment(payment, verifiedCustomer);
 
   return toPublicPaymentResponse(payment);
 }
@@ -1162,7 +1425,7 @@ export async function startPublicPayment(
   const customer = await ensurePublicCheckoutCustomer(payment, input);
 
   if (customer) {
-    await ensurePartnaVoucherForPayment(payment, customer);
+    await ensurePartnaRampForPayment(payment, customer);
   }
 
   return toPublicPaymentResponse(payment);
@@ -1227,8 +1490,11 @@ export async function updatePayment(
     };
   }
 
-  if (input.metadata !== undefined) {
-    payment.metadata = input.metadata;
+  if (input.metadata !== undefined || input.items !== undefined) {
+    payment.metadata = {
+      ...(input.metadata !== undefined ? input.metadata : asRecord(payment.metadata)),
+      ...(input.items !== undefined ? { items: input.items } : {}),
+    };
   }
 
   await payment.save();

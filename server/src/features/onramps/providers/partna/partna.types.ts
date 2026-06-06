@@ -14,9 +14,21 @@ export type PartnaBvnVerificationMethod = {
   hint: string | null;
 };
 
+export type PartnaBank = {
+  code: string;
+  name: string;
+  raw: Record<string, unknown>;
+};
+
+export type PartnaListBanksInput = {
+  currency?: string | null;
+  onlyValidators?: boolean | null;
+};
+
 export type PartnaHandleBvnOtpMethodInput = {
   accountName: string;
   verificationMethod: string;
+  currency?: string | null;
   accountNumber?: string | null;
   bankCode?: string | null;
 };
@@ -50,37 +62,40 @@ export type PartnaManagedBankAccount = {
   raw: Record<string, unknown>;
 };
 
-export type PartnaVoucherInput = {
-  email: string;
-  fullName: string;
-  amount: number;
-  currency: string;
-  merchant: string;
-};
-
-export type PartnaVoucherRecord = {
-  provider: "partna";
-  voucherId: string;
-  voucherCode: string | null;
-  status: string;
-  amount: number;
-  fee: number | null;
-  wavedFee: number | null;
-  feeBearer: string | null;
-  currency: string;
-  email: string;
-  fullName: string;
-  reference: string | null;
-  paymentUrl: string | null;
-  raw: Record<string, unknown>;
-};
-
-export type PartnaRedeemVoucherInput = {
-  email: string;
-  voucherCode: string;
-  currency: "USDC";
-  network: "solana";
+export type PartnaRampInput = {
+  accountName: string;
+  cancelPendingRampRequest?: boolean;
   cryptoAddress: string;
+  expireAction?: "useCurrentRate" | "deposit";
+  fromAmount: number;
+  fromCurrency: string;
+  fromNetwork: string;
+  rampReference?: string | null;
+  rateKey: string;
+  toCurrency: "USDC";
+  toNetwork: string;
+  type: "fiatToCrypto";
+};
+
+export type PartnaRampRecord = {
+  rampReference: string;
+  status: string | null;
+  accountName: string | null;
+  accountNumber: string | null;
+  bankName: string | null;
+  currentRate: number | null;
+  expiryDate: Date | null;
+  feeInFromCurrency: number | null;
+  feeInToCurrency: number | null;
+  fromAmount: number | null;
+  fromCurrency: string | null;
+  fromNetwork: string | null;
+  toAmount: number | null;
+  toCurrency: string | null;
+  toNetwork: string | null;
+  totalFeesInFromCurrency: number | null;
+  totalFeesInToCurrency: number | null;
+  raw: Record<string, unknown>;
 };
 
 export type PartnaRateInput = {
@@ -143,6 +158,7 @@ export type PartnaAccountDetailsInput = {
 
 export interface PartnaProvider {
   createAccount(input: PartnaCreateAccountInput): Promise<Record<string, unknown>>;
+  listBanks(input?: PartnaListBanksInput): Promise<PartnaBank[]>;
   initiateBvnKyc(
     input: PartnaInitiateBvnKycInput
   ): Promise<PartnaBvnVerificationMethod[]>;
@@ -152,14 +168,10 @@ export interface PartnaProvider {
   createBankAccount(
     input: PartnaCreateBankAccountInput
   ): Promise<PartnaManagedBankAccount>;
-  listStaticBankAccounts(email: string): Promise<PartnaManagedBankAccount[]>;
   listSupportedAssets(): Promise<PartnaSupportedAsset[]>;
   getRate(input: PartnaRateInput): Promise<PartnaRateQuote>;
   getAccountDetails(
     input?: PartnaAccountDetailsInput
   ): Promise<PartnaAccountDetailsRecord[]>;
-  createVoucher(input: PartnaVoucherInput): Promise<PartnaVoucherRecord>;
-  redeemVoucherAndWithdraw(
-    input: PartnaRedeemVoucherInput
-  ): Promise<Record<string, unknown>>;
+  createRamp(input: PartnaRampInput): Promise<PartnaRampRecord>;
 }

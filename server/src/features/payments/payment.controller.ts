@@ -6,9 +6,12 @@ import {
   confirmPublicCheckoutPhone,
   createCollection,
   createPayment,
+  createPublicPaymentIssue,
+  createPublicPaymentIssueFileUpload,
   getCollectionById,
   getPaymentById,
   getPublicPayment,
+  listPublicCheckoutBanks,
   listCollections,
   listPayments,
   selectPublicCheckoutKycMethod,
@@ -22,6 +25,7 @@ import {
   confirmPublicCheckoutOtpSchema,
   confirmPublicCheckoutPhoneSchema,
   createCollectionSchema,
+  createPublicPaymentIssueSchema,
   createPaymentSchema,
   listCollectionsQuerySchema,
   listPaymentsQuerySchema,
@@ -184,6 +188,44 @@ export const getPublicPaymentController = asyncHandler(
     response.status(200).json({
       success: true,
       data: payment,
+    });
+  }
+);
+
+export const listPublicCheckoutBanksController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const params = publicPaymentParamSchema.parse(request.params);
+    const banks = await listPublicCheckoutBanks(params.payId);
+
+    response.status(200).json({
+      success: true,
+      data: banks,
+    });
+  }
+);
+
+export const createPublicPaymentIssueFileUploadController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const params = publicPaymentParamSchema.parse(request.params);
+    const signature = await createPublicPaymentIssueFileUpload(params.payId);
+
+    response.status(200).json({
+      success: true,
+      data: signature,
+    });
+  }
+);
+
+export const createPublicPaymentIssueController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const params = publicPaymentParamSchema.parse(request.params);
+    const input = createPublicPaymentIssueSchema.parse(request.body);
+    const issue = await createPublicPaymentIssue(params.payId, input);
+
+    response.status(201).json({
+      success: true,
+      message: "Report received.",
+      data: issue,
     });
   }
 );

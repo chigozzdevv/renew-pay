@@ -253,6 +253,10 @@ test("starts a public payment with payer details", async () => {
                 phoneConfirmationRequired: false,
                 message: null,
                 bvnLast4: null,
+                sandbox: {
+                  phone: null,
+                  otp: null,
+                },
               },
               returnPage: null,
               bankTransfer: {

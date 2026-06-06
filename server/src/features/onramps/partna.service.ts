@@ -8,7 +8,6 @@ import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.fa
 import type {
   PartnaBvnVerificationMethod,
   PartnaManagedBankAccount,
-  PartnaVoucherRecord,
 } from "@/features/onramps/providers/partna/partna.types";
 import { CustomerModel } from "@/features/customers/customer.model";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
@@ -20,7 +19,6 @@ import { PaymentModel, type PaymentRecord } from "@/features/payments/payment.mo
 import { queuePayoutProcessing } from "@/features/payouts/payout.service";
 import { PayoutModel } from "@/features/payouts/payout.model";
 import { SettlementAccountModel } from "@/features/settlement/settlement-account.model";
-import { isSolanaAddress } from "@/shared/constants/solana";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
@@ -60,19 +58,6 @@ function buildPartnaCallbackUrl(mode: RuntimeMode) {
   return url.toString();
 }
 
-function getSolanaCollectionWallet(mode: RuntimeMode) {
-  const wallet =
-    mode === "live"
-      ? env.SOLANA_COLLECTION_WALLET_LIVE
-      : env.SOLANA_COLLECTION_WALLET_TEST;
-
-  if (!isSolanaAddress(wallet)) {
-    throw new HttpError(503, "Collection wallet is not configured.");
-  }
-
-  return wallet.trim();
-}
-
 function readPartnaFeeBearer(value: unknown) {
   const normalized = readString(value)?.toLowerCase() ?? null;
   return normalized === "merchant" || normalized === "client" ? normalized : null;
@@ -90,50 +75,33 @@ function toRoundedFee(value: number) {
 
 export function derivePartnaFeeAmountUsdc(input: {
   fxRate: number;
-  voucher?: PartnaVoucherRecord | null;
   payloadData?: Record<string, unknown> | null;
-  redeemResult?: Record<string, unknown> | null;
 }) {
-  const redeemResult = input.redeemResult ?? null;
   const payloadData = input.payloadData ?? null;
-  const feeBearer =
-    readPartnaFeeBearer(redeemResult?.feeBearer) ??
-    readPartnaFeeBearer(payloadData?.feeBearer) ??
-    readPartnaFeeBearer(input.voucher?.feeBearer) ??
-    null;
+  const feeBearer = readPartnaFeeBearer(payloadData?.feeBearer);
 
   if (feeBearer === "client") {
     return 0;
   }
 
-  const convertedVoucherFeeCurrency =
-    readString(redeemResult?.convertedVoucherFeeCurrency)?.toUpperCase() ??
-    readString(redeemResult?.creditCurrency)?.toUpperCase() ??
-    readString(redeemResult?.toCurrency)?.toUpperCase() ??
-    null;
-  const convertedVoucherFee =
-    readNumber(redeemResult?.convertedVoucherFee) ??
-    readNumber(redeemResult?.merchantFee) ??
+  const destinationCurrency = readString(payloadData?.toCurrency)?.toUpperCase() ?? null;
+  const destinationFee =
+    readNumber(payloadData?.totalFeesInToCurrency) ??
+    readNumber(payloadData?.feeInToCurrency) ??
     null;
 
-  if (convertedVoucherFeeCurrency === "USDC" && convertedVoucherFee !== null) {
-    return toRoundedFee(convertedVoucherFee);
+  if ((destinationCurrency === "USDC" || destinationCurrency === null) && destinationFee !== null) {
+    return toRoundedFee(destinationFee);
   }
 
   const localFee =
-    readNumber(redeemResult?.voucherFee) ??
+    readNumber(payloadData?.totalFeesInFromCurrency) ??
+    readNumber(payloadData?.feeInFromCurrency) ??
     readNumber(payloadData?.fee) ??
-    input.voucher?.fee ??
     null;
-  const wavedFee =
-    readNumber(payloadData?.wavedFee) ??
-    input.voucher?.wavedFee ??
-    0;
-  const effectiveLocalFee =
-    localFee === null ? null : Math.max(0, localFee - Math.max(0, wavedFee ?? 0));
 
-  if (effectiveLocalFee !== null && Number.isFinite(input.fxRate) && input.fxRate > 0) {
-    return toRoundedFee(effectiveLocalFee / input.fxRate);
+  if (localFee !== null && Number.isFinite(input.fxRate) && input.fxRate > 0) {
+    return toRoundedFee(localFee / input.fxRate);
   }
 
   return null;
@@ -159,6 +127,37 @@ function buildPartnaCustomerAccountName(customer: {
 
 function readPartnaResponseMessage(payload: Record<string, unknown> | null) {
   return readString(payload?.message);
+}
+
+function readPartnaResponseOtp(payload: Record<string, unknown> | null) {
+  const stack = payload ? [payload] : [];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        stack.push(value as Record<string, unknown>);
+        continue;
+      }
+
+      const normalizedKey = key.replace(/[_-]+/g, "").toLowerCase();
+      if (normalizedKey !== "otp" && normalizedKey !== "verificationcode") {
+        continue;
+      }
+
+      const normalizedValue =
+        typeof value === "number" ? value.toString() : readString(value);
+      if (normalizedValue && /^\d{4,8}$/.test(normalizedValue)) {
+        return normalizedValue;
+      }
+    }
+  }
+
+  return null;
 }
 
 function responseRequiresPartnaPhoneConfirmation(payload: Record<string, unknown> | null) {
@@ -361,6 +360,7 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterMetho
     otpDispatchResult = await provider.handleBvnOtpMethod({
       accountName,
       verificationMethod: selectedMethod,
+      currency: customer.market,
       accountNumber: input.verification.accountNumber,
       bankCode: input.verification.bankCode,
     });
@@ -398,6 +398,8 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterMetho
         selectedAccountNumber: input.verification.accountNumber?.trim() ?? null,
         selectedBankCode: input.verification.bankCode?.trim() ?? null,
         otpDispatchMessage: phoneConfirmationMessage,
+        sandboxOtp:
+          input.environment === "test" ? readPartnaResponseOtp(otpDispatchResult) : null,
       },
     },
   };
@@ -465,6 +467,7 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterPhone
   const otpDispatchResult = await provider.handleBvnOtpMethod({
     accountName,
     verificationMethod: selectedVerificationMethod,
+    currency: customer.market,
     accountNumber: readString(existingRaw.selectedAccountNumber),
     bankCode: readString(existingRaw.selectedBankCode),
   });
@@ -488,6 +491,8 @@ export async function continuePartnaCustomerPaymentProfileVerificationAfterPhone
         phoneConfirmedAt: new Date().toISOString(),
         confirmedPhone: input.verification.phone.trim(),
         otpDispatchMessage: readPartnaResponseMessage(otpDispatchResult),
+        sandboxOtp:
+          input.environment === "test" ? readPartnaResponseOtp(otpDispatchResult) : null,
       },
     },
   };
@@ -575,7 +580,11 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
 function readPartnaWebhookEventKey(payload: PartnaWebhookPayload, environment: RuntimeMode) {
   const event = readString(payload.event) ?? "unknown";
   const data = asRecord(payload.data) ?? {};
-  const id = readString(data.id) ?? readString(data.reference) ?? "none";
+  const id =
+    readString(data.rampReference) ??
+    readString(data.reference) ??
+    readString(data.id) ??
+    "none";
   const status = readString(data.status) ?? "none";
   return `partna:${environment}:${event}:${id}:${status}`;
 }
@@ -586,14 +595,13 @@ function normalizePartnaWebhookState(payload: PartnaWebhookPayload) {
   return status ? `${event}:${status}` : event;
 }
 
-function extractPartnaVoucherCode(payload: PartnaWebhookPayload) {
+function extractPartnaRampReference(payload: PartnaWebhookPayload) {
   const data = asRecord(payload.data);
-  return readString(data?.voucherCode) ?? readString(data?.vouchercode);
-}
-
-function extractPartnaVoucherId(payload: PartnaWebhookPayload) {
-  const data = asRecord(payload.data);
-  return readString(data?.id) ?? readString(data?.reference);
+  return (
+    readString(data?.rampReference) ??
+    readString(data?.reference) ??
+    readString(data?.id)
+  );
 }
 
 async function applyPartnaFeeState(input: {
@@ -614,30 +622,27 @@ async function applyPartnaFeeState(input: {
       }
     | null;
   payloadData?: Record<string, unknown> | null;
-  redeemResult?: Record<string, unknown> | null;
 }) {
   const feeAmountUsdc = derivePartnaFeeAmountUsdc({
     fxRate: input.payment.collection.fxRate ?? 0,
     payloadData: input.payloadData ?? null,
-    redeemResult: input.redeemResult ?? null,
   });
-  const voucherFeeLocal =
-    readNumber(input.redeemResult?.voucherFee) ??
+  const rampFeeLocal =
+    readNumber(input.payloadData?.totalFeesInFromCurrency) ??
+    readNumber(input.payloadData?.feeInFromCurrency) ??
     readNumber(input.payloadData?.fee) ??
     null;
-  const voucherWavedFeeLocal = readNumber(input.payloadData?.wavedFee);
-  const feeBearer =
-    readPartnaFeeBearer(input.redeemResult?.feeBearer) ??
-    readPartnaFeeBearer(input.payloadData?.feeBearer) ??
-    null;
+  const rampWaivedFeeLocal = readNumber(input.payloadData?.wavedFee);
+  const feeBearer = readPartnaFeeBearer(input.payloadData?.feeBearer);
   const metadata = asRecord(input.payment.metadata) ?? {};
+  const existingRamp = asRecord(metadata.partnaRamp) ?? {};
 
   input.payment.metadata = {
     ...metadata,
-    ...(voucherFeeLocal !== null ? { voucherFeeLocal } : {}),
-    ...(voucherWavedFeeLocal !== null ? { voucherWavedFeeLocal } : {}),
+    ...(rampFeeLocal !== null ? { rampFeeLocal } : {}),
+    ...(rampWaivedFeeLocal !== null ? { rampWaivedFeeLocal } : {}),
     ...(feeBearer ? { feeBearer } : {}),
-    ...(input.redeemResult ? { redeemResult: input.redeemResult } : {}),
+    ...(input.payloadData ? { partnaRamp: { ...existingRamp, ...input.payloadData } } : {}),
   };
 
   if (feeAmountUsdc !== null) {
@@ -719,14 +724,10 @@ async function createPayoutForPartnaPayment(
   });
 }
 
-function eventIsVoucherSuccess(payload: PartnaWebhookPayload) {
-  const event = readString(payload.event)?.toLowerCase() ?? "";
+function eventIsRampSuccess(payload: PartnaWebhookPayload) {
   const status = readString(asRecord(payload.data)?.status)?.toLowerCase() ?? "";
 
-  return (
-    event === "voucher.updated" &&
-    (status === "success" || status === "paid" || status === "complete")
-  );
+  return ["completed", "complete", "success", "paid"].includes(status);
 }
 
 export function verifyPartnaWebhookSignature(input: {
@@ -779,11 +780,13 @@ export async function processPartnaWebhook(
       idempotent: true,
       matched: Boolean(existingEvent.result),
       state,
-      externalPaymentId: extractPartnaVoucherId(payload),
+      externalPaymentId: extractPartnaRampReference(payload),
     };
   }
 
   let webhookEvent = existingEvent;
+  const rampReference = extractPartnaRampReference(payload);
+  const payloadData = asRecord(payload.data) ?? null;
 
   if (!webhookEvent) {
     webhookEvent = await OnrampEventModel.create({
@@ -791,19 +794,17 @@ export async function processPartnaWebhook(
       environment,
       eventKey,
       state,
-      externalId: extractPartnaVoucherId(payload),
-      sequenceId: extractPartnaVoucherId(payload),
+      externalId: rampReference,
+      sequenceId: rampReference,
       payload,
     });
   }
 
-  const voucherId = extractPartnaVoucherId(payload);
-
-  if (!voucherId) {
+  if (!rampReference) {
     webhookEvent.result = {
       processed: false,
       matched: false,
-      reason: "missing_voucher_id",
+      reason: "missing_ramp_reference",
       state,
     };
     webhookEvent.processedAt = new Date();
@@ -813,7 +814,7 @@ export async function processPartnaWebhook(
   }
 
   const payment = await PaymentModel.findOne({
-    "collection.externalId": voucherId,
+    "collection.externalId": rampReference,
     "collection.provider": "partna",
     ...createRuntimeModeCondition("environment", environment),
   }).exec();
@@ -823,7 +824,7 @@ export async function processPartnaWebhook(
       processed: false,
       matched: false,
       state,
-      externalPaymentId: voucherId,
+      externalPaymentId: rampReference,
     };
     webhookEvent.processedAt = new Date();
     await webhookEvent.save();
@@ -839,39 +840,26 @@ export async function processPartnaWebhook(
     .exec();
 
   const previousPaymentStatus = payment.status;
-  const voucherCode =
-    extractPartnaVoucherCode(payload) ??
-    readString(asRecord(payment.metadata)?.voucherCode);
-  const payloadData = asRecord(payload.data) ?? null;
 
-  if (eventIsVoucherSuccess(payload)) {
-    if (!voucherCode) {
-      throw new HttpError(
-        409,
-        "Partna voucher code is required before onramp can be executed."
-      );
-    }
-
-    const provider = getPartnaProvider(environment);
-    const collectionWallet = getSolanaCollectionWallet(environment);
-    const redeemResult = await provider.redeemVoucherAndWithdraw({
-      email:
-        readString(payloadData?.email) ??
-        readString(asRecord(payment.metadata)?.email) ??
-        readString(asRecord(payment.metadata)?.payerEmail) ??
-        "",
-      voucherCode,
-      currency: "USDC",
-      network: "solana",
-      cryptoAddress: collectionWallet,
-    });
+  if (eventIsRampSuccess(payload)) {
+    const rampToAmount = readNumber(payloadData?.toAmount);
+    const rampFromAmount = readNumber(payloadData?.fromAmount);
+    const rampRate = readNumber(payloadData?.currentRate);
 
     payment.collection.status = "paid";
     payment.collection.paidAt = payment.collection.paidAt ?? new Date();
+    payment.collection.stableAmount = rampToAmount ?? payment.collection.stableAmount;
+    payment.collection.localAmount =
+      rampFromAmount ?? payment.collection.localAmount ?? payment.amount;
+    payment.collection.fxRate = rampRate ?? payment.collection.fxRate;
     payment.metadata = {
       ...(asRecord(payment.metadata) ?? {}),
-      voucherCode,
-      voucherId,
+      partnaRamp: {
+        ...(asRecord(asRecord(payment.metadata)?.partnaRamp) ?? {}),
+        ...(payloadData ?? {}),
+        rampReference,
+        status: readString(payloadData?.status) ?? null,
+      },
       email:
         readString(payloadData?.email) ??
         readString(asRecord(payment.metadata)?.email) ??
@@ -882,7 +870,6 @@ export async function processPartnaWebhook(
       payment,
       linkedSettlement,
       payloadData,
-      redeemResult: asRecord(redeemResult) ?? null,
     });
 
     if (!linkedSettlement) {
@@ -917,9 +904,13 @@ export async function processPartnaWebhook(
     payment.collection.status = "failed";
     payment.metadata = {
       ...(asRecord(payment.metadata) ?? {}),
-      voucherId,
-      voucherCode,
       failureCode: state,
+      partnaRamp: {
+        ...(asRecord(asRecord(payment.metadata)?.partnaRamp) ?? {}),
+        ...(payloadData ?? {}),
+        rampReference,
+        status: readString(payloadData?.status) ?? null,
+      },
     };
     await applyPartnaFeeState({
       payment,
@@ -943,8 +934,12 @@ export async function processPartnaWebhook(
     }
     payment.metadata = {
       ...(asRecord(payment.metadata) ?? {}),
-      voucherId,
-      voucherCode,
+      partnaRamp: {
+        ...(asRecord(asRecord(payment.metadata)?.partnaRamp) ?? {}),
+        ...(payloadData ?? {}),
+        rampReference,
+        status: readString(payloadData?.status) ?? null,
+      },
     };
     await applyPartnaFeeState({
       payment,
@@ -976,7 +971,7 @@ export async function processPartnaWebhook(
     processed: true,
     matched: true,
     state,
-    externalPaymentId: payment.collection.externalId ?? voucherId,
+    externalPaymentId: payment.collection.externalId ?? rampReference,
     paymentId: payment._id.toString(),
     paymentStatus: payment.status,
     payoutId: linkedSettlement?._id.toString() ?? null,

@@ -6,6 +6,7 @@ import type {
   PartnaAccountDetailsInput,
   PartnaAccountDetailsRecord,
   PartnaAccountKycDetails,
+  PartnaBank,
   PartnaBvnVerificationMethod,
   PartnaConfirmBvnOtpInput,
   PartnaConfirmPhoneInput,
@@ -13,14 +14,14 @@ import type {
   PartnaCreateBankAccountInput,
   PartnaHandleBvnOtpMethodInput,
   PartnaInitiateBvnKycInput,
+  PartnaListBanksInput,
   PartnaManagedBankAccount,
   PartnaProvider,
+  PartnaRampInput,
+  PartnaRampRecord,
   PartnaRateInput,
   PartnaRateQuote,
-  PartnaRedeemVoucherInput,
   PartnaSupportedAsset,
-  PartnaVoucherInput,
-  PartnaVoucherRecord,
 } from "@/features/onramps/providers/partna/partna.types";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "PUT";
@@ -163,29 +164,56 @@ function extractBvnVerificationMethods(payload: unknown) {
     .filter((entry) => entry.method.length > 0);
 }
 
-function extractVoucherRecord(record: Record<string, unknown>): PartnaVoucherRecord {
+function extractBanks(payload: unknown): PartnaBank[] {
+  const data = extractPayloadData(payload);
+  const records = Array.isArray(data) ? data : [];
+
+  return records
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => ({
+      code:
+        readString(entry.code) ??
+        readString(entry.bankCode) ??
+        readString(entry.value) ??
+        "",
+      name:
+        readString(entry.name) ??
+        readString(entry.bankName) ??
+        readString(entry.label) ??
+        "",
+      raw: entry,
+    }))
+    .filter((entry) => entry.code.length > 0 && entry.name.length > 0);
+}
+
+function extractRampRecord(record: Record<string, unknown>): PartnaRampRecord {
   return {
-    provider: "partna",
-    voucherId:
-      readString(record.id) ??
-      readString(record.voucherId) ??
+    rampReference:
+      readString(record.rampReference) ??
       readString(record.reference) ??
-      `partna-voucher-${Date.now()}`,
-    voucherCode: readString(record.voucherCode) ?? readString(record.code),
-    status: readString(record.status)?.toLowerCase() ?? "pending",
-    amount: readNumber(record.amount) ?? 0,
-    fee: readNumber(record.fee),
-    wavedFee: readNumber(record.wavedFee),
-    feeBearer: readString(record.feeBearer)?.toLowerCase() ?? null,
-    currency: readString(record.currency)?.toUpperCase() ?? "NGN",
-    email: readString(record.email) ?? "",
-    fullName:
-      readString(record.fullName) ??
-      readString(record.fullname) ??
-      readString(record.accountName) ??
-      "",
-    reference: readString(record.reference) ?? readString(record.id),
-    paymentUrl: readString(record.paymentUrl) ?? readString(record.payUrl),
+      readString(record.id) ??
+      `partna-ramp-${Date.now()}`,
+    status: readString(record.status)?.toLowerCase() ?? null,
+    accountName: readString(record.accountName) ?? readString(record.bankAccountName),
+    accountNumber:
+      readString(record.accountNumber) ?? readString(record.bankAccountNumber),
+    bankName: readString(record.bankName),
+    currentRate:
+      readNumber(record.currentRate) ??
+      readNumber(record.initialRate) ??
+      readNumber(record.processedRate),
+    expiryDate: readDate(record.expiryDate) ?? readDate(record.expiredAt),
+    feeInFromCurrency: readNumber(record.feeInFromCurrency),
+    feeInToCurrency: readNumber(record.feeInToCurrency),
+    fromAmount: readNumber(record.fromAmount),
+    fromCurrency: readString(record.fromCurrency)?.toUpperCase() ?? null,
+    fromNetwork: readString(record.fromNetwork)?.toLowerCase() ?? null,
+    toAmount: readNumber(record.toAmount),
+    toCurrency: readString(record.toCurrency)?.toUpperCase() ?? null,
+    toNetwork: readString(record.toNetwork)?.toLowerCase() ?? null,
+    totalFeesInFromCurrency: readNumber(record.totalFeesInFromCurrency),
+    totalFeesInToCurrency: readNumber(record.totalFeesInToCurrency),
     raw: record,
   };
 }
@@ -425,6 +453,29 @@ export class PartnaRemoteProvider implements PartnaProvider {
     return extractPayloadData(payload);
   }
 
+  async listBanks(input: PartnaListBanksInput = {}) {
+    const searchParams = new URLSearchParams();
+    const currency = input.currency?.trim().toUpperCase();
+
+    if (currency) {
+      searchParams.set("currency", currency);
+    }
+
+    if (typeof input.onlyValidators === "boolean") {
+      searchParams.set("onlyValidators", String(input.onlyValidators));
+    }
+
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/banks",
+      "GET",
+      undefined,
+      searchParams
+    );
+
+    return extractBanks(payload);
+  }
+
   async initiateBvnKyc(input: PartnaInitiateBvnKycInput) {
     const payload = await this.requestJson(
       this.config.v4BaseUrl,
@@ -449,6 +500,7 @@ export class PartnaRemoteProvider implements PartnaProvider {
       {
         accountName: input.accountName,
         verificationMethod: input.verificationMethod,
+        currency: input.currency?.trim().toUpperCase() || undefined,
         accountNumber: input.accountNumber ?? undefined,
         bankCode: input.bankCode ?? undefined,
       }
@@ -500,28 +552,6 @@ export class PartnaRemoteProvider implements PartnaProvider {
     );
 
     return extractManagedBankAccountPayload(payload);
-  }
-
-  async listStaticBankAccounts(email: string) {
-    const payload = await this.requestJson(
-      this.config.vouchersBaseUrl,
-      "/get-accounts",
-      "GET",
-      undefined,
-      new URLSearchParams({ email })
-    );
-
-    const data = extractPayloadData(payload);
-    const collection =
-      (Array.isArray(data.accounts) ? data.accounts : null) ??
-      (Array.isArray(data.data) ? data.data : null) ??
-      (Array.isArray(data) ? data : null) ??
-      [];
-
-    return collection
-      .map((entry) => asRecord(entry))
-      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-      .map(extractManagedBankAccount);
   }
 
   async listSupportedAssets() {
@@ -595,37 +625,27 @@ export class PartnaRemoteProvider implements PartnaProvider {
       .map(extractAccountDetailsRecord);
   }
 
-  async createVoucher(input: PartnaVoucherInput) {
+  async createRamp(input: PartnaRampInput) {
     const payload = await this.requestJson(
-      this.config.vouchersBaseUrl,
-      "/vouchers",
+      this.config.v4BaseUrl,
+      "/ramp",
       "POST",
       {
-        email: input.email,
-        fullname: input.fullName,
-        amount: input.amount,
-        currency: input.currency.trim().toUpperCase(),
-        merchant: input.merchant,
-      }
-    );
-
-    return extractVoucherRecord(extractPayloadData(payload));
-  }
-
-  async redeemVoucherAndWithdraw(input: PartnaRedeemVoucherInput) {
-    const payload = await this.requestJson(
-      this.config.vouchersBaseUrl,
-      "/voucher/redeem-and-withdraw",
-      "PATCH",
-      {
-        email: input.email,
-        voucherCode: input.voucherCode,
-        currency: input.currency,
-        network: input.network,
+        accountName: input.accountName,
+        cancelPendingRampRequest: input.cancelPendingRampRequest ?? true,
         cryptoAddress: input.cryptoAddress,
+        expireAction: input.expireAction ?? "useCurrentRate",
+        fromAmount: input.fromAmount,
+        fromCurrency: input.fromCurrency.trim().toUpperCase(),
+        fromNetwork: input.fromNetwork.trim(),
+        rampReference: input.rampReference ?? undefined,
+        rateKey: input.rateKey,
+        toCurrency: input.toCurrency,
+        toNetwork: input.toNetwork.trim(),
+        type: input.type,
       }
     );
 
-    return extractPayloadData(payload);
+    return extractRampRecord(extractPayloadData(payload));
   }
 }

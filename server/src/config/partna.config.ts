@@ -15,9 +15,6 @@ export function getPartnaConfig(mode: RuntimeMode = env.PAYMENT_ENV) {
     v4BaseUrl: (
       isLive ? env.PARTNA_V4_BASE_URL_LIVE : env.PARTNA_V4_BASE_URL_TEST
     ).trim(),
-    vouchersBaseUrl: (
-      isLive ? env.PARTNA_VOUCHERS_BASE_URL_LIVE : env.PARTNA_VOUCHERS_BASE_URL_TEST
-    ).trim(),
     timeoutMs: env.PARTNA_TIMEOUT_MS,
     webhookPublicKey: normalizePem(
       isLive ? env.PARTNA_WEBHOOK_PUBLIC_KEY_LIVE : env.PARTNA_WEBHOOK_PUBLIC_KEY_TEST

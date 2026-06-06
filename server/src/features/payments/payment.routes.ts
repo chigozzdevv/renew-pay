@@ -6,9 +6,12 @@ import {
   confirmPublicCheckoutPhoneController,
   createCollectionController,
   createPaymentController,
+  createPublicPaymentIssueController,
+  createPublicPaymentIssueFileUploadController,
   getCollectionController,
   getPaymentController,
   getPublicPaymentController,
+  listPublicCheckoutBanksController,
   listCollectionsController,
   listPaymentsController,
   selectPublicCheckoutKycMethodController,
@@ -23,7 +26,13 @@ const paymentRouter = Router();
 const collectionRouter = Router();
 const publicPaymentRouter = Router();
 
+publicPaymentRouter.get("/:payId/banks", listPublicCheckoutBanksController);
 publicPaymentRouter.get("/:payId", getPublicPaymentController);
+publicPaymentRouter.post(
+  "/:payId/issues/files/signature",
+  createPublicPaymentIssueFileUploadController
+);
+publicPaymentRouter.post("/:payId/issues", createPublicPaymentIssueController);
 publicPaymentRouter.post("/:payId/customer", submitPublicCheckoutCustomerController);
 publicPaymentRouter.post("/:payId/kyc/bvn", startPublicCheckoutKycController);
 publicPaymentRouter.post("/:payId/kyc/method", selectPublicCheckoutKycMethodController);

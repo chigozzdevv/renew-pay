@@ -41,6 +41,12 @@ const recurringSchema = z
     }
   });
 
+const orderItemSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  quantity: z.coerce.number().int().min(1).max(999).default(1),
+  amount: z.coerce.number().nonnegative(),
+});
+
 const paymentStatusSchema = z.enum([
   "open",
   "pending",
@@ -67,6 +73,7 @@ export const createPaymentSchema = z.object({
   amount: z.coerce.number().positive(),
   currency: currencySchema,
   description: z.string().trim().min(2).max(240),
+  items: z.array(orderItemSchema).max(50).optional(),
   recurring: recurringSchema,
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
@@ -78,6 +85,7 @@ export const createCollectionSchema = z.object({
   currency: currencySchema,
   reference: z.string().trim().min(2).max(160),
   description: z.string().trim().min(2).max(240).optional(),
+  items: z.array(orderItemSchema).max(50).optional(),
   recurring: recurringSchema,
   settlement: z.string().trim().min(1).max(160).optional(),
   customer: z
@@ -124,6 +132,7 @@ export const updatePaymentSchema = z.object({
   amount: z.coerce.number().positive().optional(),
   currency: currencySchema.optional(),
   description: z.string().trim().min(2).max(240).optional(),
+  items: z.array(orderItemSchema).max(50).optional(),
   status: paymentStatusSchema.optional(),
   recurring: recurringSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -179,8 +188,35 @@ export const confirmPublicCheckoutOtpSchema = z.object({
   otp: z.string().trim().min(3).max(12),
 });
 
+export const publicPaymentIssueTypeSchema = z.enum([
+  "paid_not_confirmed",
+  "wrong_amount",
+  "duplicate_payment",
+  "refund_request",
+  "other",
+]);
+
+export const publicPaymentIssueFileSchema = z.object({
+  url: z.url().trim().max(1000),
+  name: z.string().trim().min(1).max(180),
+  type: z.string().trim().max(120).nullable().optional(),
+  size: z.coerce.number().int().min(0).max(10 * 1024 * 1024).nullable().optional(),
+  publicId: z.string().trim().max(240).nullable().optional(),
+});
+
+export const createPublicPaymentIssueSchema = z.object({
+  issueType: publicPaymentIssueTypeSchema,
+  details: z.string().trim().min(8).max(2000),
+  reporterEmail: z.email().trim().toLowerCase().optional(),
+  reporterName: z.string().trim().min(2).max(120).optional(),
+  files: z.array(publicPaymentIssueFileSchema).max(4).optional(),
+});
+
 export type ConfirmPublicCheckoutOtpInput = z.infer<typeof confirmPublicCheckoutOtpSchema>;
 export type ConfirmPublicCheckoutPhoneInput = z.infer<typeof confirmPublicCheckoutPhoneSchema>;
+export type CreatePublicPaymentIssueInput = z.infer<
+  typeof createPublicPaymentIssueSchema
+>;
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
 export type CreateCollectionInput = z.infer<typeof createCollectionSchema>;
 export type ListCollectionsQuery = z.infer<typeof listCollectionsQuerySchema>;

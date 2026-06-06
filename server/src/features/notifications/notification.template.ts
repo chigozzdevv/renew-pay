@@ -104,7 +104,7 @@ export type NotificationTemplateBranding = {
   merchantName: string;
   supportEmail: string;
   brandAccent: string;
-  emailLogoUrl?: string | null;
+  renewLogoUrl: string;
 };
 
 export type NotificationTemplatePayload = Record<string, unknown>;
@@ -170,11 +170,11 @@ function buildTemplateDocument(input: {
       return {
         subject: `Your payment to ${merchantName} was successful`,
         eyebrow: "Payment successful",
-        heading: "Payment received.",
+        heading: "",
         body: [
           `${amountLabel} was paid to ${merchantName} for ${referenceLabel}.`,
           `Payment reference: ${paymentReference}.`,
-          `If something looks wrong, report it before settlement is released on ${releaseAtLabel}.`,
+          "If something looks wrong, report it and we will review the payment.",
         ],
         cta: {
           label: "Report an issue",
@@ -185,11 +185,11 @@ function buildTemplateDocument(input: {
       return {
         subject: "We received your payment report",
         eyebrow: "Issue reported",
-        heading: "We are reviewing your report.",
+        heading: "",
         body: [
           `We received your report for ${referenceLabel}.`,
-          "Settlement for this payment is held while Renew reviews the issue.",
-          "We will email you when there is an update.",
+          "Renew will review the payment details.",
+          "We will email you with an update.",
         ],
         cta: {
           label: "View payment",
@@ -200,7 +200,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `Payment received for ${referenceLabel}`,
         eyebrow: "Payment received",
-        heading: "Payment received.",
+        heading: "",
         body: [
           `${amountLabel} was collected for ${referenceLabel}.`,
           `Settlement is scheduled for ${releaseAtLabel}.`,
@@ -214,7 +214,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} payment failed`,
         eyebrow: "Payment failed",
-        heading: "Payment could not be completed.",
+        heading: "",
         body: [
           `${amountLabel} could not be collected for ${referenceLabel}.`,
           "Open collections to review the latest status.",
@@ -228,7 +228,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `Settlement scheduled for ${referenceLabel}`,
         eyebrow: "Settlement scheduled",
-        heading: "Settlement scheduled.",
+        heading: "",
         body: [
           `${settlementAmountLabel} is scheduled for release on ${releaseAtLabel}.`,
           ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
@@ -242,7 +242,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `Settlement held for ${referenceLabel}`,
         eyebrow: "Settlement held",
-        heading: "Settlement is held for review.",
+        heading: "",
         body: [
           `Settlement for ${referenceLabel} is held because a payment issue was reported before release.`,
           "Renew will review the report and update the payout status.",
@@ -256,7 +256,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `Stellar settlement released for ${referenceLabel}`,
         eyebrow: "Settlement released",
-        heading: "Settlement released.",
+        heading: "",
         body: [
           `${settlementAmountLabel} was released to your Stellar wallet.`,
           ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
@@ -270,7 +270,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `Settlement failed for ${referenceLabel}`,
         eyebrow: "Settlement failed",
-        heading: "Settlement could not be completed.",
+        heading: "",
         body: [
           `${settlementAmountLabel} could not settle for ${referenceLabel}.`,
           "Open payouts to review the latest status.",
@@ -284,7 +284,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} owner verification needs action`,
         eyebrow: "Verification update",
-        heading: "Owner verification needs attention.",
+        heading: "",
         body: [
           `Status received: ${statusLabel}.`,
           "Open onboarding to review the latest verification state.",
@@ -298,7 +298,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} owner verification approved`,
         eyebrow: "Verification approved",
-        heading: "Owner verification is approved.",
+        heading: "",
         body: [
           "The account owner has passed verification.",
           "You can continue with the next onboarding step.",
@@ -312,7 +312,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} owner verification rejected`,
         eyebrow: "Verification rejected",
-        heading: "Owner verification was rejected.",
+        heading: "",
         body: [
           `Status received: ${statusLabel}.`,
           "Review the provider response and prepare a corrected submission.",
@@ -326,7 +326,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} business verification needs action`,
         eyebrow: "Business verification",
-        heading: "Business verification needs attention.",
+        heading: "",
         body: [
           `Status received: ${statusLabel}.`,
           "Open onboarding to review the latest verification state.",
@@ -340,7 +340,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} business verification approved`,
         eyebrow: "Business verified",
-        heading: "Business verification is approved.",
+        heading: "",
         body: [
           "The merchant business profile has passed verification.",
           "Live payment operations can continue where enabled.",
@@ -354,7 +354,7 @@ function buildTemplateDocument(input: {
       return {
         subject: `${merchantName} business verification rejected`,
         eyebrow: "Business verification",
-        heading: "Business verification was rejected.",
+        heading: "",
         body: [
           `Status received: ${statusLabel}.`,
           "Review the provider response and prepare a corrected submission.",
@@ -374,8 +374,7 @@ function renderText(document: NotificationTemplateDocument) {
   return [
     document.subject,
     "",
-    document.heading,
-    "",
+    ...(document.heading.trim() ? [document.heading, ""] : []),
     ...document.body,
     ...(document.cta ? ["", `${document.cta.label}: ${document.cta.url}`] : []),
   ].join("\n");
@@ -385,28 +384,41 @@ function renderHtml(input: {
   branding: NotificationTemplateBranding;
   document: NotificationTemplateDocument;
 }) {
-  const accent = escapeHtml(input.branding.brandAccent || "#335c46");
+  const ctaColor = "#272b25";
+  const renewLogoUrl = input.branding.renewLogoUrl;
+  const brandHeader = `<img src="${escapeHtml(renewLogoUrl)}" alt="Renew" width="92" style="display:block;height:auto;border:0;margin:0 auto;" />`;
+  const heading = input.document.heading.trim()
+    ? `<h1 style="margin:12px 0 18px;font-size:26px;line-height:1.18;color:#111827;">${escapeHtml(input.document.heading)}</h1>`
+    : "";
   const body = input.document.body
-    .map((line) => `<p style="margin:0 0 14px;color:#334238;line-height:1.6;">${escapeHtml(line)}</p>`)
+    .map((line) => `<p style="margin:0 0 14px;color:#374151;line-height:1.6;">${escapeHtml(line)}</p>`)
     .join("");
   const cta = input.document.cta
-    ? `<a href="${escapeHtml(input.document.cta.url)}" style="display:inline-block;border-radius:12px;background:${accent};color:#fff;text-decoration:none;padding:12px 16px;font-weight:700;">${escapeHtml(input.document.cta.label)}</a>`
+    ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto 0;"><tr><td align="center" bgcolor="${ctaColor}" style="border-radius:10px;"><a href="${escapeHtml(input.document.cta.url)}" style="display:inline-block;border-radius:10px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:13px 18px;">${escapeHtml(input.document.cta.label)}</a></td></tr></table>`
     : "";
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;background:#eef3ed;font-family:Inter,Arial,sans-serif;">
-    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef3ed;padding:32px 16px;">
+  <body style="margin:0;background:#f9fafb;font-family:Inter,Arial,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f9fafb;padding:40px 20px;">
       <tr>
         <td align="center">
-          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;background:#fff;border-radius:20px;padding:32px;border:1px solid #dde7dd;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:0;overflow:hidden;">
             <tr>
-              <td>
-                <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${accent};font-weight:800;">${escapeHtml(input.document.eyebrow)}</div>
-                <h1 style="margin:12px 0 16px;font-size:28px;line-height:1.15;color:#132018;">${escapeHtml(input.document.heading)}</h1>
+              <td align="center" style="padding:36px 40px 22px;">
+                ${brandHeader}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 40px 40px;">
+                ${heading}
                 ${body}
                 ${cta}
-                <p style="margin:28px 0 0;color:#6d7a70;font-size:13px;">${escapeHtml(input.branding.merchantName)}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f3f4f6;padding:26px 40px;text-align:center;">
+                <p style="margin:0;color:#6b7280;font-size:14px;font-weight:500;">Questions? Reply to this email.</p>
               </td>
             </tr>
           </table>

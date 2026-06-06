@@ -51,24 +51,6 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
 function openModal(url: string) {
   removeCheckout();
   activeCheckoutOrigin = new URL(url, window.location.href).origin;
-  messageListener = (event: MessageEvent) => {
-    if (activeCheckoutOrigin && event.origin !== activeCheckoutOrigin) {
-      return;
-    }
-
-    const data =
-      typeof event.data === "object" && event.data !== null
-        ? (event.data as { source?: unknown; type?: unknown })
-        : null;
-
-    if (
-      data?.source === checkoutMessageSource &&
-      (data.type === "success" || data.type === "close")
-    ) {
-      removeCheckout();
-    }
-  };
-  window.addEventListener("message", messageListener);
 
   const overlay = createElement("div", {
     position: "fixed",
@@ -86,9 +68,45 @@ function openModal(url: string) {
 
   const wrapper = createElement("div", {
     position: "relative",
-    width: "min(480px, 100%)",
-    height: "min(720px, 100%)",
+    width: "min(420px, 100%)",
+    height: "min(560px, calc(100vh - 40px))",
+    transition: "height 180ms ease",
   });
+
+  const resizeWrapper = (height: unknown) => {
+    if (typeof height !== "number" || !Number.isFinite(height)) {
+      return;
+    }
+
+    const maxHeight = Math.max(320, window.innerHeight - 40);
+    const nextHeight = Math.min(Math.max(Math.ceil(height), 320), maxHeight);
+    wrapper.style.height = `${nextHeight}px`;
+  };
+
+  messageListener = (event: MessageEvent) => {
+    if (activeCheckoutOrigin && event.origin !== activeCheckoutOrigin) {
+      return;
+    }
+
+    const data =
+      typeof event.data === "object" && event.data !== null
+        ? (event.data as { source?: unknown; type?: unknown; height?: unknown })
+        : null;
+
+    if (data?.source !== checkoutMessageSource) {
+      return;
+    }
+
+    if (data.type === "resize") {
+      resizeWrapper(data.height);
+      return;
+    }
+
+    if (data.type === "success" || data.type === "close") {
+      removeCheckout();
+    }
+  };
+  window.addEventListener("message", messageListener);
 
   const shell = createElement("div", {
     width: "100%",

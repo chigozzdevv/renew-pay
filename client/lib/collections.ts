@@ -9,6 +9,11 @@ export type CollectionRecord = {
   amount: number;
   currency: string;
   description: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    amount: number;
+  }>;
   status: "created" | "collecting" | "paid" | "failed" | "cancelled";
   checkoutUrl: string;
   recurring: {
@@ -89,6 +94,11 @@ export async function createCollection(input: {
   amount: number;
   currency: string;
   description?: string;
+  items?: Array<{
+    name: string;
+    quantity?: number;
+    amount: number;
+  }>;
   recurring: {
     enabled: boolean;
     interval?: "day" | "week" | "month" | "year" | null;
@@ -108,6 +118,7 @@ export async function createCollection(input: {
       amount: input.amount,
       currency: input.currency,
       description: input.description?.trim() || undefined,
+      items: input.items,
       recurring: input.recurring,
     }),
   });

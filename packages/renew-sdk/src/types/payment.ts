@@ -32,6 +32,12 @@ export type RenewPaymentCollection = {
   readonly paidAt: string | Date | null;
 };
 
+export type RenewOrderItem = {
+  readonly name: string;
+  readonly quantity?: number;
+  readonly amount: number;
+};
+
 export type RenewPaymentRecord = {
   readonly id: string;
   readonly merchantId: string;
@@ -78,6 +84,7 @@ export type RenewCollectionRecord = {
   readonly amount: number;
   readonly currency: string;
   readonly description: string;
+  readonly items: readonly Required<RenewOrderItem>[];
   readonly status: RenewCollectionStatus;
   readonly checkoutUrl: string;
   readonly recurring: RenewPaymentRecurring;
@@ -99,6 +106,7 @@ export type RenewPublicPaymentRecord = {
   readonly amount: number;
   readonly currency: string;
   readonly description: string | null;
+  readonly items: readonly Required<RenewOrderItem>[];
   readonly status: RenewPaymentStatus;
   readonly paymentUrl: string;
   readonly merchant: {
@@ -128,6 +136,10 @@ export type RenewPublicPaymentRecord = {
       readonly phoneConfirmationRequired: boolean;
       readonly message: string | null;
       readonly bvnLast4: string | null;
+      readonly sandbox: {
+        readonly phone: string | null;
+        readonly otp: string | null;
+      };
     };
     readonly returnPage: string | null;
     readonly bankTransfer: {
@@ -155,6 +167,7 @@ export type CreateRenewPaymentInput = {
   readonly amount: number;
   readonly currency: string;
   readonly description: string;
+  readonly items?: readonly RenewOrderItem[];
   readonly recurring?: {
     readonly enabled?: boolean;
     readonly interval?: RenewRecurringInterval | null;
@@ -170,6 +183,7 @@ export type CreateRenewCollectionInput = {
   readonly currency: string;
   readonly reference: string;
   readonly description?: string;
+  readonly items?: readonly RenewOrderItem[];
   readonly recurring?: {
     readonly enabled?: boolean;
     readonly interval?: RenewRecurringInterval | null;

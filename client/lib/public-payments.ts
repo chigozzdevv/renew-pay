@@ -1,12 +1,17 @@
 "use client";
 
-import { fetchApi } from "@/lib/api";
+import { ApiError, fetchApi } from "@/lib/api";
 
 export type PublicPayment = {
   payId: string;
   amount: number;
   currency: string;
   description: string | null;
+  items: Array<{
+    name: string;
+    quantity: number;
+    amount: number;
+  }>;
   status: "open" | "pending" | "paid" | "settling" | "settled" | "failed" | "cancelled";
   paymentUrl: string;
   merchant: {
@@ -47,6 +52,10 @@ export type PublicPayment = {
       phoneConfirmationRequired: boolean;
       message: string | null;
       bvnLast4: string | null;
+      sandbox: {
+        phone: string | null;
+        otp: string | null;
+      };
     };
     returnPage: string | null;
     bankTransfer: {
@@ -68,8 +77,132 @@ export type PublicPayment = {
   };
 };
 
+export type PublicCheckoutBank = {
+  code: string;
+  name: string;
+};
+
+export type PublicPaymentIssueFile = {
+  url: string;
+  name: string;
+  type: string | null;
+  size: number | null;
+  publicId: string | null;
+};
+
+export type PublicPaymentIssue = {
+  id: string;
+  payId: string;
+  paymentId: string;
+  payoutId: string | null;
+  issueType: string;
+  details: string;
+  reporterEmail: string | null;
+  reporterName: string | null;
+  files: PublicPaymentIssueFile[];
+  status: string;
+  heldAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PaymentIssueUploadSignature = {
+  cloudName: string;
+  apiKey: string;
+  uploadUrl: string;
+  folder: string;
+  timestamp: number;
+  signature: string;
+};
+
+type CloudinaryUploadResponse = {
+  secure_url?: string;
+  public_id?: string;
+  resource_type?: string;
+  bytes?: number;
+  error?: {
+    message?: string;
+  };
+};
+
 export async function loadPublicPayment(payId: string) {
   const response = await fetchApi<PublicPayment>(`/pay/${payId}`);
+
+  return response.data;
+}
+
+export async function loadPublicPaymentBanks(payId: string) {
+  const response = await fetchApi<PublicCheckoutBank[]>(`/pay/${payId}/banks`);
+
+  return response.data;
+}
+
+export async function createPaymentIssueUploadSignature(payId: string) {
+  const response = await fetchApi<PaymentIssueUploadSignature>(
+    `/pay/${payId}/issues/files/signature`,
+    {
+      method: "POST",
+    }
+  );
+
+  return response.data;
+}
+
+export async function uploadPaymentIssueFile(input: {
+  payId: string;
+  file: File;
+}) {
+  const signature = await createPaymentIssueUploadSignature(input.payId);
+  const formData = new FormData();
+
+  formData.append("file", input.file);
+  formData.append("api_key", signature.apiKey);
+  formData.append("folder", signature.folder);
+  formData.append("signature", signature.signature);
+  formData.append("timestamp", String(signature.timestamp));
+
+  const response = await fetch(signature.uploadUrl, {
+    method: "POST",
+    body: formData,
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | CloudinaryUploadResponse
+    | null;
+
+  if (!response.ok || !payload?.secure_url) {
+    throw new ApiError(
+      response.status || 500,
+      payload?.error?.message ?? "File upload failed."
+    );
+  }
+
+  return {
+    url: payload.secure_url,
+    name: input.file.name,
+    type: input.file.type || payload.resource_type || null,
+    size: input.file.size || payload.bytes || null,
+    publicId: payload.public_id ?? null,
+  } satisfies PublicPaymentIssueFile;
+}
+
+export async function submitPaymentIssue(input: {
+  payId: string;
+  issueType: string;
+  details: string;
+  reporterEmail?: string | null;
+  reporterName?: string | null;
+  files?: PublicPaymentIssueFile[];
+}) {
+  const response = await fetchApi<PublicPaymentIssue>(`/pay/${input.payId}/issues`, {
+    method: "POST",
+    body: JSON.stringify({
+      issueType: input.issueType,
+      details: input.details,
+      reporterEmail: input.reporterEmail || undefined,
+      reporterName: input.reporterName || undefined,
+      files: input.files ?? [],
+    }),
+  });
 
   return response.data;
 }
