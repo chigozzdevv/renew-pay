@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, Pencil, Plus } from "lucide-react";
+import { Ban, Check, Copy, Pencil, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -157,6 +157,7 @@ export default function DevelopersPage() {
   const [testEventType, setTestEventType] =
     useState<SupportedWebhookEvent>("collection.paid");
   const [secretReveal, setSecretReveal] = useState<SecretReveal | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
 
   const keyPageSize = 12;
   const webhookPageSize = 12;
@@ -202,6 +203,20 @@ export default function DevelopersPage() {
 
     return () => window.clearTimeout(timeout);
   }, [errorMessage, message]);
+
+  useEffect(() => {
+    setSecretCopied(false);
+  }, [secretReveal?.value]);
+
+  useEffect(() => {
+    if (!secretCopied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setSecretCopied(false), 1600);
+
+    return () => window.clearTimeout(timeout);
+  }, [secretCopied]);
 
   useEffect(() => {
     setKeyPage(1);
@@ -393,6 +408,7 @@ export default function DevelopersPage() {
   async function handleCopySecret(value: string) {
     try {
       await navigator.clipboard.writeText(value);
+      setSecretCopied(true);
       setMessage("Copied.");
     } catch {
       setErrorMessage("Could not copy the value.");
@@ -906,7 +922,25 @@ export default function DevelopersPage() {
         footer={
           <div className="flex items-center justify-end gap-3">
             {secretReveal ? (
-              <Button onClick={() => void handleCopySecret(secretReveal.value)}>Copy</Button>
+              <Button
+                type="button"
+                aria-label={secretCopied ? "Copied" : "Copy secret"}
+                title={secretCopied ? "Copied" : "Copy secret"}
+                className="h-10 w-10 p-0"
+                onClick={() => void handleCopySecret(secretReveal.value)}
+              >
+                <span
+                  className={`inline-flex transition-transform duration-150 ${
+                    secretCopied ? "scale-110" : "scale-100"
+                  }`}
+                >
+                  {secretCopied ? (
+                    <Check className="h-4 w-4 text-[#225c39]" strokeWidth={2.3} />
+                  ) : (
+                    <Copy className="h-4 w-4" strokeWidth={2.2} />
+                  )}
+                </span>
+              </Button>
             ) : null}
             <Button tone="brand" onClick={() => setSecretReveal(null)}>
               Done

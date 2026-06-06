@@ -23,6 +23,10 @@ import {
   updateWorkspaceSettings,
   type WorkspaceSettings,
 } from "@/lib/settings";
+import {
+  connectStellarWallet,
+  enableStellarUsdcTrustline,
+} from "@/lib/stellar-wallet";
 import { cn } from "@/lib/utils";
 
 type SettingsTabKey =
@@ -222,7 +226,7 @@ export default function SettingsPage() {
         environment: mode,
         payload: { business: businessDraft },
       });
-      setActionMessage("Workspace settings saved.");
+      setActionMessage("Saved.");
     });
   }
 
@@ -243,7 +247,7 @@ export default function SettingsPage() {
           },
         },
       });
-      setActionMessage("Notification settings saved.");
+      setActionMessage("Saved.");
     });
   }
 
@@ -264,7 +268,7 @@ export default function SettingsPage() {
           checkout: checkoutDraft,
         },
       });
-      setActionMessage("Checkout settings saved.");
+      setActionMessage("Saved.");
     });
   }
 
@@ -281,8 +285,43 @@ export default function SettingsPage() {
         primaryWallet: walletDraft.primaryWallet.trim(),
         walletAlerts: walletDraft.walletAlerts,
       });
-      setActionMessage("Wallet settings saved.");
+      setActionMessage("Saved.");
     });
+  }
+
+  async function handleWalletConnect() {
+    setBusyAction("wallet-connect");
+    setActionMessage(null);
+    setActionError(null);
+
+    try {
+      const address = await connectStellarWallet(mode);
+
+      setWalletDraft((current) => ({
+        ...current,
+        primaryWallet: address,
+      }));
+      setActionMessage("Wallet connected.");
+    } catch (error) {
+      setActionError(toErrorMessage(error));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleWalletEnableUsdc() {
+    setBusyAction("wallet-enable");
+    setActionMessage(null);
+    setActionError(null);
+
+    try {
+      await enableStellarUsdcTrustline(mode, walletDraft.primaryWallet);
+      setActionMessage("USDC enabled.");
+    } catch (error) {
+      setActionError(toErrorMessage(error));
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   if (isLoading) {
@@ -377,7 +416,7 @@ export default function SettingsPage() {
               disabled={busyAction === "workspace-save"}
               onClick={() => void handleWorkspaceSave()}
             >
-              Save changes
+              Save
             </Button>
           </div>
         </Card>
@@ -386,18 +425,46 @@ export default function SettingsPage() {
       {activeTab === "wallets" ? (
         <Card>
           <div className="space-y-4 max-w-xl">
-            <SettingsField label="Stellar payout wallet">
-              <Input
-                value={walletDraft.primaryWallet}
-                placeholder="Stellar wallet address"
-                onChange={(event) =>
-                  setWalletDraft((current) => ({
-                    ...current,
-                    primaryWallet: event.target.value,
-                  }))
-                }
-              />
+            <SettingsField label="Settlement wallet">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <Input
+                  className="min-w-0"
+                  value={walletDraft.primaryWallet}
+                  placeholder="Stellar wallet address"
+                  onChange={(event) =>
+                    setWalletDraft((current) => ({
+                      ...current,
+                      primaryWallet: event.target.value,
+                    }))
+                  }
+                />
+                <Button
+                  type="button"
+                  className="whitespace-nowrap"
+                  disabled={
+                    busyAction === "wallet-connect" ||
+                    busyAction === "wallet-enable" ||
+                    busyAction === "wallet-save"
+                  }
+                  onClick={() => void handleWalletConnect()}
+                >
+                  {busyAction === "wallet-connect" ? "Connecting..." : "Connect wallet"}
+                </Button>
+              </div>
             </SettingsField>
+            <Button
+              type="button"
+              className="w-full"
+              disabled={
+                !walletDraft.primaryWallet.trim() ||
+                busyAction === "wallet-connect" ||
+                busyAction === "wallet-enable" ||
+                busyAction === "wallet-save"
+              }
+              onClick={() => void handleWalletEnableUsdc()}
+            >
+              {busyAction === "wallet-enable" ? "Enabling..." : "Enable USDC"}
+            </Button>
 
             {data.wallets.primaryWallet ? (
               <div className="flex items-center gap-2">
@@ -414,10 +481,14 @@ export default function SettingsPage() {
             <Button
               type="button"
               tone="brand"
-              disabled={busyAction === "wallet-save"}
+              disabled={
+                busyAction === "wallet-connect" ||
+                busyAction === "wallet-enable" ||
+                busyAction === "wallet-save"
+              }
               onClick={() => void handleWalletSave()}
             >
-              Save settlement
+              {busyAction === "wallet-save" ? "Saving..." : "Save"}
             </Button>
           </div>
         </Card>
@@ -475,7 +546,7 @@ export default function SettingsPage() {
               disabled={busyAction === "checkout-save"}
               onClick={() => void handleCheckoutSave()}
             >
-              Save checkout
+              Save
             </Button>
           </div>
         </Card>

@@ -2,12 +2,14 @@ import { cn } from "@/lib/utils";
 
 type LogoProps = {
   inverted?: boolean;
-  size?: "default" | "compact";
+  size?: "default" | "compact" | "micro";
 };
 
 export function Logo({ inverted = false, size = "default" }: LogoProps) {
   const sizeClass =
-    size === "compact"
+    size === "micro"
+      ? "h-4 w-[3.8rem]"
+      : size === "compact"
       ? "h-6 w-[5.75rem] max-sm:h-5 max-sm:w-[4.75rem]"
       : "h-9 w-[8.5rem] max-sm:h-7 max-sm:w-[6.75rem]";
 

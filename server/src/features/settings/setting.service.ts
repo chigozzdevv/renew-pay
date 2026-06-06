@@ -5,6 +5,9 @@ import { normalizeStellarAddress } from "@/shared/constants/stellar";
 import { appendAuditLog } from "@/features/audit/audit.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
+import {
+  assertStellarUsdcTrustline,
+} from "@/features/settlement/providers/stellar/trustline.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import type { SettingDocument } from "@/features/settings/setting.model";
 import type {
@@ -150,6 +153,11 @@ export async function updateSettingsByMerchantId(
   if (input.wallets) {
     if (input.wallets.primaryWallet !== undefined) {
       const primaryWallet = normalizeStellarAddress(input.wallets.primaryWallet);
+      await assertStellarUsdcTrustline({
+        environment: input.environment,
+        address: primaryWallet ?? "",
+        ownerLabel: "Settlement wallet",
+      });
       setting.wallets.primaryWallet = primaryWallet;
       merchant.payoutWallet = primaryWallet;
     }
@@ -242,6 +250,11 @@ export async function saveWalletSettings(
 
   const { merchant, setting } = await getOrCreateSetting(merchantId);
   const primaryWallet = normalizeStellarAddress(input.primaryWallet);
+  await assertStellarUsdcTrustline({
+    environment: input.environment,
+    address: primaryWallet ?? "",
+    ownerLabel: "Settlement wallet",
+  });
 
   setting.wallets.primaryWallet = primaryWallet;
   merchant.payoutWallet = primaryWallet;

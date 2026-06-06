@@ -7,6 +7,9 @@ import {
 } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { assertSupportedCollectionMarkets } from "@/features/onramps/onramp.service";
+import {
+  assertStellarUsdcTrustline,
+} from "@/features/settlement/providers/stellar/trustline.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { SettingModel } from "@/features/settings/setting.model";
 import type {
@@ -103,7 +106,7 @@ async function resolveOnboardingState(input: {
     },
     {
       key: "payout",
-      label: "Payout",
+      label: "Settlement",
       status: payoutConfigured
         ? "complete"
         : currentStepKey === "payout"
@@ -332,8 +335,14 @@ export async function saveOnboardingPayout(input: {
   const payoutWallet = normalizeStellarAddress(input.payload.payoutWallet);
 
   if (!payoutWallet) {
-    throw new HttpError(400, "Payout wallet is invalid.");
+    throw new HttpError(400, "Settlement wallet is invalid.");
   }
+
+  await assertStellarUsdcTrustline({
+    environment: input.payload.environment,
+    address: payoutWallet,
+    ownerLabel: "Settlement wallet",
+  });
 
   merchant.payoutWallet = payoutWallet;
   setting.wallets.primaryWallet = payoutWallet;
@@ -342,11 +351,11 @@ export async function saveOnboardingPayout(input: {
   await appendAuditLog({
     merchantId: input.merchantId,
     actor: input.actor,
-    action: "Configured onboarding payout wallet",
+    action: "Configured onboarding settlement wallet",
     category: "workspace",
     status: "ok",
     target: input.payload.payoutWallet,
-    detail: "Payout wallet was configured during onboarding.",
+    detail: "Settlement wallet was configured during onboarding.",
     metadata: {
       payoutWallet,
     },
@@ -376,11 +385,20 @@ export async function registerOnboardingMerchant(input: {
     throw new HttpError(409, "Onboarding is still missing required steps.");
   }
 
-  const merchantPayoutWallet = state.merchant.payoutWallet;
+  const merchantPayoutWallet = normalizeStellarAddress(state.merchant.payoutWallet);
 
   if (!merchantPayoutWallet) {
-    throw new HttpError(409, "Configure a payout wallet before registering the workspace.");
+    throw new HttpError(
+      409,
+      "Configure a settlement wallet before registering the workspace."
+    );
   }
+
+  await assertStellarUsdcTrustline({
+    environment: input.payload.environment,
+    address: merchantPayoutWallet,
+    ownerLabel: "Settlement wallet",
+  });
 
   state.merchant.onboardingStatus = "workspace_active";
   await state.merchant.save();
