@@ -6,6 +6,9 @@ import {
   assertStellarVaultAccountConfig,
 } from "@/features/settlement/providers/stellar/vault.service";
 import {
+  assertStellarUsdcTrustline,
+} from "@/features/settlement/providers/stellar/trustline.service";
+import {
   SettlementAccountModel,
   type SettlementAccountRecord,
 } from "@/features/settlement/settlement-account.model";
@@ -148,6 +151,10 @@ export async function createSettlementAccount(input: CreateSettlementAccountInpu
   const normalized = normalizeAccountInput(input);
   await ensureMerchant(normalized.merchantId);
   assertStellarVaultAccountConfig(normalized);
+  await assertStellarUsdcTrustline({
+    environment: normalized.environment,
+    address: normalized.destinationAddress ?? "",
+  });
 
   if (normalized.isDefault) {
     await applyDefaultAccountPolicy({
@@ -308,6 +315,12 @@ export async function updateSettlementAccount(
   }
 
   const asset = assertStellarVaultAccountConfig(account);
+  if (account.destinationAddress) {
+    await assertStellarUsdcTrustline({
+      environment: accountEnvironment,
+      address: account.destinationAddress,
+    });
+  }
   account.mode = "standard";
   account.provider = "stellar_vault";
   account.chain = "stellar";

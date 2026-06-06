@@ -15,6 +15,7 @@ contracts/target/idl/*
 contracts/keys/*.json
 !contracts/keys/.gitkeep
 contracts/.anchor/
+contracts/settlement_vault/test_snapshots/
 .DS_Store
 .env
 .env.local

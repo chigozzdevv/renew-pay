@@ -16,6 +16,7 @@ const addressSchema = z
 const payoutStatusSchema = z.enum([
   "queued",
   "confirming",
+  "held",
   "settled",
   "failed",
   "reversed",

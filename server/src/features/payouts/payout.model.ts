@@ -90,6 +90,16 @@ const payoutSchema = new Schema(
       trim: true,
       default: null,
     },
+    bridgeMessage: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    bridgeAttestation: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     creditTxHash: {
       type: String,
       trim: true,

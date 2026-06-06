@@ -320,3 +320,207 @@ impl RenewSettlementVault {
         config(&env)
     }
 }
+
+#[cfg(test)]
+extern crate std;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use soroban_sdk::testutils::{Address as _, Ledger, Register};
+
+    struct VaultTest {
+        env: Env,
+        admin: Address,
+        operator: Address,
+        merchant: Address,
+        recovery: Address,
+        token_address: Address,
+        contract_id: Address,
+    }
+
+    impl VaultTest {
+        fn new() -> Self {
+            let env = Env::default();
+            env.mock_all_auths();
+            env.ledger().with_mut(|ledger| {
+                ledger.timestamp = 1_000;
+            });
+
+            let admin = Address::generate(&env);
+            let operator = Address::generate(&env);
+            let merchant = Address::generate(&env);
+            let recovery = Address::generate(&env);
+            let token_admin = Address::generate(&env);
+            let asset = env.register_stellar_asset_contract_v2(token_admin.clone());
+            let token_address = asset.address();
+            let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+            token_admin_client.mint(&operator, &10_000);
+
+            let contract_id = RenewSettlementVault.register(&env, None, ());
+            let vault = RenewSettlementVaultClient::new(&env, &contract_id);
+            vault.initialize(&admin, &operator, &token_address);
+
+            Self {
+                env,
+                admin,
+                operator,
+                merchant,
+                recovery,
+                token_address,
+                contract_id,
+            }
+        }
+
+        fn vault(&self) -> RenewSettlementVaultClient<'_> {
+            RenewSettlementVaultClient::new(&self.env, &self.contract_id)
+        }
+
+        fn token(&self) -> token::TokenClient<'_> {
+            token::TokenClient::new(&self.env, &self.token_address)
+        }
+
+        fn set_time(&self, timestamp: u64) {
+            self.env.ledger().with_mut(|ledger| {
+                ledger.timestamp = timestamp;
+            });
+        }
+
+        fn deposit_default(&self, batch_id: BytesN<32>) {
+            self.vault().deposit(
+                &batch_id,
+                &self.merchant,
+                &1_000,
+                &1_100,
+                &metadata_hash(&self.env),
+            );
+        }
+    }
+
+    fn batch_id(env: &Env, value: u8) -> BytesN<32> {
+        BytesN::from_array(env, &[value; 32])
+    }
+
+    fn metadata_hash(env: &Env) -> BytesN<32> {
+        BytesN::from_array(env, &[9; 32])
+    }
+
+    #[test]
+    fn initialize_sets_config() {
+        let fixture = VaultTest::new();
+        let config = fixture.vault().get_config();
+
+        assert_eq!(config.admin, fixture.admin);
+        assert_eq!(config.operator, fixture.operator);
+        assert_eq!(config.token, fixture.token_address);
+        assert!(!config.paused);
+    }
+
+    #[test]
+    fn deposit_locks_tokens_and_records_batch() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 1);
+
+        fixture.deposit_default(batch_id.clone());
+
+        let batch = fixture.vault().get_batch(&batch_id);
+        assert_eq!(batch.merchant, fixture.merchant);
+        assert_eq!(batch.amount, 1_000);
+        assert_eq!(batch.release_at, 1_100);
+        assert_eq!(batch.status, BatchStatus::Pending);
+        assert_eq!(fixture.token().balance(&fixture.contract_id), 1_000);
+        assert_eq!(fixture.token().balance(&fixture.operator), 9_000);
+    }
+
+    #[test]
+    #[should_panic]
+    fn release_before_release_at_fails() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 2);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.vault().release(&batch_id);
+    }
+
+    #[test]
+    fn release_after_release_at_pays_merchant() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 3);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.set_time(1_100);
+        fixture.vault().release(&batch_id);
+
+        let batch = fixture.vault().get_batch(&batch_id);
+        assert_eq!(batch.status, BatchStatus::Released);
+        assert_eq!(fixture.token().balance(&fixture.merchant), 1_000);
+        assert_eq!(fixture.token().balance(&fixture.contract_id), 0);
+    }
+
+    #[test]
+    fn held_batch_can_be_resolved() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 4);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.vault().hold(&batch_id);
+        fixture
+            .vault()
+            .resolve(&batch_id, &700, &fixture.recovery, &300);
+
+        let batch = fixture.vault().get_batch(&batch_id);
+        assert_eq!(batch.status, BatchStatus::Resolved);
+        assert_eq!(fixture.token().balance(&fixture.merchant), 700);
+        assert_eq!(fixture.token().balance(&fixture.recovery), 300);
+        assert_eq!(fixture.token().balance(&fixture.contract_id), 0);
+    }
+
+    #[test]
+    fn held_batch_can_be_refunded() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 5);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.vault().hold(&batch_id);
+        fixture.vault().refund(&batch_id, &fixture.recovery);
+
+        let batch = fixture.vault().get_batch(&batch_id);
+        assert_eq!(batch.status, BatchStatus::Refunded);
+        assert_eq!(fixture.token().balance(&fixture.merchant), 0);
+        assert_eq!(fixture.token().balance(&fixture.recovery), 1_000);
+        assert_eq!(fixture.token().balance(&fixture.contract_id), 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn pause_blocks_deposit() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 6);
+
+        fixture.vault().set_paused(&true);
+        fixture.deposit_default(batch_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn duplicate_batch_fails() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 7);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.deposit_default(batch_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_resolution_fails() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 8);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.vault().hold(&batch_id);
+        fixture
+            .vault()
+            .resolve(&batch_id, &600, &fixture.recovery, &300);
+    }
+}

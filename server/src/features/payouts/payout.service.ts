@@ -14,6 +14,8 @@ import type {
   ListPayoutsQuery,
   UpdatePayoutInput,
 } from "@/features/payouts/payout.validation";
+import { getCctpSettlementConfig } from "@/features/settlement/providers/cctp/config";
+import { bridgeUsdcToStellar } from "@/features/settlement/providers/cctp/service";
 import {
   depositToStellarVault,
   releaseStellarVaultBatch,
@@ -48,6 +50,8 @@ function toPayoutResponse(document: {
   txHash?: string | null;
   bridgeSourceTxHash?: string | null;
   bridgeReceiveTxHash?: string | null;
+  bridgeMessage?: string | null;
+  bridgeAttestation?: string | null;
   creditTxHash?: string | null;
   vaultBatchId?: string | null;
   vaultDepositTxHash?: string | null;
@@ -101,6 +105,7 @@ function resolvePaymentStatusFromPayout(
   switch (payoutStatus) {
     case "queued":
     case "confirming":
+    case "held":
       return "settling";
     case "settled":
       return "settled";
@@ -198,18 +203,21 @@ function getPayoutProcessingDelay(payout: { scheduledFor: Date }) {
 async function enqueuePayoutProcessingJob(input: {
   payoutId: string;
   delayMs?: number;
+  phase?: "attestation" | "release" | "now";
 }) {
   const delayMs = input.delayMs ?? 0;
+  const phase = input.phase ?? (delayMs > 0 ? "release" : "now");
+  const jobId =
+    phase === "attestation"
+      ? `payout-processing-${input.payoutId}-${phase}-${Date.now()}`
+      : `payout-processing-${input.payoutId}-${phase}`;
 
   return enqueueQueueJob(
     queueNames.payoutProcessing,
     "payout-processing",
     { payoutId: input.payoutId },
     {
-      jobId:
-        delayMs > 0
-          ? `payout-processing-${input.payoutId}-release`
-          : `payout-processing-${input.payoutId}-now`,
+      jobId,
       attempts: 3,
       ...(delayMs > 0 ? { delayMs } : {}),
     }
@@ -236,6 +244,45 @@ async function processStellarVaultPayout(input: {
     );
   }
 
+  if (!payout.bridgeReceiveTxHash) {
+    const bridge = await bridgeUsdcToStellar({
+      environment: runtimeEnvironment,
+      amount: payout.netUsdc,
+      sourceTxHash: payout.bridgeSourceTxHash ?? null,
+      receiveTxHash: payout.bridgeReceiveTxHash ?? null,
+      message: payout.bridgeMessage ?? null,
+      attestation: payout.bridgeAttestation ?? null,
+    });
+
+    payout.status = "confirming";
+    payout.bridgeSourceTxHash = bridge.sourceTxHash ?? null;
+    payout.bridgeReceiveTxHash = bridge.receiveTxHash ?? null;
+    payout.bridgeMessage = bridge.message ?? null;
+    payout.bridgeAttestation = bridge.attestation ?? null;
+    if (bridge.attested) {
+      payout.bridgeAttestedAt = payout.bridgeAttestedAt ?? new Date();
+    }
+    payout.txHash =
+      bridge.receiveTxHash ?? bridge.sourceTxHash ?? payout.txHash ?? null;
+    payout.creditTxHash = null;
+    payout.submittedAt = payout.submittedAt ?? new Date();
+    payout.settledAt = null;
+    payout.reversalReason = null;
+    await payout.save();
+
+    await syncLinkedPaymentFromPayout(payout);
+
+    if (!bridge.completed) {
+      await enqueuePayoutProcessingJob({
+        payoutId: payout._id.toString(),
+        delayMs: getCctpSettlementConfig(runtimeEnvironment).attestationPollIntervalMs,
+        phase: "attestation",
+      });
+
+      return toPayoutProcessingResult(payout, false);
+    }
+  }
+
   if (!payout.vaultDepositTxHash) {
     const deposit = await depositToStellarVault({
       payoutId: payout._id.toString(),
@@ -255,10 +302,7 @@ async function processStellarVaultPayout(input: {
     }
     payout.vaultHeldAt = new Date();
     payout.txHash = deposit.txHash;
-    payout.bridgeSourceTxHash = null;
-    payout.bridgeReceiveTxHash = deposit.txHash;
     payout.creditTxHash = null;
-    payout.bridgeAttestedAt = null;
     payout.submittedAt = payout.submittedAt ?? new Date();
     payout.settledAt = null;
     payout.reversalReason = null;
@@ -607,6 +651,7 @@ export async function queuePayoutProcessing(
   );
 
   if (
+    payout.status === "held" ||
     payout.status === "settled" ||
     payout.status === "reversed" ||
     payout.creditTxHash
@@ -721,6 +766,21 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
     };
   }
 
+  if (payout.status === "held") {
+    return {
+      payoutId: input.payoutId,
+      status: payout.status,
+      bridgeSourceTxHash: payout.bridgeSourceTxHash ?? null,
+      bridgeReceiveTxHash: payout.bridgeReceiveTxHash ?? null,
+      creditTxHash: payout.creditTxHash ?? null,
+      vaultBatchId: payout.vaultBatchId ?? null,
+      vaultDepositTxHash: payout.vaultDepositTxHash ?? null,
+      vaultReleaseTxHash: payout.vaultReleaseTxHash ?? null,
+      payoutReady: false,
+      heldAt: payout.vaultHeldAt ?? payout.updatedAt,
+    };
+  }
+
   const delayMs = getPayoutProcessingDelay(payout);
 
   if (delayMs > 0 && payout.vaultDepositTxHash) {
@@ -766,6 +826,8 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
   payout.status = "failed";
   payout.bridgeSourceTxHash = null;
   payout.bridgeReceiveTxHash = null;
+  payout.bridgeMessage = null;
+  payout.bridgeAttestation = null;
   payout.creditTxHash = null;
   payout.bridgeAttestedAt = null;
   payout.submittedAt = payout.submittedAt ?? new Date();

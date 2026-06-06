@@ -53,6 +53,8 @@ export type StellarVaultDepositResult = StellarVaultTransactionResult & {
 };
 
 const ledgerSafetyDelaySeconds = 10;
+const stellarUsdcTokenUnits = 10_000_000;
+const stellarUsdcDecimals = 7;
 
 export function assertStellarVaultAccountConfig(
   input: StellarVaultAccountConfigInput
@@ -83,7 +85,7 @@ export function assertStellarVaultAccountConfig(
 
   return {
     symbol: "USDC" as const,
-    decimals: 6,
+    decimals: stellarUsdcDecimals,
   };
 }
 
@@ -140,7 +142,7 @@ export function createStellarVaultBatchId(input: {
         input.payoutId,
         input.merchantId,
         input.accountId,
-        input.amount.toFixed(6),
+        input.amount.toFixed(stellarUsdcDecimals),
         input.destinationAddress,
       ].join(":")
     )
@@ -177,7 +179,7 @@ function amountToTokenUnits(amount: number) {
     throw new HttpError(400, "Stellar vault amount must be positive.");
   }
 
-  return BigInt(Math.round(amount * 1_000_000));
+  return BigInt(Math.round(amount * stellarUsdcTokenUnits));
 }
 
 function releaseAtToUnixSeconds(releaseAt: Date) {
