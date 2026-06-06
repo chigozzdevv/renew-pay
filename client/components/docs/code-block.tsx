@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 
 import type { CodeLanguage } from "@/content/docs";
 import { cn } from "@/lib/utils";
@@ -280,6 +281,7 @@ function getLanguageLabel(language: CodeLanguage) {
 }
 
 export function CodeBlock({
+  label,
   language,
   code,
   className,
@@ -312,9 +314,18 @@ export function CodeBlock({
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold tracking-[0.08em] text-[#d9f6bc] transition-colors hover:bg-white/[0.08]"
+          aria-label={copied ? `${label} copied` : `Copy ${label}`}
+          title={copied ? "Copied" : "Copy"}
+          className={cn(
+            "inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#d9f6bc] transition-all duration-200 hover:bg-white/[0.08]",
+            copied && "scale-110 border-[#d9f6bc]/40 bg-[#d9f6bc]/12 text-[#d9f6bc]"
+          )}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? (
+            <Check className="h-4 w-4" strokeWidth={2.4} />
+          ) : (
+            <Copy className="h-4 w-4" strokeWidth={2.2} />
+          )}
         </button>
       </div>
 

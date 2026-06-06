@@ -100,7 +100,19 @@ export const docsPages: DocsPage[] = [
           "Create a collection with amount, currency, and reference.",
           "Open the returned checkout URL with the SDK or redirect the customer to it.",
           "Listen for `collection.paid` before fulfilling the order.",
-          "Track settlement from the dashboard and webhook events.",
+          "Track Stellar settlement from the dashboard and webhook events.",
+        ],
+      },
+      {
+        id: "api-overview-settlement-path",
+        title: "Settlement path",
+        paragraphs: [
+          "After a collection is paid, Renew receives canonical USDC, routes it to Stellar USDC through Circle CCTP, locks it in the settlement vault, and releases it after the payout window.",
+        ],
+        references: [
+          { label: "Asset", value: "USDC", detail: "Native USDC, not a wrapped token." },
+          { label: "Network", value: "Stellar", detail: "Merchant settlement wallet and vault release network." },
+          { label: "Release", value: "Next day", detail: "Renew can hold settlement before release if a payment issue is reported." },
         ],
       },
       {
@@ -382,7 +394,7 @@ export const docsPages: DocsPage[] = [
         id: "api-settlement-create",
         title: "Create account",
         paragraphs: [
-          "Create one active default account before creating live collections. Renew releases Stellar USDC to this wallet after the settlement window.",
+          "Create one active default account before creating live collections. The wallet must be funded on Stellar and trust Circle USDC before it can receive settlement.",
         ],
         sample: {
           label: "Create settlement account",
@@ -441,7 +453,7 @@ export const docsPages: DocsPage[] = [
         id: "api-settlement-release",
         title: "Release window",
         paragraphs: [
-          "Confirmed payments settle as Stellar USDC after the next-day release window. If a customer reports an issue before release, Renew can hold the settlement for review.",
+          "Confirmed payments route through Circle CCTP to Stellar USDC, enter the settlement vault, and release after the next-day window. If a customer reports an issue before release, Renew can hold settlement for review.",
         ],
       },
       {
@@ -498,7 +510,9 @@ export const docsPages: DocsPage[] = [
       {
         id: "sdk-quickstart-settlement",
         title: "One-time setup",
-        paragraphs: ["Create a default Stellar settlement account once from the dashboard or server SDK."],
+        paragraphs: [
+          "Create a default Stellar settlement account once from the dashboard or server SDK. Renew routes collected value to Stellar USDC through CCTP before vault release.",
+        ],
         sample: {
           label: "Create default account",
           language: "ts",

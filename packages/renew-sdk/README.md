@@ -42,6 +42,12 @@ await client.settlement.accounts.create({
 });
 ```
 
+The settlement wallet must be funded on Stellar and trust Circle USDC before it can receive payout.
+
+## Settlement Path
+
+Renew collects local payments, receives canonical USDC, routes settlement to Stellar USDC through Circle CCTP, then releases funds from the Renew settlement vault after the payout window.
+
 ## Server Usage
 
 Create a collection for each order on your server.
@@ -132,4 +138,4 @@ const isValid = verifyRenewWebhookSignature({
 
 - Use server keys only on trusted backend infrastructure.
 - Use checkout URLs in browser flows.
-- Sandbox mode is for demo and test integrations. Live mode should only be used with production credentials and endpoints.
+- Sandbox mode uses test keys, test checkout, sandbox local collection rails, Circle Iris sandbox, and the Stellar testnet vault. Live mode should only be used with production credentials and endpoints.

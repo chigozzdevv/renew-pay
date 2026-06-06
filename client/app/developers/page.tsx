@@ -18,9 +18,13 @@ const sdkSnippet = `const response = await fetch("https://staging-pay.renew.sh/v
     currency: "NGN",
     reference: "order_1042",
     description: "Order #1042",
-    recurring: { enabled: false },
+    settlement: "default",
   }),
 });
+
+if (!response.ok) {
+  throw new Error(await response.text());
+}
 
 const { data: collection } = await response.json();
 
@@ -74,7 +78,7 @@ export default function DevelopersPage() {
                 <div className="px-7 py-9 sm:px-10 sm:py-12 lg:px-14 lg:py-16">
                   <div className="mx-auto w-full max-w-[34rem]">
                     <CodeBlock
-                      label="SDK quickstart"
+                      label="API quickstart"
                       language="ts"
                       code={sdkSnippet}
                       className="mt-0"
