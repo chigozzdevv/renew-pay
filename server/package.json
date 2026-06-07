@@ -17,6 +17,9 @@
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "@stellar/stellar-sdk": "^15.1.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.3.1",
     "bs58": "^6.0.0",
     "bullmq": "^5.63.0",
     "cors": "^2.8.5",
@@ -25,14 +28,11 @@
     "ioredis": "^5.8.1",
     "jose": "^6.2.2",
     "mongoose": "^8.18.1",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.2",
     "zod": "^4.1.5"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.3.1",
-    "tsc-alias": "^1.8.16",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "tsx": "^4.20.5"
   }
 }
