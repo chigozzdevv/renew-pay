@@ -5,8 +5,8 @@ export const notificationTemplateKeys = [
   "customer.payment.issue_received",
   "merchant.payment.paid",
   "merchant.payment.failed",
+  "merchant.payment.issue_reported",
   "merchant.settlement.scheduled",
-  "merchant.settlement.held",
   "merchant.settlement.settled",
   "merchant.settlement.failed",
   "merchant.verification.owner_needs_action",
@@ -48,14 +48,14 @@ export const notificationTemplateCatalog: Record<
     description: "Sent when a customer payment fails.",
     audience: "merchant",
   },
+  "merchant.payment.issue_reported": {
+    label: "Payment issue reported",
+    description: "Sent when a customer reports a payment issue.",
+    audience: "merchant",
+  },
   "merchant.settlement.scheduled": {
     label: "Settlement scheduled",
     description: "Sent when settlement is scheduled for release.",
-    audience: "merchant",
-  },
-  "merchant.settlement.held": {
-    label: "Settlement held",
-    description: "Sent when a reported issue holds settlement.",
     audience: "merchant",
   },
   "merchant.settlement.settled": {
@@ -155,6 +155,11 @@ function buildTemplateDocument(input: {
   const amountLabel = normalizeValue(payload.amountLabel, "the payment");
   const referenceLabel = normalizeValue(payload.referenceLabel, "the collection");
   const paymentReference = normalizeValue(payload.paymentReference, referenceLabel);
+  const issueTypeLabel = normalizeValue(payload.issueTypeLabel, "Payment issue");
+  const issueDetails = normalizeValue(payload.issueDetails, "No details provided.");
+  const issueHoldLabel = normalizeValue(payload.issueHoldLabel, "No payout was held");
+  const customerLabel = normalizeValue(payload.customerLabel, "Customer not provided");
+  const issueFilesLabel = normalizeOptionalValue(payload.issueFilesLabel);
   const releaseAtLabel = normalizeValue(payload.releaseAtLabel, "the next release window");
   const settlementAmountLabel = normalizeValue(
     payload.settlementAmountLabel,
@@ -224,6 +229,25 @@ function buildTemplateDocument(input: {
           url: appUrl,
         },
       } satisfies NotificationTemplateDocument;
+    case "merchant.payment.issue_reported":
+      return {
+        subject: `Payment issue reported for ${referenceLabel}`,
+        eyebrow: "Payment issue",
+        heading: "",
+        body: [
+          `A customer reported an issue for ${referenceLabel}.`,
+          `Issue: ${issueTypeLabel}.`,
+          `Amount: ${amountLabel}.`,
+          `Customer: ${customerLabel}.`,
+          `Status: ${issueHoldLabel}.`,
+          `Details: ${issueDetails}`,
+          ...(issueFilesLabel ? [`Files: ${issueFilesLabel}.`] : []),
+        ],
+        cta: {
+          label: "Open collections",
+          url: appUrl,
+        },
+      } satisfies NotificationTemplateDocument;
     case "merchant.settlement.scheduled":
       return {
         subject: `Settlement scheduled for ${referenceLabel}`,
@@ -232,20 +256,6 @@ function buildTemplateDocument(input: {
         body: [
           `${settlementAmountLabel} is scheduled for release on ${releaseAtLabel}.`,
           ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
-        ],
-        cta: {
-          label: "Open payouts",
-          url: appUrl,
-        },
-      } satisfies NotificationTemplateDocument;
-    case "merchant.settlement.held":
-      return {
-        subject: `Settlement held for ${referenceLabel}`,
-        eyebrow: "Settlement held",
-        heading: "",
-        body: [
-          `Settlement for ${referenceLabel} is held because a payment issue was reported before release.`,
-          "Renew will review the report and update the payout status.",
         ],
         cta: {
           label: "Open payouts",
@@ -472,8 +482,18 @@ export function buildNotificationTemplatePreviewPayload(
         releaseAtLabel: "May 8, 2026 at 10:00",
         appUrl: "https://app.renew.sh/dashboard/collections",
       };
+    case "merchant.payment.issue_reported":
+      return {
+        amountLabel: "NGN 26,500",
+        referenceLabel: "Order #1042",
+        issueTypeLabel: "Paid but not confirmed",
+        issueDetails: "Customer says the transfer has been completed.",
+        issueHoldLabel: "Payout held",
+        customerLabel: "Ada Okafor · ada@example.com",
+        issueFilesLabel: "receipt.png",
+        appUrl: "https://app.renew.sh/dashboard/collections",
+      };
     case "merchant.settlement.scheduled":
-    case "merchant.settlement.held":
     case "merchant.settlement.settled":
     case "merchant.settlement.failed":
       return {

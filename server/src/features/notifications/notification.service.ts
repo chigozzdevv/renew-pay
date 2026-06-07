@@ -152,6 +152,33 @@ function shortenValue(value: string | null | undefined) {
   return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
 }
 
+function formatIssueType(value: string) {
+  const labels: Record<string, string> = {
+    paid_not_confirmed: "Paid but not confirmed",
+    wrong_amount: "Wrong amount",
+    duplicate_payment: "Duplicate payment",
+    refund_request: "Refund request",
+    other: "Other",
+  };
+
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function formatIssueFiles(
+  files?: Array<{ name?: string | null; url?: string | null }> | null
+) {
+  const fileLabels = (files ?? [])
+    .flatMap((file) => {
+      const name = readString(file.name) ?? "File";
+      const url = readString(file.url);
+
+      return url ? [`${name} (${url})`] : [];
+    })
+    .slice(0, 4);
+
+  return fileLabels.length > 0 ? fileLabels.join(", ") : null;
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -1048,50 +1075,56 @@ export async function queuePaymentIssueNotifications(input: {
     queuedNotifications.push(record);
   }
 
-  if (!input.heldPayoutId) {
-    return queuedNotifications;
-  }
-
   const merchantId = payment.merchantId.toString();
   const setting = await getOrCreateMerchantSetting(merchantId);
-
-  if (setting.notifications.settlementAlerts === false) {
-    return queuedNotifications;
-  }
-
-  const payout = await PayoutModel.findById(input.heldPayoutId).exec();
-
-  if (!payout) {
-    return queuedNotifications;
-  }
-
-  const recipients = await resolveMerchantRecipients({
-    merchantId,
-    group: "settlement",
-  });
+  const merchantRecipients =
+    setting.notifications.paymentAlerts === false
+      ? []
+      : await resolveMerchantRecipients({
+          merchantId,
+          group: "payment",
+        });
+  const adminEmail = readString(env.PAYMENT_ISSUES_ADMIN_EMAIL);
+  const recipients = Array.from(
+    new Map(
+      [
+        ...merchantRecipients,
+        ...(adminEmail ? [{ email: adminEmail, name: "Renew Ops" }] : []),
+      ].map((recipient) => [toLowerEmail(recipient.email), recipient])
+    ).values()
+  );
+  const customerLabel =
+    issue.reporterName && issue.reporterEmail
+      ? `${issue.reporterName} - ${issue.reporterEmail}`
+      : issue.reporterEmail ?? issue.reporterName ?? "Customer not provided";
+  const issueFilesLabel = formatIssueFiles(issue.files);
 
   for (const recipient of recipients) {
     const record = await createNotificationRecord({
       merchantId,
       environment: payment.environment === "live" ? "live" : "test",
-      templateKey: "merchant.settlement.held",
+      templateKey: "merchant.payment.issue_reported",
       audience: "merchant",
-      category: "settlement",
+      category: "payment",
       recipient,
       payload: {
         referenceLabel: reference,
-        settlementAmountLabel: formatMoney(payout.netUsdc, "USDC"),
-        destinationLabel: shortenValue(payout.destinationWallet),
-        appUrl: getAppUrl("/dashboard/payouts"),
+        amountLabel: formatMoney(payment.amount, payment.currency),
+        issueTypeLabel: formatIssueType(issue.issueType),
+        issueDetails: issue.details,
+        issueHoldLabel: input.heldPayoutId ? "Payout held" : "Payout not held",
+        customerLabel,
+        ...(issueFilesLabel ? { issueFilesLabel } : {}),
+        appUrl: getAppUrl("/dashboard/collections"),
       },
       metadata: {
         paymentId: payment._id.toString(),
         payId: payment.payId,
-        payoutId: payout._id.toString(),
+        payoutId: input.heldPayoutId ?? null,
         issueId: issue._id.toString(),
       },
       idempotencyKey: createNotificationIdempotencyKey([
-        "merchant.settlement.held",
+        "merchant.payment.issue_reported",
         issue._id.toString(),
         recipient.email,
       ]),
