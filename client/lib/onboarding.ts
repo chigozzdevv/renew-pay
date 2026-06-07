@@ -97,8 +97,9 @@ export async function startOnboardingVerification(input: {
 }) {
   const response = await fetchApi<{
     kyc: Record<string, unknown>;
-    sdkAccessToken?: string;
-    sdkAccessTokenExpiresAt?: string;
+    verificationUrl?: string;
+    sessionId?: string;
+    sessionToken?: string | null;
     userId?: string;
   }>("/onboarding/verification/start", {
     method: "POST",

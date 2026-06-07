@@ -24,6 +24,12 @@ import {
   type WorkspaceSettings,
 } from "@/lib/settings";
 import {
+  loadVerificationSummary,
+  startBusinessVerification,
+  startOwnerVerification,
+  type VerificationStatus,
+} from "@/lib/verification";
+import {
   connectStellarWallet,
   enableStellarUsdcTrustline,
 } from "@/lib/stellar-wallet";
@@ -33,6 +39,7 @@ type SettingsTabKey =
   | "workspace"
   | "checkout"
   | "developers"
+  | "verification"
   | "wallets"
   | "notifications";
 
@@ -42,6 +49,7 @@ type NotificationsDraft = WorkspaceSettings["notifications"];
 
 const settingsTabKeys = [
   "workspace",
+  "verification",
   "checkout",
   "developers",
   "wallets",
@@ -94,6 +102,20 @@ export default function SettingsPage() {
   const { data, isLoading, error, reload } = useResource(
     async ({ token, merchantId }) =>
       loadWorkspaceSettings({
+        token,
+        merchantId,
+        environment: mode,
+      }),
+    [mode]
+  );
+  const {
+    data: verificationData,
+    isLoading: isVerificationLoading,
+    error: verificationError,
+    reload: reloadVerification,
+  } = useResource(
+    async ({ token, merchantId }) =>
+      loadVerificationSummary({
         token,
         merchantId,
         environment: mode,
@@ -159,6 +181,7 @@ export default function SettingsPage() {
     () =>
       [
         { key: "workspace", label: "Business" },
+        { key: "verification", label: "Verification" },
         { key: "checkout", label: "Checkout" },
         { key: "developers", label: "Developers" },
         { key: "wallets", label: "Settlement" },
@@ -192,6 +215,21 @@ export default function SettingsPage() {
     try {
       await runner();
       await reload();
+    } catch (error) {
+      setActionError(toErrorMessage(error));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function runVerificationAction(actionKey: string, runner: () => Promise<void>) {
+    setBusyAction(actionKey);
+    setActionMessage(null);
+    setActionError(null);
+
+    try {
+      await runner();
+      await reloadVerification();
     } catch (error) {
       setActionError(toErrorMessage(error));
     } finally {
@@ -322,6 +360,48 @@ export default function SettingsPage() {
     } finally {
       setBusyAction(null);
     }
+  }
+
+  async function handleStartOwnerVerification() {
+    if (!token || !user?.merchantId) {
+      return;
+    }
+
+    await runVerificationAction("owner-kyc", async () => {
+      const result = await startOwnerVerification({
+        token,
+        merchantId: user.merchantId,
+        environment: mode,
+      });
+      const verificationUrl = result.verificationUrl?.trim();
+
+      if (!verificationUrl) {
+        throw new Error("Verification did not return a link.");
+      }
+
+      window.location.assign(verificationUrl);
+    });
+  }
+
+  async function handleStartBusinessVerification() {
+    if (!token || !user?.merchantId) {
+      return;
+    }
+
+    await runVerificationAction("merchant-kyb", async () => {
+      const result = await startBusinessVerification({
+        token,
+        merchantId: user.merchantId,
+        environment: mode,
+      });
+      const verificationUrl = result.verificationUrl?.trim();
+
+      if (!verificationUrl) {
+        throw new Error("Verification did not return a link.");
+      }
+
+      window.location.assign(verificationUrl);
+    });
   }
 
   if (isLoading) {
@@ -554,6 +634,71 @@ export default function SettingsPage() {
 
       {activeTab === "developers" ? <DevelopersSettings /> : null}
 
+      {activeTab === "verification" ? (
+        <Card>
+          {isVerificationLoading ? (
+            <LoadingState label="Loading verification" className="min-h-[12rem]" />
+          ) : verificationError || !verificationData ? (
+            <PageState
+              title="Verification unavailable"
+              message={verificationError ?? "Verification status could not be loaded."}
+              tone="danger"
+              action={
+                <Button type="button" onClick={() => void reloadVerification()}>
+                  Retry
+                </Button>
+              }
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-2">
+                <VerificationCard
+                  title="Owner KYC"
+                  status={verificationData.ownerKyc}
+                  busy={busyAction === "owner-kyc"}
+                  actionLabel="Start KYC"
+                  onStart={() => void handleStartOwnerVerification()}
+                />
+                <VerificationCard
+                  title="Business KYB"
+                  status={verificationData.merchantKyb}
+                  busy={busyAction === "merchant-kyb"}
+                  actionLabel="Start KYB"
+                  onStart={() => void handleStartBusinessVerification()}
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-[color:var(--ink)]">
+                    {verificationData.merchantKyb.status === "approved"
+                      ? "Business verified"
+                      : verificationData.ownerKyc.status === "approved"
+                        ? "Owner verified"
+                        : "Verification needed"}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-[color:var(--muted)]">
+                    {verificationData.merchantKyb.status === "approved"
+                      ? "Higher settlement limits"
+                      : verificationData.ownerKyc.status === "approved"
+                        ? "Starter settlement limits"
+                        : "KYC or KYB unlocks access"}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  disabled={busyAction === "verification-refresh"}
+                  onClick={() =>
+                    void runVerificationAction("verification-refresh", async () => {})
+                  }
+                >
+                  Refresh
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      ) : null}
+
       {activeTab === "notifications" ? (
         <Card>
           <div className="grid gap-3 max-w-2xl sm:grid-cols-2">
@@ -646,4 +791,64 @@ function SettingsToggle({
       </div>
     </div>
   );
+}
+
+function VerificationCard({
+  title,
+  status,
+  busy,
+  actionLabel,
+  onStart,
+}: {
+  title: string;
+  status: VerificationStatus;
+  busy: boolean;
+  actionLabel: string;
+  onStart: () => void;
+}) {
+  const approved = status.status === "approved";
+  const pending = ["pending", "in_review", "started", "submitted"].includes(status.status);
+
+  return (
+    <div className="rounded-lg border border-[color:var(--line)] bg-white px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-[color:var(--ink)]">{title}</p>
+          <div className="mt-2">
+            <Badge tone={toBadgeTone(status.status)}>
+              {formatVerificationStatus(status.status)}
+            </Badge>
+          </div>
+        </div>
+        <Button
+          type="button"
+          tone={approved ? "neutral" : "brand"}
+          disabled={busy || approved}
+          onClick={onStart}
+        >
+          {busy ? "Starting..." : approved ? "Verified" : pending ? "Continue" : actionLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function formatVerificationStatus(value: string) {
+  return value.replace(/_/g, " ");
+}
+
+function toBadgeTone(value: string): "neutral" | "brand" | "warning" | "danger" {
+  if (value === "approved") {
+    return "brand";
+  }
+
+  if (["rejected", "declined", "failed"].includes(value)) {
+    return "danger";
+  }
+
+  if (["pending", "in_review", "started", "submitted"].includes(value)) {
+    return "warning";
+  }
+
+  return "neutral";
 }
