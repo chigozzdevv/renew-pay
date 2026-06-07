@@ -28,7 +28,7 @@ export type WorkspaceMode = "test" | "live";
 export function getApiBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-    "https://pay.renew.sh/v1"
+    "https://api.renew.sh/v1"
   );
 }
 

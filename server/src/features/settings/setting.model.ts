@@ -60,7 +60,7 @@ const businessSettingsSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "app.renew.sh",
+      default: "www.renew.sh",
     },
   },
   {

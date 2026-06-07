@@ -28,7 +28,7 @@ export async function getOrCreateMerchantSetting(merchantId: string) {
         statementDescriptor: "RENEW",
         brandAccent: "forest-green",
         logoUrl: null,
-        customerDomain: "app.renew.sh",
+        customerDomain: "www.renew.sh",
       },
       wallets: {
         primaryWallet: merchant.payoutWallet ?? null,

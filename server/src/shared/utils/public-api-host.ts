@@ -3,8 +3,8 @@ import type { Request } from "express";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 
 const publicApiHostToRuntimeMode: Readonly<Record<string, RuntimeMode>> = {
-  "pay.renew.sh": "live",
-  "staging-pay.renew.sh": "test",
+  "api.renew.sh": "live",
+  "sandbox.renew.sh": "test",
 };
 
 export function normalizeRequestHost(value: string) {
@@ -27,7 +27,11 @@ export function inferPublicApiRuntimeModeFromHost(
 }
 
 export function getPublicApiHostForRuntimeMode(mode: RuntimeMode) {
-  return mode === "live" ? "pay.renew.sh" : "staging-pay.renew.sh";
+  return mode === "live" ? "api.renew.sh" : "sandbox.renew.sh";
+}
+
+export function getPublicApiOriginForRuntimeMode(mode: RuntimeMode) {
+  return `https://${getPublicApiHostForRuntimeMode(mode)}`;
 }
 
 export function resolveRequestPublicApiRuntimeMode(request: Request) {

@@ -14,11 +14,17 @@ Live mode follows mainnet settlement configuration and production compliance con
 
 ## Quick Links
 
-- App: [app.renew.sh](https://app.renew.sh)
-- Docs: [app.renew.sh/docs](https://app.renew.sh/docs)
-- Sandbox API: [staging-pay.renew.sh](https://staging-pay.renew.sh)
-- Live API: [pay.renew.sh](https://pay.renew.sh)
+- App: [www.renew.sh](https://www.renew.sh)
+- Docs: [www.renew.sh/docs](https://www.renew.sh/docs)
+- Sandbox API: [sandbox.renew.sh](https://sandbox.renew.sh)
+- Live API: [api.renew.sh](https://api.renew.sh)
 - SDK: [@renew.sh/sdk on npm](https://www.npmjs.com/package/@renew.sh/sdk)
+
+## Callback URLs
+
+- Partna sandbox: `https://sandbox.renew.sh/v1/onramps/webhooks/partna`
+- Partna live: `https://api.renew.sh/v1/onramps/webhooks/partna`
+- Didit verification: `https://api.renew.sh/v1/kyc/webhooks/didit`
 
 ## Platform
 

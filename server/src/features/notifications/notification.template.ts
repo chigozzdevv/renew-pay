@@ -466,13 +466,13 @@ export function buildNotificationTemplatePreviewPayload(
         referenceLabel: "Order #1042",
         paymentReference: "pay_1042",
         releaseAtLabel: "May 8, 2026 at 10:00",
-        issueUrl: "https://app.renew.sh/pay/pay_1042/report",
-        appUrl: "https://app.renew.sh/pay/pay_1042",
+        issueUrl: "https://www.renew.sh/pay/pay_1042/report",
+        appUrl: "https://www.renew.sh/pay/pay_1042",
       };
     case "customer.payment.issue_received":
       return {
         referenceLabel: "Order #1042",
-        appUrl: "https://app.renew.sh/pay/pay_1042",
+        appUrl: "https://www.renew.sh/pay/pay_1042",
       };
     case "merchant.payment.paid":
     case "merchant.payment.failed":
@@ -480,7 +480,7 @@ export function buildNotificationTemplatePreviewPayload(
         amountLabel: "NGN 26,500",
         referenceLabel: "Order #1042",
         releaseAtLabel: "May 8, 2026 at 10:00",
-        appUrl: "https://app.renew.sh/dashboard/collections",
+        appUrl: "https://www.renew.sh/dashboard/collections",
       };
     case "merchant.payment.issue_reported":
       return {
@@ -491,7 +491,7 @@ export function buildNotificationTemplatePreviewPayload(
         issueHoldLabel: "Payout held",
         customerLabel: "Ada Okafor · ada@example.com",
         issueFilesLabel: "receipt.png",
-        appUrl: "https://app.renew.sh/dashboard/collections",
+        appUrl: "https://www.renew.sh/dashboard/collections",
       };
     case "merchant.settlement.scheduled":
     case "merchant.settlement.settled":
@@ -501,7 +501,7 @@ export function buildNotificationTemplatePreviewPayload(
         referenceLabel: "Order #1042",
         destinationLabel: "GB2NKG6W...7UPO6KD",
         releaseAtLabel: "May 8, 2026 at 10:00",
-        appUrl: "https://app.renew.sh/dashboard/payouts",
+        appUrl: "https://www.renew.sh/dashboard/payouts",
       };
     case "merchant.verification.owner_needs_action":
     case "merchant.verification.owner_approved":
@@ -511,7 +511,7 @@ export function buildNotificationTemplatePreviewPayload(
     case "merchant.verification.merchant_rejected":
       return {
         statusLabel: "pending",
-        appUrl: "https://app.renew.sh/overview",
+        appUrl: "https://www.renew.sh/overview",
       };
   }
 

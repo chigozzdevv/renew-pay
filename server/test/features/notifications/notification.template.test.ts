@@ -10,7 +10,7 @@ const branding = {
   merchantName: "Acme Store",
   supportEmail: "support@acme.test",
   brandAccent: "#272b25",
-  renewLogoUrl: "https://app.renew.sh/renew-logo.png",
+  renewLogoUrl: "https://www.renew.sh/renew-logo.png",
 };
 
 test("merchant issue report email includes issue details and hold status", () => {
@@ -25,7 +25,7 @@ test("merchant issue report email includes issue details and hold status", () =>
       issueHoldLabel: "Payout held",
       customerLabel: "Ada Okafor - ada@example.com",
       issueFilesLabel: "receipt.png",
-      appUrl: "https://app.renew.sh/dashboard/collections",
+      appUrl: "https://www.renew.sh/dashboard/collections",
     },
   });
 

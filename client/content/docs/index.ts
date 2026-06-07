@@ -157,8 +157,8 @@ export const docsPages: DocsPage[] = [
           "The API host and server key must match. Renew scopes server API requests to the merchant and environment stored on the key.",
         ],
         references: [
-          { label: "Sandbox", value: "https://staging-pay.renew.sh", detail: "Use with `rw_test_` keys." },
-          { label: "Live", value: "https://pay.renew.sh", detail: "Use with `rw_live_` keys." },
+          { label: "Sandbox", value: "https://sandbox.renew.sh", detail: "Use with `rw_test_` keys." },
+          { label: "Live", value: "https://api.renew.sh", detail: "Use with `rw_live_` keys." },
           { label: "Header", value: "x-renew-secret-key", detail: "Send the server key on API requests." },
         ],
         note: "Do not pass an `environment` field in server API payloads. The server key and host decide sandbox or live.",
@@ -171,7 +171,7 @@ export const docsPages: DocsPage[] = [
           label: "Authenticated request",
           language: "bash",
           filename: "request.sh",
-          code: `curl https://staging-pay.renew.sh/v1/collections \\
+          code: `curl https://sandbox.renew.sh/v1/collections \\
   -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
   -H "Content-Type: application/json"`,
         },
@@ -240,7 +240,7 @@ export const docsPages: DocsPage[] = [
           label: "Create collection",
           language: "bash",
           filename: "create-collection.sh",
-          code: `curl https://staging-pay.renew.sh/v1/collections \\
+          code: `curl https://sandbox.renew.sh/v1/collections \\
   -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -287,7 +287,7 @@ export const docsPages: DocsPage[] = [
             currency: "NGN",
             description: "Order #1042",
             status: "created",
-            checkoutUrl: "https://app.renew.sh/pay/pay_7de830caf3cc49df9f18d8a1",
+            checkoutUrl: "https://www.renew.sh/pay/pay_7de830caf3cc49df9f18d8a1",
             settlement: {
               id: "66f1d2c11d0e63b8a1",
             },
@@ -400,7 +400,7 @@ export const docsPages: DocsPage[] = [
           label: "Create settlement account",
           language: "bash",
           filename: "create-settlement-account.sh",
-          code: `curl https://staging-pay.renew.sh/v1/settlement/accounts \\
+          code: `curl https://sandbox.renew.sh/v1/settlement/accounts \\
   -H "x-renew-secret-key: $RENEW_SECRET_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{

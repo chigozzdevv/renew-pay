@@ -25,7 +25,7 @@ test("uses server key headers for payment creation", async () => {
             currency: "NGN",
             description: "Website order",
             status: "open",
-            paymentUrl: "https://app.renew.sh/pay/pay_123",
+            paymentUrl: "https://www.renew.sh/pay/pay_123",
             recurring: {
               enabled: false,
               interval: null,
@@ -67,7 +67,7 @@ test("uses server key headers for payment creation", async () => {
     { secretKey: "rw_test_example" }
   );
 
-  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/payments");
+  assert.equal(captured.url, "https://sandbox.renew.sh/v1/payments");
   assert.equal(captured.init.method, "POST");
   assert.equal(captured.init.headers["x-renew-secret-key"], "rw_test_example");
 });
@@ -91,7 +91,7 @@ test("creates collections through the collections endpoint", async () => {
             currency: "NGN",
             description: "Order #1042",
             status: "created",
-            checkoutUrl: "https://app.renew.sh/pay/pay_123",
+            checkoutUrl: "https://www.renew.sh/pay/pay_123",
             recurring: {
               enabled: false,
               interval: null,
@@ -132,7 +132,7 @@ test("creates collections through the collections endpoint", async () => {
     { secretKey: "rw_test_example" }
   );
 
-  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/collections");
+  assert.equal(captured.url, "https://sandbox.renew.sh/v1/collections");
   assert.equal(captured.init.method, "POST");
   assert.equal(captured.init.headers["x-renew-secret-key"], "rw_test_example");
   assert.deepEqual(JSON.parse(captured.init.body), {
@@ -200,7 +200,7 @@ test("creates settlement accounts with server key scope", async () => {
     { secretKey: "rw_test_example" }
   );
 
-  assert.equal(captured.url, "https://staging-pay.renew.sh/v1/settlement/accounts");
+  assert.equal(captured.url, "https://sandbox.renew.sh/v1/settlement/accounts");
   assert.equal(captured.init.method, "POST");
   assert.equal(captured.init.headers["x-renew-secret-key"], "rw_test_example");
   assert.deepEqual(JSON.parse(captured.init.body), {
@@ -228,7 +228,7 @@ test("starts a public payment with payer details", async () => {
             currency: "NGN",
             description: "Website order",
             status: "pending",
-            paymentUrl: "https://app.renew.sh/pay/pay_123",
+            paymentUrl: "https://www.renew.sh/pay/pay_123",
             merchant: {
               name: "Renew merchant",
               supportEmail: null,
@@ -295,7 +295,7 @@ test("starts a public payment with payer details", async () => {
 
   assert.equal(
     captured.url,
-    "https://staging-pay.renew.sh/v1/pay/pay_123/start"
+    "https://sandbox.renew.sh/v1/pay/pay_123/start"
   );
   assert.equal(captured.init.method, "POST");
   assert.deepEqual(JSON.parse(captured.init.body), {

@@ -2,7 +2,6 @@ import { createVerify, constants as cryptoConstants } from "crypto";
 
 import { HttpError } from "@/shared/errors/http-error";
 
-import { env } from "@/config/env.config";
 import { OnrampEventModel } from "@/features/onramps/onramp-event.model";
 import { getPartnaProvider } from "@/features/onramps/providers/partna/partna.factory";
 import type {
@@ -20,6 +19,7 @@ import { queuePayoutProcessing } from "@/features/payouts/payout.service";
 import { PayoutModel } from "@/features/payouts/payout.model";
 import { SettlementAccountModel } from "@/features/settlement/settlement-account.model";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { getPublicApiOriginForRuntimeMode } from "@/shared/utils/public-api-host";
 import { createRuntimeModeCondition } from "@/shared/utils/runtime-environment";
 
 type PartnaWebhookPayload = {
@@ -53,8 +53,10 @@ function normalizeEmail(value: string) {
 }
 
 function buildPartnaCallbackUrl(mode: RuntimeMode) {
-  const url = new URL("/v1/onramps/webhooks/partna", env.API_BASE_URL);
-  url.searchParams.set("environment", mode);
+  const url = new URL(
+    "/v1/onramps/webhooks/partna",
+    getPublicApiOriginForRuntimeMode(mode)
+  );
   return url.toString();
 }
 

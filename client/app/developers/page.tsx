@@ -7,7 +7,7 @@ import { Header } from "@/components/shared/header";
 import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
-const sdkSnippet = `const response = await fetch("https://staging-pay.renew.sh/v1/collections", {
+const sdkSnippet = `const response = await fetch("https://sandbox.renew.sh/v1/collections", {
   method: "POST",
   headers: {
     "x-renew-secret-key": process.env.RENEW_SECRET_KEY!,

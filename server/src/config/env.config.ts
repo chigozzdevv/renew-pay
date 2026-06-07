@@ -174,8 +174,7 @@ const envSchema = z
       .default(8 * 60 * 60),
     PRIVY_APP_ID: z.string().trim().default(""),
     PRIVY_APP_SECRET: z.string().trim().default(""),
-    API_BASE_URL: z.string().trim().min(1).default("http://localhost:4000"),
-    APP_BASE_URL: z.string().trim().min(1).default("http://localhost:3000"),
+    APP_BASE_URL: z.string().trim().min(1).default("https://www.renew.sh"),
     RESEND_API_KEY: z.string().trim().default(""),
     RESEND_FROM_EMAIL: z
       .string()

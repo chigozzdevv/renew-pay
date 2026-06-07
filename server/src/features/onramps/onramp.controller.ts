@@ -22,15 +22,27 @@ import {
 } from "@/features/onramps/onramp.validation";
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { resolveRequestPublicApiRuntimeMode } from "@/shared/utils/public-api-host";
 import { optionalEnvironmentInputSchema } from "@/shared/utils/runtime-environment";
 import { asyncHandler } from "@/shared/utils/async-handler";
 
 function resolveEnvironmentScope(request: Request) {
-  return optionalEnvironmentInputSchema.parse(
+  const hostEnvironment = resolveRequestPublicApiRuntimeMode(request);
+  const explicitEnvironment = optionalEnvironmentInputSchema.parse(
     typeof request.query.environment === "string"
       ? request.query.environment
       : request.body?.environment
   );
+
+  if (
+    hostEnvironment &&
+    explicitEnvironment &&
+    hostEnvironment !== explicitEnvironment
+  ) {
+    throw new HttpError(400, "Environment does not match API host.");
+  }
+
+  return hostEnvironment ?? explicitEnvironment;
 }
 
 export const listChannelsController = asyncHandler(
@@ -133,7 +145,9 @@ export const processPartnaWebhookController = asyncHandler(
       environment: resolveEnvironmentScope(request),
     });
 
-    const candidateModes: RuntimeMode[] = ["test", "live"];
+    const candidateModes: RuntimeMode[] = input.environment
+      ? [input.environment]
+      : ["test", "live"];
     const matchedEnvironment =
       candidateModes.find((mode) => {
         const publicKey = getPartnaConfig(mode).webhookPublicKey;
