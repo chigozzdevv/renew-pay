@@ -1,5 +1,6 @@
 import { Types, type HydratedDocument } from "mongoose";
 
+import { env } from "@/config/env.config";
 import { emitPaymentWebhookEventForStatusChange } from "@/features/developers/developer-webhook-delivery.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
@@ -32,6 +33,60 @@ import { enqueueQueueJob } from "@/shared/workers/queue-runtime";
 import { queueNames } from "@/shared/workers/queue-names";
 
 type PayoutRecord = HydratedDocument<PayoutDocument>;
+
+const kycOnlyDailySettlementLimitUsdc = env.KYC_ONLY_DAILY_SETTLEMENT_LIMIT_USD;
+
+function getUtcDayRange(date = new Date()) {
+  const start = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  ));
+  const end = new Date(start);
+
+  end.setUTCDate(end.getUTCDate() + 1);
+
+  return { start, end };
+}
+
+async function getDailyPayoutVolumeUsdc(input: {
+  merchantId: string;
+  environment: RuntimeMode;
+  date?: Date;
+}) {
+  const { start, end } = getUtcDayRange(input.date);
+  const [result] = await PayoutModel.aggregate<{ total: number }>([
+    {
+      $match: {
+        merchantId: new Types.ObjectId(input.merchantId),
+        environment: toStoredRuntimeMode(input.environment),
+        status: { $nin: ["failed", "cancelled"] },
+        createdAt: { $gte: start, $lt: end },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$netUsdc" },
+      },
+    },
+  ]);
+
+  return result?.total ?? 0;
+}
+
+function shouldHoldForStarterDailyLimit(input: {
+  verificationTier: "none" | "owner" | "business";
+  payoutStatus: string;
+  dailyVolumeUsdc: number;
+  payoutNetUsdc: number;
+}) {
+  return (
+    input.verificationTier === "owner" &&
+    ["queued", "confirming"].includes(input.payoutStatus) &&
+    input.dailyVolumeUsdc + input.payoutNetUsdc > kycOnlyDailySettlementLimitUsdc
+  );
+}
 
 function toPayoutResponse(document: {
   _id: { toString(): string };
@@ -198,6 +253,18 @@ function toPayoutProcessingResult(payout: PayoutRecord, payoutReady: boolean) {
 
 function getPayoutProcessingDelay(payout: { scheduledFor: Date }) {
   return Math.max(0, payout.scheduledFor.getTime() - Date.now());
+}
+
+function shouldSkipPayoutProcessing(payout: {
+  status: string;
+  creditTxHash?: string | null;
+}) {
+  return (
+    payout.status === "held" ||
+    payout.status === "settled" ||
+    payout.status === "reversed" ||
+    Boolean(payout.creditTxHash)
+  );
 }
 
 async function enqueuePayoutProcessingJob(input: {
@@ -418,11 +485,31 @@ export async function createPayout(input: CreatePayoutInput) {
     }
   }
 
-  await assertMerchantKybApprovedForLive(
+  const verificationAccess = await assertMerchantKybApprovedForLive(
     input.merchantId,
     "creating payouts",
     input.environment
   );
+  const dailyVolumeUsdc =
+    verificationAccess.tier === "owner"
+      ? await getDailyPayoutVolumeUsdc({
+          merchantId: input.merchantId,
+          environment: input.environment,
+        })
+      : 0;
+  const starterLimitExceeded = shouldHoldForStarterDailyLimit({
+    verificationTier: verificationAccess.tier,
+    payoutStatus: input.status,
+    dailyVolumeUsdc,
+    payoutNetUsdc: input.netUsdc,
+  });
+  const status = starterLimitExceeded ? "held" : input.status;
+  const vaultHeldAt = starterLimitExceeded
+    ? input.vaultHeldAt ?? new Date()
+    : input.vaultHeldAt ?? null;
+  const reversalReason = starterLimitExceeded
+    ? input.reversalReason ?? "Starter daily settlement limit reached."
+    : input.reversalReason ?? null;
 
   const payout = await PayoutModel.create({
     merchantId: input.merchantId,
@@ -437,7 +524,7 @@ export async function createPayout(input: CreatePayoutInput) {
     feeUsdc: input.feeUsdc,
     netUsdc: input.netUsdc,
     destinationWallet: normalizeStellarAddress(input.destinationWallet) ?? input.destinationWallet,
-    status: input.status,
+    status,
     txHash: input.txHash ?? null,
     bridgeSourceTxHash: input.bridgeSourceTxHash ?? null,
     bridgeReceiveTxHash: input.bridgeReceiveTxHash ?? null,
@@ -445,12 +532,12 @@ export async function createPayout(input: CreatePayoutInput) {
     vaultBatchId: input.vaultBatchId ?? null,
     vaultDepositTxHash: input.vaultDepositTxHash ?? null,
     vaultReleaseTxHash: input.vaultReleaseTxHash ?? null,
-    vaultHeldAt: input.vaultHeldAt ?? null,
+    vaultHeldAt,
     submittedAt: input.submittedAt ?? null,
     scheduledFor: input.scheduledFor,
     settledAt: input.settledAt ?? null,
     reversedAt: input.reversedAt ?? null,
-    reversalReason: input.reversalReason ?? null,
+    reversalReason,
   });
 
   await syncLinkedPaymentFromPayout(payout);
@@ -650,12 +737,7 @@ export async function queuePayoutProcessing(
     toStoredRuntimeMode(payout.environment)
   );
 
-  if (
-    payout.status === "held" ||
-    payout.status === "settled" ||
-    payout.status === "reversed" ||
-    payout.creditTxHash
-  ) {
+  if (shouldSkipPayoutProcessing(payout)) {
     return {
       queued: false,
       processedInline: false,
@@ -849,3 +931,10 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
 
   return toPayoutProcessingResult(payout, false);
 }
+
+export const __test__ = {
+  getPayoutProcessingDelay,
+  resolvePaymentStatusFromPayout,
+  shouldHoldForStarterDailyLimit,
+  shouldSkipPayoutProcessing,
+};

@@ -52,7 +52,7 @@ const depositForBurnWithHookDiscriminator = Buffer.from([
 
 const cctpHookMagicBytesLength = 24;
 const cctpHookVersion = 0;
-const solanaUsdcDecimals = 6;
+const collectionAssetDecimals = 6;
 
 function assertNonEmpty(value: string | null | undefined, message: string) {
   if (!value?.trim()) {
@@ -105,11 +105,15 @@ function amountToSourceTokenUnits(amount: number, options?: { allowZero?: boolea
     throw new HttpError(400, "CCTP settlement amount must be positive.");
   }
 
-  const [whole, fraction = ""] = amount.toFixed(solanaUsdcDecimals).split(".");
+  const [whole, fraction = ""] = amount.toFixed(collectionAssetDecimals).split(".");
 
   return (
-    BigInt(whole) * 10n ** BigInt(solanaUsdcDecimals) +
-    BigInt(fraction.padEnd(solanaUsdcDecimals, "0").slice(0, solanaUsdcDecimals))
+    BigInt(whole) * 10n ** BigInt(collectionAssetDecimals) +
+    BigInt(
+      fraction
+        .padEnd(collectionAssetDecimals, "0")
+        .slice(0, collectionAssetDecimals)
+    )
   );
 }
 
@@ -206,7 +210,7 @@ async function burnSourceUsdcForStellar(input: {
   amount: number;
 }) {
   const config = getCctpSettlementConfig(input.environment);
-  const connection = new Connection(config.solanaRpcUrl, "confirmed");
+  const connection = new Connection(config.collectionRpcUrl, "confirmed");
   const collectionKeypair = await parseSolanaCollectionKeypair(
       config.collectionPrivateKey
   );
@@ -227,21 +231,21 @@ async function burnSourceUsdcForStellar(input: {
 
   const tokenMessengerProgramId = new PublicKey(
     assertNonEmpty(
-      config.solanaTokenMessengerProgramId,
-      "Solana CCTP TokenMessenger program is required."
+      config.collectionTokenMessengerProgramId,
+      "CCTP collection TokenMessenger program is required."
     )
   );
   const messageTransmitterProgramId = new PublicKey(
     assertNonEmpty(
-      config.solanaMessageTransmitterProgramId,
-      "Solana CCTP MessageTransmitter program is required."
+      config.collectionMessageTransmitterProgramId,
+      "CCTP collection MessageTransmitter program is required."
     )
   );
-  const usdcMint = new PublicKey(
-    assertNonEmpty(config.solanaUsdcMint, "Solana USDC mint is required.")
+  const collectionAssetMint = new PublicKey(
+    assertNonEmpty(config.collectionAssetMint, "CCTP collection asset mint is required.")
   );
   const sourceTokenAccount = await getAssociatedTokenAddress(
-    usdcMint,
+    collectionAssetMint,
     collectionKeypair.publicKey
   );
   const stellarOperator = StellarKeypair.fromSecret(
@@ -312,12 +316,12 @@ async function burnSourceUsdcForStellar(input: {
       },
       {
         pubkey: findProgramAddress("local_token", tokenMessengerProgramId, [
-          usdcMint,
+          collectionAssetMint,
         ]),
         isSigner: false,
         isWritable: true,
       },
-      { pubkey: usdcMint, isSigner: false, isWritable: true },
+      { pubkey: collectionAssetMint, isSigner: false, isWritable: true },
       {
         pubkey: messageSentEventData.publicKey,
         isSigner: true,
@@ -360,26 +364,33 @@ async function burnSourceUsdcForStellar(input: {
   );
 }
 
-async function fetchCircleAttestation(input: {
-  environment: RuntimeMode;
+type CircleAttestationConfig = ReturnType<typeof getCctpSettlementConfig>;
+
+async function fetchCircleAttestationWithDeps(input: {
+  config: Pick<
+    CircleAttestationConfig,
+    | "sourceDomain"
+    | "irisApiUrl"
+    | "attestationMaxAttempts"
+    | "attestationPollIntervalMs"
+  >;
   sourceTxHash: string;
+  fetcher: typeof fetch;
+  sleep: (durationMs: number) => Promise<void>;
 }) {
-  const config = getCctpSettlementConfig(input.environment);
   const url = new URL(
-    `/v2/messages/${config.sourceDomain}`,
-    config.irisApiUrl.endsWith("/")
-      ? config.irisApiUrl
-      : `${config.irisApiUrl}/`
+    `/v2/messages/${input.config.sourceDomain}`,
+    input.config.irisApiUrl.endsWith("/")
+      ? input.config.irisApiUrl
+      : `${input.config.irisApiUrl}/`
   );
   url.searchParams.set("transactionHash", input.sourceTxHash);
 
-  for (let attempt = 0; attempt < config.attestationMaxAttempts; attempt += 1) {
-    const response = await fetch(url);
+  for (let attempt = 0; attempt < input.config.attestationMaxAttempts; attempt += 1) {
+    const response = await input.fetcher(url);
 
     if (response.status === 404) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, config.attestationPollIntervalMs)
-      );
+      await input.sleep(input.config.attestationPollIntervalMs);
       continue;
     }
 
@@ -403,12 +414,24 @@ async function fetchCircleAttestation(input: {
       };
     }
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, config.attestationPollIntervalMs)
-    );
+    await input.sleep(input.config.attestationPollIntervalMs);
   }
 
   return null;
+}
+
+async function fetchCircleAttestation(input: {
+  environment: RuntimeMode;
+  sourceTxHash: string;
+}) {
+  const config = getCctpSettlementConfig(input.environment);
+
+  return fetchCircleAttestationWithDeps({
+    config,
+    sourceTxHash: input.sourceTxHash,
+    fetcher: fetch,
+    sleep: (durationMs) => new Promise((resolve) => setTimeout(resolve, durationMs)),
+  });
 }
 
 async function mintAndForwardOnStellar(input: {
@@ -540,3 +563,10 @@ export async function bridgeUsdcToStellar(input: CctpBridgeInput) {
     attested: true,
   };
 }
+
+export const __test__ = {
+  amountToSourceTokenUnits,
+  buildDepositForBurnWithHookData,
+  createForwarderHookData,
+  fetchCircleAttestationWithDeps,
+};

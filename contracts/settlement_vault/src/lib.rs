@@ -503,6 +503,36 @@ mod test {
 
     #[test]
     #[should_panic]
+    fn zero_amount_deposit_fails() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 6);
+
+        fixture.vault().deposit(
+            &batch_id,
+            &fixture.merchant,
+            &0,
+            &1_100,
+            &metadata_hash(&fixture.env),
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn deposit_release_time_must_be_future() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 6);
+
+        fixture.vault().deposit(
+            &batch_id,
+            &fixture.merchant,
+            &1_000,
+            &1_000,
+            &metadata_hash(&fixture.env),
+        );
+    }
+
+    #[test]
+    #[should_panic]
     fn duplicate_batch_fails() {
         let fixture = VaultTest::new();
         let batch_id = batch_id(&fixture.env, 7);
@@ -522,5 +552,29 @@ mod test {
         fixture
             .vault()
             .resolve(&batch_id, &600, &fixture.recovery, &300);
+    }
+
+    #[test]
+    #[should_panic]
+    fn released_batch_cannot_be_held() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 9);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.set_time(1_100);
+        fixture.vault().release(&batch_id);
+        fixture.vault().hold(&batch_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn refunded_batch_cannot_be_released() {
+        let fixture = VaultTest::new();
+        let batch_id = batch_id(&fixture.env, 10);
+
+        fixture.deposit_default(batch_id.clone());
+        fixture.vault().refund(&batch_id, &fixture.recovery);
+        fixture.set_time(1_100);
+        fixture.vault().release(&batch_id);
     }
 }
