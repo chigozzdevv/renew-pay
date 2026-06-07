@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import {
   getMerchantKybStatusByMerchantId,
   getOwnerKycStatusByMerchantId,
-  processSumsubWebhook,
+  processDiditWebhook,
   startMerchantKybSession,
   startOwnerKycSession,
   syncMerchantKybStatus,
@@ -13,9 +13,9 @@ import {
   merchantKybParamSchema,
   merchantKybStatusQuerySchema,
   ownerKycStatusQuerySchema,
+  diditWebhookSchema,
   startMerchantKybSchema,
   startOwnerKycSchema,
-  sumsubWebhookSchema,
   syncMerchantKybSchema,
   syncOwnerKycSchema,
 } from "@/features/kyc/kyc.validation";
@@ -45,10 +45,7 @@ export const getMerchantKybStatusController = asyncHandler(
       merchantId: resolveMerchantScope(request, params.merchantId),
       environment: resolveEnvironmentScope(request),
     });
-    const status = await getMerchantKybStatusByMerchantId(
-      query.merchantId,
-      query.environment ?? "test"
-    );
+    const status = await getMerchantKybStatusByMerchantId(query.merchantId);
 
     response.status(200).json({
       success: true,
@@ -146,23 +143,23 @@ export const syncOwnerKycController = asyncHandler(
   }
 );
 
-export const processSumsubWebhookController = asyncHandler(
+export const processDiditWebhookController = asyncHandler(
   async (request: Request, response: Response) => {
-    const payload = sumsubWebhookSchema.parse({
+    const payload = diditWebhookSchema.parse({
       ...request.body,
-      environment: resolveEnvironmentScope(request),
     });
-    const result = await processSumsubWebhook({
+    const result = await processDiditWebhook({
       payload,
       rawBody: request.rawBody ?? JSON.stringify(payload),
-      digestHeader: request.header("x-payload-digest") ?? null,
-      digestAlgorithmHeader: request.header("x-payload-digest-alg") ?? null,
-      environment: payload.environment ?? undefined,
+      timestampHeader: request.header("x-timestamp") ?? null,
+      signatureHeader: request.header("x-signature") ?? null,
+      signatureV2Header: request.header("x-signature-v2") ?? null,
+      signatureSimpleHeader: request.header("x-signature-simple") ?? null,
     });
 
     response.status(200).json({
       success: true,
-      message: "Sumsub webhook processed.",
+      message: "Verification webhook processed.",
       data: result,
     });
   }

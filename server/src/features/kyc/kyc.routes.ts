@@ -3,7 +3,7 @@ import { Router } from "express";
 import {
   getMerchantKybStatusController,
   getOwnerKycStatusController,
-  processSumsubWebhookController,
+  processDiditWebhookController,
   startMerchantKybController,
   startOwnerKycController,
   syncMerchantKybController,
@@ -16,7 +16,7 @@ import {
 
 const kycRouter = Router();
 
-kycRouter.post("/webhooks/sumsub", processSumsubWebhookController);
+kycRouter.post("/webhooks/didit", processDiditWebhookController);
 
 kycRouter.use(requirePlatformAuth);
 

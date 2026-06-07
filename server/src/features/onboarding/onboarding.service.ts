@@ -58,7 +58,7 @@ async function resolveOnboardingState(input: {
       merchantId: input.merchantId,
       environment: input.environment,
     }),
-    getMerchantKybStatusByMerchantId(input.merchantId, input.environment),
+    getMerchantKybStatusByMerchantId(input.merchantId),
   ]);
 
   const businessComplete =
@@ -70,9 +70,8 @@ async function resolveOnboardingState(input: {
     merchant.supportEmail.trim().length > 3 &&
     merchant.supportedMarkets.length > 0;
   const ownerKycComplete = ownerKyc.status === "approved";
-  const merchantKybRequired = input.environment === "live";
-  const merchantKybComplete = !merchantKybRequired || merchantKyb.status === "approved";
-  const verificationComplete = ownerKycComplete && merchantKybComplete;
+  const merchantKybComplete = merchantKyb.status === "approved";
+  const verificationComplete = ownerKycComplete || merchantKybComplete;
   const payoutConfigured = isStellarAddress(merchant.payoutWallet);
 
   const currentStepKey = !businessComplete
@@ -165,7 +164,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
       merchantKyb: input.merchantKyb,
       required: {
         ownerKyc: true,
-        merchantKyb: input.environment === "live",
+        merchantKyb: false,
       },
     },
     payout: {
@@ -295,8 +294,7 @@ export async function startOnboardingVerification(input: {
   }
 
   const subject =
-    input.payload.subject ??
-    (input.payload.environment === "live" ? "owner_kyc" : "owner_kyc");
+    input.payload.subject ?? "owner_kyc";
 
   if (subject === "merchant_kyb") {
     return startMerchantKybSession({

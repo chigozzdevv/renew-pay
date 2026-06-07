@@ -4,11 +4,11 @@
 
 Renew helps merchants collect local payments and settle in stable assets. Merchants create a collection, open Renew checkout, and Renew handles local collection, reconciliation, fees, payout tracking, and Stellar USDC settlement.
 
-Renew uses Partna for local collection, Privy for authentication, Sumsub for KYC/KYB, and a Stellar settlement vault for released USDC payouts.
+Renew uses Partna for local collection, Privy for authentication, Didit for KYC/KYB, and a Stellar settlement vault for released USDC payouts.
 
 ## Runtime Status
 
-Renew runs in test mode with Partna test collection, Sumsub test verification, and Stellar testnet settlement configuration.
+Renew runs in test mode with Partna test collection, Didit test verification, and Stellar testnet settlement configuration.
 
 Live mode follows mainnet settlement configuration and production compliance controls.
 
@@ -29,7 +29,7 @@ Live mode follows mainnet settlement configuration and production compliance con
 | Collection | Partna |
 | Local markets | `GHS`, `KES`, `NGN` |
 | Settlement | Stellar USDC |
-| Verification | Sumsub |
+| Verification | Didit |
 
 ## How Renew Works
 
@@ -104,7 +104,7 @@ renew-pay/
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, Framer Motion |
 | Backend | Node.js, Express, MongoDB, Mongoose, BullMQ, Zod |
 | Auth | Privy |
-| Verification | Sumsub |
+| Verification | Didit |
 | Collection | Partna |
 | Settlement | Stellar, Soroban, USDC |
 | SDK | TypeScript, npm |

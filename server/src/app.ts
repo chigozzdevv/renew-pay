@@ -23,7 +23,6 @@ import { payoutRouter } from "@/features/payouts/payout.routes";
 import { settlementRouter } from "@/features/settlement/settlement.routes";
 import { settingRouter } from "@/features/settings/setting.routes";
 import { errorHandler, notFoundHandler } from "@/shared/middleware/error-handler";
-import { blockLiveModeUntilLaunch } from "@/shared/middleware/live-mode-launch-gate";
 import {
   requirePlatformAuth,
   requirePlatformPermissions,
@@ -101,60 +100,51 @@ export function createApp() {
         "developers",
         "settings",
       ]),
-      blockLiveModeUntilLaunch(),
       overviewRouter
     );
     app.use(
       `${apiBasePath}/customers`,
       requirePlatformAuth,
       requirePlatformPermissions(["customers", "settings"]),
-      blockLiveModeUntilLaunch(),
       customerRouter
     );
     app.use(
       `${apiBasePath}/payments`,
       requireWorkspaceApiAuth(["payments", "settings"]),
-      blockLiveModeUntilLaunch(),
       paymentRouter
     );
     app.use(
       `${apiBasePath}/collections`,
       requireWorkspaceApiAuth(["payments", "settings"]),
-      blockLiveModeUntilLaunch(),
       collectionRouter
     );
     app.use(
       `${apiBasePath}/settlement`,
       requireWorkspaceApiAuth(["settlement", "settings"]),
-      blockLiveModeUntilLaunch(),
       settlementRouter
     );
     app.use(
       `${apiBasePath}/payouts`,
       requirePlatformAuth,
       requirePlatformPermissions(["payouts", "settings"]),
-      blockLiveModeUntilLaunch(),
       payoutRouter
     );
     app.use(
       `${apiBasePath}/history`,
       requirePlatformAuth,
       requirePlatformPermissions(["history", "settings"]),
-      blockLiveModeUntilLaunch(),
       historyRouter
     );
     app.use(
       `${apiBasePath}/developers`,
       requirePlatformAuth,
       requirePlatformPermissions(["developers", "settings"]),
-      blockLiveModeUntilLaunch(),
       developerRouter
     );
     app.use(
       `${apiBasePath}/settings`,
       requirePlatformAuth,
       requirePlatformPermissions(["settings"]),
-      blockLiveModeUntilLaunch(),
       settingRouter
     );
     app.use(

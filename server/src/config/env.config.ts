@@ -34,26 +34,16 @@ const envSchema = z
     COLLECTION_WALLET_LIVE: z.string().trim().default(""),
     COLLECTION_PRIVATE_KEY_TEST: z.string().trim().default(""),
     COLLECTION_PRIVATE_KEY_LIVE: z.string().trim().default(""),
-    SOLANA_RPC_URL_TEST: z
+    COLLECTION_RPC_URL_TEST: z
       .string()
       .trim()
       .min(1)
       .default("https://api.devnet.solana.com"),
-    SOLANA_RPC_URL_LIVE: z
+    COLLECTION_RPC_URL_LIVE: z
       .string()
       .trim()
       .min(1)
       .default("https://api.mainnet-beta.solana.com"),
-    SOLANA_RPC_SUBSCRIPTIONS_URL_TEST: z
-      .string()
-      .trim()
-      .min(1)
-      .default("wss://api.devnet.solana.com"),
-    SOLANA_RPC_SUBSCRIPTIONS_URL_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("wss://api.mainnet-beta.solana.com"),
     STELLAR_RPC_URL_TEST: publicStringDefault("https://soroban-testnet.stellar.org"),
     STELLAR_RPC_URL_LIVE: publicStringDefault("https://mainnet.sorobanrpc.com"),
     STELLAR_HORIZON_URL_TEST: publicStringDefault(
@@ -90,27 +80,27 @@ const envSchema = z
     CCTP_SOURCE_DOMAIN_LIVE: z.coerce.number().int().nonnegative().default(5),
     CCTP_DESTINATION_DOMAIN_TEST: z.coerce.number().int().nonnegative().default(27),
     CCTP_DESTINATION_DOMAIN_LIVE: z.coerce.number().int().nonnegative().default(27),
-    CCTP_SOLANA_USDC_MINT_TEST: z
+    CCTP_COLLECTION_ASSET_MINT_TEST: z
       .string()
       .trim()
       .default("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"),
-    CCTP_SOLANA_USDC_MINT_LIVE: z
+    CCTP_COLLECTION_ASSET_MINT_LIVE: z
       .string()
       .trim()
       .default("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-    CCTP_SOLANA_TOKEN_MESSENGER_PROGRAM_ID_TEST: z
+    CCTP_COLLECTION_TOKEN_MESSENGER_PROGRAM_ID_TEST: z
       .string()
       .trim()
       .default("CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe"),
-    CCTP_SOLANA_TOKEN_MESSENGER_PROGRAM_ID_LIVE: z
+    CCTP_COLLECTION_TOKEN_MESSENGER_PROGRAM_ID_LIVE: z
       .string()
       .trim()
       .default("CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe"),
-    CCTP_SOLANA_MESSAGE_TRANSMITTER_PROGRAM_ID_TEST: z
+    CCTP_COLLECTION_MESSAGE_TRANSMITTER_PROGRAM_ID_TEST: z
       .string()
       .trim()
       .default("CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC"),
-    CCTP_SOLANA_MESSAGE_TRANSMITTER_PROGRAM_ID_LIVE: z
+    CCTP_COLLECTION_MESSAGE_TRANSMITTER_PROGRAM_ID_LIVE: z
       .string()
       .trim()
       .default("CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC"),
@@ -154,28 +144,21 @@ const envSchema = z
     CLOUDINARY_API_KEY: z.string().trim().default(""),
     CLOUDINARY_API_SECRET: z.string().trim().default(""),
     CLOUDINARY_UPLOAD_FOLDER: z.string().trim().default("renew"),
-    SUMSUB_BASE_URL_TEST: z
+    VERIFICATION_ONBOARDING_ENABLED: booleanEnv.default(true),
+    DIDIT_BASE_URL: z
       .string()
       .trim()
       .min(1)
-      .default("https://api.sumsub.com"),
-    SUMSUB_APP_TOKEN_TEST: z.string().trim().default(""),
-    SUMSUB_SECRET_KEY_TEST: z.string().trim().default(""),
-    SUMSUB_LEVEL_NAME_KYC_TEST: z.string().trim().min(1).default("renew-kyc-test"),
-    SUMSUB_LEVEL_NAME_KYB_TEST: z.string().trim().min(1).default("renew-kyb-test"),
-    SUMSUB_WEBHOOK_SECRET_TEST: z.string().trim().default(""),
-    SUMSUB_BASE_URL_LIVE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("https://api.sumsub.com"),
-    SUMSUB_APP_TOKEN_LIVE: z.string().trim().default(""),
-    SUMSUB_SECRET_KEY_LIVE: z.string().trim().default(""),
-    SUMSUB_LEVEL_NAME_KYC_LIVE: z.string().trim().min(1).default("renew-kyc-live"),
-    SUMSUB_LEVEL_NAME_KYB_LIVE: z.string().trim().min(1).default("renew-kyb-live"),
-    SUMSUB_WEBHOOK_SECRET_LIVE: z.string().trim().default(""),
-    SUMSUB_SDK_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
-    SUMSUB_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+      .default("https://verification.didit.me"),
+    DIDIT_API_KEY: z.string().trim().default(""),
+    DIDIT_WORKFLOW_ID_KYC: z.string().trim().default(""),
+    DIDIT_WORKFLOW_ID_KYB: z.string().trim().default(""),
+    DIDIT_WEBHOOK_SECRET: z.string().trim().default(""),
+    DIDIT_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    KYC_ONLY_DAILY_SETTLEMENT_LIMIT_USD: z.coerce
+      .number()
+      .positive()
+      .default(1000),
     DEVELOPER_WEBHOOK_SECRET_ENCRYPTION_KEY: z.string().trim().min(32),
     PLATFORM_AUTH_ENABLED: booleanEnv.default(true),
     PLATFORM_AUTH_JWT_SECRET: z
@@ -202,6 +185,7 @@ const envSchema = z
     RESEND_WEBHOOK_SECRET: z.string().trim().default(""),
     RESEND_INBOUND_FORWARD_TO: z.string().trim().default(""),
     RESEND_INBOUND_FORWARD_FROM: z.string().trim().default(""),
+    PAYMENT_ISSUES_ADMIN_EMAIL: z.string().trim().default("renew@muwa.io"),
   });
 
 export const env = envSchema.parse(process.env);

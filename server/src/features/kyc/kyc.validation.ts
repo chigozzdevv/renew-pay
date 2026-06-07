@@ -24,6 +24,7 @@ export const startMerchantKybSchema = z.object({
   merchantId: objectIdSchema,
   actor: z.string().trim().min(2).max(120).default("system"),
   environment: environmentInputSchema.default("test"),
+  workflowId: z.string().trim().min(2).max(120).optional(),
   levelName: z.string().trim().min(2).max(120).optional(),
   companyName: z.string().trim().min(2).max(180).optional(),
   registrationNumber: z.string().trim().min(2).max(120).optional(),
@@ -42,6 +43,7 @@ export const startOwnerKycSchema = z.object({
   merchantId: objectIdSchema,
   actor: z.string().trim().min(2).max(120).default("system"),
   environment: environmentInputSchema.default("test"),
+  workflowId: z.string().trim().min(2).max(120).optional(),
   levelName: z.string().trim().min(2).max(120).optional(),
   country: countrySchema.optional(),
   lang: z.string().trim().min(2).max(10).optional(),
@@ -63,24 +65,23 @@ export const ownerKycStatusQuerySchema = z.object({
   environment: optionalEnvironmentInputSchema,
 });
 
-export const sumsubWebhookSchema = z
+export const diditWebhookSchema = z
   .object({
     environment: optionalEnvironmentInputSchema,
-    type: z.string().trim().min(1).default("unknown"),
-    applicantId: z.string().trim().min(1).optional(),
+    event_id: z.string().trim().min(1).optional(),
+    webhook_type: z.string().trim().min(1).optional(),
+    type: z.string().trim().min(1).optional(),
+    session_id: z.string().trim().min(1).optional(),
+    vendor_data: z.string().trim().min(1).optional(),
+    vendor_user_id: z.string().trim().min(1).optional(),
     externalUserId: z.string().trim().min(1).optional(),
-    reviewStatus: z.string().trim().min(1).optional(),
-    reviewResult: z
-      .object({
-        reviewAnswer: z.string().trim().min(1).optional(),
-        reviewRejectType: z.string().trim().min(1).optional(),
-        rejectLabels: z.array(z.string().trim().min(1)).optional(),
-        moderationComment: z.string().trim().min(1).optional(),
-        clientComment: z.string().trim().min(1).optional(),
-      })
-      .partial()
-      .passthrough()
-      .optional(),
+    status: z.string().trim().min(1).optional(),
+    previous_status: z.string().trim().min(1).optional(),
+    decision: z.record(z.string(), z.unknown()).optional(),
+    resubmit_info: z.record(z.string(), z.unknown()).optional(),
+    rejectLabels: z.array(z.string().trim().min(1)).optional(),
+    comment: z.string().trim().min(1).optional(),
+    reason: z.string().trim().min(1).optional(),
   })
   .passthrough();
 
@@ -90,4 +91,4 @@ export type StartOwnerKycInput = z.infer<typeof startOwnerKycSchema>;
 export type SyncOwnerKycInput = z.infer<typeof syncOwnerKycSchema>;
 export type MerchantKybStatusQuery = z.infer<typeof merchantKybStatusQuerySchema>;
 export type OwnerKycStatusQuery = z.infer<typeof ownerKycStatusQuerySchema>;
-export type SumsubWebhookInput = z.infer<typeof sumsubWebhookSchema>;
+export type DiditWebhookInput = z.infer<typeof diditWebhookSchema>;

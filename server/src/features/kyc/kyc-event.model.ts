@@ -6,13 +6,13 @@ const kycEventSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "sumsub",
+      default: "didit",
     },
     environment: {
       type: String,
       required: true,
-      enum: ["test", "live"],
-      default: "test",
+      enum: ["global", "test", "live"],
+      default: "global",
     },
     eventKey: {
       type: String,
