@@ -30,8 +30,10 @@ import {
   type VerificationStatus,
 } from "@/lib/verification";
 import {
+  checkStellarUsdcTrustline,
   connectStellarWallet,
   enableStellarUsdcTrustline,
+  type StellarUsdcTrustlineStatus,
 } from "@/lib/stellar-wallet";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +42,7 @@ type SettingsTabKey =
   | "checkout"
   | "developers"
   | "verification"
-  | "wallets"
+  | "settlement"
   | "notifications";
 
 type BusinessDraft = WorkspaceSettings["business"];
@@ -52,7 +54,7 @@ const settingsTabKeys = [
   "verification",
   "checkout",
   "developers",
-  "wallets",
+  "settlement",
   "notifications",
 ] as const satisfies readonly SettingsTabKey[];
 
@@ -65,7 +67,9 @@ function readTabFromLocation() {
     return null;
   }
 
-  return new URLSearchParams(window.location.search).get("tab");
+  const tab = new URLSearchParams(window.location.search).get("tab");
+
+  return tab === "wallets" ? "settlement" : tab;
 }
 
 function formatAddress(value: string | null) {
@@ -134,6 +138,10 @@ export default function SettingsPage() {
     primaryWallet: "",
     walletAlerts: true,
   });
+  const [walletTrustline, setWalletTrustline] =
+    useState<StellarUsdcTrustlineStatus | null>(null);
+  const [walletStatusError, setWalletStatusError] = useState<string | null>(null);
+  const [isCheckingWallet, setIsCheckingWallet] = useState(false);
 
   useEffect(() => {
     const syncTab = () => {
@@ -165,6 +173,47 @@ export default function SettingsPage() {
   }, [data]);
 
   useEffect(() => {
+    const address = walletDraft.primaryWallet.trim();
+
+    if (!address) {
+      setWalletTrustline(null);
+      setWalletStatusError(null);
+      setIsCheckingWallet(false);
+      return;
+    }
+
+    let isCurrent = true;
+
+    setIsCheckingWallet(true);
+    setWalletStatusError(null);
+    void checkStellarUsdcTrustline(mode, address)
+      .then((status) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setWalletTrustline(status);
+      })
+      .catch((error) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setWalletTrustline(null);
+        setWalletStatusError(toErrorMessage(error));
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsCheckingWallet(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [mode, walletDraft.primaryWallet]);
+
+  useEffect(() => {
     if (!actionMessage && !actionError) {
       return;
     }
@@ -184,7 +233,7 @@ export default function SettingsPage() {
         { key: "verification", label: "Verification" },
         { key: "checkout", label: "Checkout" },
         { key: "developers", label: "Developers" },
-        { key: "wallets", label: "Settlement" },
+        { key: "settlement", label: "Settlement" },
         { key: "notifications", label: "Notifications" },
       ] satisfies Array<{ key: SettingsTabKey; label: string }>,
     [],
@@ -310,20 +359,17 @@ export default function SettingsPage() {
     });
   }
 
-  async function handleWalletSave() {
+  async function saveConnectedWallet(address: string) {
     if (!token || !user?.merchantId) {
       return;
     }
 
-    await runMutation("wallet-save", async () => {
-      await saveWalletSettings({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-        primaryWallet: walletDraft.primaryWallet.trim(),
-        walletAlerts: walletDraft.walletAlerts,
-      });
-      setActionMessage("Saved.");
+    await saveWalletSettings({
+      token,
+      merchantId: user.merchantId,
+      environment: mode,
+      primaryWallet: address.trim(),
+      walletAlerts: walletDraft.walletAlerts,
     });
   }
 
@@ -331,14 +377,30 @@ export default function SettingsPage() {
     setBusyAction("wallet-connect");
     setActionMessage(null);
     setActionError(null);
+    setWalletStatusError(null);
 
     try {
       const address = await connectStellarWallet(mode);
+      const status = await checkStellarUsdcTrustline(mode, address);
 
       setWalletDraft((current) => ({
         ...current,
         primaryWallet: address,
       }));
+      setWalletTrustline(status);
+
+      if (!status.funded) {
+        setActionError("Fund this Stellar wallet with XLM first.");
+        return;
+      }
+
+      if (!status.trusted) {
+        setActionMessage("Wallet connected.");
+        return;
+      }
+
+      await saveConnectedWallet(address);
+      await reload();
       setActionMessage("Wallet connected.");
     } catch (error) {
       setActionError(toErrorMessage(error));
@@ -351,9 +413,20 @@ export default function SettingsPage() {
     setBusyAction("wallet-enable");
     setActionMessage(null);
     setActionError(null);
+    setWalletStatusError(null);
 
     try {
-      await enableStellarUsdcTrustline(mode, walletDraft.primaryWallet);
+      const address = walletDraft.primaryWallet.trim();
+
+      await enableStellarUsdcTrustline(mode, address);
+      const status = await checkStellarUsdcTrustline(mode, address);
+      setWalletTrustline(status);
+
+      if (status.trusted) {
+        await saveConnectedWallet(address);
+        await reload();
+      }
+
       setActionMessage("USDC enabled.");
     } catch (error) {
       setActionError(toErrorMessage(error));
@@ -502,74 +575,82 @@ export default function SettingsPage() {
         </Card>
       ) : null}
 
-      {activeTab === "wallets" ? (
+      {activeTab === "settlement" ? (
         <Card>
-          <div className="space-y-4 max-w-xl">
-            <SettingsField label="Settlement wallet">
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <Input
-                  className="min-w-0"
-                  value={walletDraft.primaryWallet}
-                  placeholder="Stellar wallet address"
-                  onChange={(event) =>
-                    setWalletDraft((current) => ({
-                      ...current,
-                      primaryWallet: event.target.value,
-                    }))
-                  }
-                />
+          <div className="max-w-xl space-y-4">
+            <div className="rounded-lg border border-[color:var(--line)] bg-white px-4 py-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[color:var(--muted)]">
+                    Settlement wallet
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold text-[color:var(--ink)]">
+                    {walletDraft.primaryWallet
+                      ? formatAddress(walletDraft.primaryWallet)
+                      : "No wallet connected"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {walletDraft.primaryWallet ? (
+                      <Badge tone={walletTrustline?.trusted ? "brand" : "warning"}>
+                        {isCheckingWallet
+                          ? "Checking USDC"
+                          : walletTrustline?.trusted
+                            ? "USDC enabled"
+                            : walletTrustline?.funded === false
+                              ? "Needs XLM"
+                              : "Enable USDC"}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
                 <Button
                   type="button"
                   className="whitespace-nowrap"
                   disabled={
                     busyAction === "wallet-connect" ||
                     busyAction === "wallet-enable" ||
-                    busyAction === "wallet-save"
+                    isCheckingWallet
                   }
                   onClick={() => void handleWalletConnect()}
                 >
-                  {busyAction === "wallet-connect" ? "Connecting..." : "Connect wallet"}
+                  {busyAction === "wallet-connect"
+                    ? "Connecting..."
+                    : walletDraft.primaryWallet
+                      ? "Change wallet"
+                      : "Connect wallet"}
                 </Button>
               </div>
-            </SettingsField>
-            <Button
-              type="button"
-              className="w-full"
-              disabled={
-                !walletDraft.primaryWallet.trim() ||
-                busyAction === "wallet-connect" ||
-                busyAction === "wallet-enable" ||
-                busyAction === "wallet-save"
-              }
-              onClick={() => void handleWalletEnableUsdc()}
-            >
-              {busyAction === "wallet-enable" ? "Enabling..." : "Enable USDC"}
-            </Button>
 
-            {data.wallets.primaryWallet ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-[color:var(--muted)]">Current:</span>
-                <span className="text-sm font-semibold text-[color:var(--ink)]">
-                  {formatAddress(data.wallets.primaryWallet)}
-                </span>
-                <Badge tone="brand">Default</Badge>
-              </div>
-            ) : null}
-          </div>
+              {walletStatusError ? (
+                <p className="mt-3 text-sm font-medium text-[#9a3a31]">
+                  {walletStatusError}
+                </p>
+              ) : null}
 
-          <div className="mt-6 flex justify-end">
-            <Button
-              type="button"
-              tone="brand"
-              disabled={
-                busyAction === "wallet-connect" ||
-                busyAction === "wallet-enable" ||
-                busyAction === "wallet-save"
-              }
-              onClick={() => void handleWalletSave()}
-            >
-              {busyAction === "wallet-save" ? "Saving..." : "Save"}
-            </Button>
+              {walletTrustline?.funded === false ? (
+                <p className="mt-3 text-sm font-medium text-[color:var(--muted)]">
+                  Fund the wallet with XLM before enabling USDC.
+                </p>
+              ) : null}
+
+              {walletDraft.primaryWallet &&
+              walletTrustline?.funded &&
+              !walletTrustline.trusted ? (
+                <Button
+                  type="button"
+                  className="mt-4 w-full"
+                  disabled={
+                    busyAction === "wallet-connect" ||
+                    busyAction === "wallet-enable" ||
+                    isCheckingWallet
+                  }
+                  onClick={() => void handleWalletEnableUsdc()}
+                >
+                  {busyAction === "wallet-enable" ? "Enabling..." : "Enable USDC"}
+                </Button>
+              ) : null}
+
+            </div>
           </div>
         </Card>
       ) : null}
@@ -667,33 +748,32 @@ export default function SettingsPage() {
                   onStart={() => void handleStartBusinessVerification()}
                 />
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-[color:var(--ink)]">
-                    {verificationData.merchantKyb.status === "approved"
-                      ? "Business verified"
-                      : verificationData.ownerKyc.status === "approved"
-                        ? "Owner verified"
-                        : "Verification needed"}
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-[color:var(--muted)]">
-                    {verificationData.merchantKyb.status === "approved"
-                      ? "Higher settlement limits"
-                      : verificationData.ownerKyc.status === "approved"
-                        ? "Starter settlement limits"
-                        : "KYC or KYB unlocks access"}
-                  </p>
+              {verificationData.merchantKyb.status === "approved" ||
+              verificationData.ownerKyc.status === "approved" ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[color:var(--ink)]">
+                      {verificationData.merchantKyb.status === "approved"
+                        ? "Business verified"
+                        : "Owner verified"}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-[color:var(--muted)]">
+                      {verificationData.merchantKyb.status === "approved"
+                        ? "Higher settlement limits"
+                        : "Starter settlement limits"}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={busyAction === "verification-refresh"}
+                    onClick={() =>
+                      void runVerificationAction("verification-refresh", async () => {})
+                    }
+                  >
+                    Refresh
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  disabled={busyAction === "verification-refresh"}
-                  onClick={() =>
-                    void runVerificationAction("verification-refresh", async () => {})
-                  }
-                >
-                  Refresh
-                </Button>
-              </div>
+              ) : null}
             </div>
           )}
         </Card>

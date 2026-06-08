@@ -17,6 +17,43 @@ const stellarConfigByMode = {
   usdcIssuer: string;
 }>;
 
+type HorizonBalanceLine = {
+  asset_type?: string;
+  asset_code?: string;
+  asset_issuer?: string;
+  balance?: string;
+  limit?: string;
+  is_authorized?: boolean;
+};
+
+type HorizonAccountResponse = {
+  balances?: HorizonBalanceLine[];
+};
+
+export type StellarUsdcTrustlineStatus = {
+  address: string;
+  funded: boolean;
+  trusted: boolean;
+  balance: string | null;
+  limit: string | null;
+};
+
+function buildAccountUrl(horizonUrl: string, address: string) {
+  const base = horizonUrl.endsWith("/") ? horizonUrl : `${horizonUrl}/`;
+
+  return new URL(`accounts/${address}`, base);
+}
+
+function findUsdcBalance(account: HorizonAccountResponse, issuer: string) {
+  return account.balances?.find(
+    (balance) =>
+      balance.asset_code === "USDC" &&
+      balance.asset_issuer === issuer &&
+      (balance.asset_type === "credit_alphanum4" ||
+        balance.asset_type === "credit_alphanum12")
+  );
+}
+
 async function loadStellarWalletKit(mode: StellarWalletMode) {
   const [{ Networks, StellarWalletsKit }, { defaultModules }] = await Promise.all([
     import("@creit.tech/stellar-wallets-kit"),
@@ -40,6 +77,45 @@ export async function connectStellarWallet(mode: StellarWalletMode) {
   const { address } = await StellarWalletsKit.authModal();
 
   return address;
+}
+
+export async function checkStellarUsdcTrustline(
+  mode: StellarWalletMode,
+  address: string
+): Promise<StellarUsdcTrustlineStatus> {
+  const normalizedAddress = address.trim().toUpperCase();
+
+  if (!normalizedAddress) {
+    throw new Error("Connect a settlement wallet first.");
+  }
+
+  const config = stellarConfigByMode[mode];
+  const response = await fetch(buildAccountUrl(config.horizonUrl, normalizedAddress));
+
+  if (response.status === 404) {
+    return {
+      address: normalizedAddress,
+      funded: false,
+      trusted: false,
+      balance: null,
+      limit: null,
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error("Could not check USDC status.");
+  }
+
+  const account = (await response.json()) as HorizonAccountResponse;
+  const usdcBalance = findUsdcBalance(account, config.usdcIssuer);
+
+  return {
+    address: normalizedAddress,
+    funded: true,
+    trusted: Boolean(usdcBalance && usdcBalance.is_authorized !== false),
+    balance: usdcBalance?.balance ?? null,
+    limit: usdcBalance?.limit ?? null,
+  };
 }
 
 export async function enableStellarUsdcTrustline(
