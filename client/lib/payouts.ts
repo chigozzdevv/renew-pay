@@ -15,7 +15,7 @@ export type PayoutRecord = {
   feeUsdc: number;
   netUsdc: number;
   destinationWallet: string;
-  status: "queued" | "confirming" | "settled" | "failed" | "reversed";
+  status: "queued" | "confirming" | "held" | "settled" | "failed" | "reversed";
   txHash: string | null;
   bridgeSourceTxHash: string | null;
   bridgeReceiveTxHash: string | null;

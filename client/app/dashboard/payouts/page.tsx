@@ -139,6 +139,7 @@ export default function PayoutsPage() {
               <option value="all">All statuses</option>
               <option value="queued">Queued</option>
               <option value="confirming">Confirming</option>
+              <option value="held">Held</option>
               <option value="settled">Settled</option>
               <option value="failed">Failed</option>
               <option value="reversed">Reversed</option>

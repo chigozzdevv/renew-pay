@@ -7,11 +7,12 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiEnvelope<T> = {
+export type ApiEnvelope<T, TSummary = unknown> = {
   success: boolean;
   message?: string;
   data: T;
   pagination?: ApiPagination;
+  summary?: TSummary;
 };
 
 export type ApiPagination = {
@@ -63,7 +64,7 @@ export function clearAccessToken() {
   window.localStorage.removeItem(accessTokenStorageKey);
 }
 
-export async function fetchApi<T>(
+export async function fetchApi<T, TSummary = unknown>(
   path: string,
   init: RequestInit & {
     token?: string | null;
@@ -90,10 +91,10 @@ export async function fetchApi<T>(
     cache: "no-store",
   });
 
-  let payload: ApiEnvelope<T> | null = null;
+  let payload: ApiEnvelope<T, TSummary> | null = null;
 
   try {
-    payload = (await response.json()) as ApiEnvelope<T>;
+    payload = (await response.json()) as ApiEnvelope<T, TSummary>;
   } catch {
     payload = null;
   }

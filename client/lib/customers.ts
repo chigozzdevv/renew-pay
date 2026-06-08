@@ -18,9 +18,17 @@ export type CustomerRecord = {
   updatedAt: string;
 };
 
+export type CustomerSummary = {
+  total: number;
+  active: number;
+  blocked: number;
+  markets: number;
+};
+
 export type CustomerPage = {
   customers: CustomerRecord[];
   pagination: ApiPagination;
+  summary: CustomerSummary;
 };
 
 function resolvePagination(
@@ -37,6 +45,23 @@ function resolvePagination(
       totalPages: Math.max(1, Math.ceil(count / limit)),
     }
   );
+}
+
+function resolveCustomerSummary(
+  summary: CustomerSummary | undefined,
+  customers: CustomerRecord[],
+  pagination: ApiPagination
+) {
+  if (summary) {
+    return summary;
+  }
+
+  return {
+    total: pagination.total,
+    active: customers.filter((customer) => customer.status === "active").length,
+    blocked: customers.filter((customer) => customer.status === "blacklisted").length,
+    markets: new Set(customers.map((customer) => customer.market)).size,
+  };
 }
 
 export async function loadCustomers(input: {
@@ -72,7 +97,7 @@ export async function loadCustomersPage(input: {
   limit?: number;
 }) {
   const limit = input.limit ?? 20;
-  const response = await fetchApi<CustomerRecord[]>("/customers", {
+  const response = await fetchApi<CustomerRecord[], CustomerSummary>("/customers", {
     token: input.token,
     query: {
       merchantId: input.merchantId,
@@ -84,10 +109,17 @@ export async function loadCustomersPage(input: {
       limit,
     },
   });
+  const pagination = resolvePagination(
+    response.pagination,
+    input.page,
+    limit,
+    response.data.length
+  );
 
   return {
     customers: response.data,
-    pagination: resolvePagination(response.pagination, input.page, limit, response.data.length),
+    pagination,
+    summary: resolveCustomerSummary(response.summary, response.data, pagination),
   } satisfies CustomerPage;
 }
 

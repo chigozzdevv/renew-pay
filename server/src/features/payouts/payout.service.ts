@@ -565,7 +565,8 @@ export async function listPayouts(query: ListPayoutsQuery) {
   }
 
   if (query.search) {
-    const pattern = new RegExp(query.search, "i");
+    const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(escaped, "i");
     filters.push({
       batchRef: pattern,
     });

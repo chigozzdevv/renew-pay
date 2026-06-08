@@ -79,18 +79,54 @@ async function ensureCustomer(
   return customer;
 }
 
+function buildCustomerSearchFilter(search: string) {
+  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(escaped, "i");
+
+  return {
+    $or: [{ name: pattern }, { email: pattern }, { customerRef: pattern }],
+  };
+}
+
+async function getCustomerSummary(scopedQuery: Record<string, unknown>) {
+  const [total, active, blocked, marketAggregation] = await Promise.all([
+    CustomerModel.countDocuments(scopedQuery).exec(),
+    CustomerModel.countDocuments({ ...scopedQuery, status: "active" }).exec(),
+    CustomerModel.countDocuments({ ...scopedQuery, status: "blacklisted" }).exec(),
+    CustomerModel.aggregate<{ _id: string }>([
+      { $match: scopedQuery },
+      { $group: { _id: "$market" } },
+    ]).exec(),
+  ]);
+
+  return {
+    total,
+    active,
+    blocked,
+    markets: marketAggregation.length,
+  };
+}
+
 export async function listCustomers(query: ListCustomersQuery) {
   await ensureMerchant(query.merchantId);
 
-  const filters: Record<string, unknown>[] = [
+  const scopedFilters: Record<string, unknown>[] = [
     {
       merchantId: query.merchantId,
     },
   ];
 
   if (query.environment) {
-    filters.push(createRuntimeModeCondition("environment", query.environment));
+    scopedFilters.push(createRuntimeModeCondition("environment", query.environment));
   }
+
+  const scopedQuery =
+    scopedFilters.length === 1
+      ? scopedFilters[0]
+      : {
+          $and: scopedFilters,
+        };
+  const filters: Record<string, unknown>[] = [...scopedFilters];
 
   if (query.status) {
     filters.push({
@@ -105,13 +141,10 @@ export async function listCustomers(query: ListCustomersQuery) {
   }
 
   if (query.search) {
-    const pattern = new RegExp(query.search, "i");
-    filters.push({
-      $or: [{ name: pattern }, { email: pattern }, { customerRef: pattern }],
-    });
+    filters.push(buildCustomerSearchFilter(query.search));
   }
 
-  const scopedQuery =
+  const listQuery =
     filters.length === 1
       ? filters[0]
       : {
@@ -121,18 +154,23 @@ export async function listCustomers(query: ListCustomersQuery) {
   const pagination = resolvePagination(query);
 
   if (!pagination) {
-    const customers = await CustomerModel.find(scopedQuery)
-      .sort({ updatedAt: -1 })
-      .exec();
+    const [summary, customers] = await Promise.all([
+      getCustomerSummary(scopedQuery),
+      CustomerModel.find(listQuery)
+        .sort({ updatedAt: -1 })
+        .exec(),
+    ]);
 
     return {
       items: customers.map(toCustomerResponse),
+      summary,
     } satisfies ListResult<ReturnType<typeof toCustomerResponse>>;
   }
 
-  const [total, customers] = await Promise.all([
-    CustomerModel.countDocuments(scopedQuery).exec(),
-    CustomerModel.find(scopedQuery)
+  const [total, summary, customers] = await Promise.all([
+    CustomerModel.countDocuments(listQuery).exec(),
+    getCustomerSummary(scopedQuery),
+    CustomerModel.find(listQuery)
       .sort({ updatedAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -142,6 +180,7 @@ export async function listCustomers(query: ListCustomersQuery) {
   return {
     items: customers.map(toCustomerResponse),
     pagination: buildPagination(pagination.page, pagination.limit, total),
+    summary,
   } satisfies ListResult<ReturnType<typeof toCustomerResponse>>;
 }
 

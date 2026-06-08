@@ -14,9 +14,10 @@ export type PaginationMeta = {
   totalPages: number;
 };
 
-export type ListResult<T> = {
+export type ListResult<T, TSummary = unknown> = {
   items: T[];
   pagination?: PaginationMeta;
+  summary?: TSummary;
 };
 
 export function resolvePagination(

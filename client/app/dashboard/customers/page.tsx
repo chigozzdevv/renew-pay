@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Ban, Eye, Pencil, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
@@ -121,12 +121,12 @@ export default function CustomersPage() {
     );
   }, [marketCatalog?.defaultMarket]);
 
-  const metrics = useMemo(() => {
-    const blocked = customers.filter((c) => c.status === "blacklisted").length;
-    const markets = new Set(customers.map((c) => c.market)).size;
-    const active = customers.filter((c) => c.status === "active").length;
-    return { total: pagination.total, active, blocked, markets };
-  }, [customers, pagination.total]);
+  const metrics = data?.summary ?? {
+    total: pagination.total,
+    active: 0,
+    blocked: 0,
+    markets: 0,
+  };
 
   async function runAction(key: string, runner: () => Promise<void>) {
     setIsBusy(key);

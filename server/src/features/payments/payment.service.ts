@@ -949,16 +949,46 @@ function buildSearchFilter(search: string) {
   };
 }
 
+async function getCollectionSummary(scopedQuery: Record<string, unknown>) {
+  const [total, created, paid, recurring] = await Promise.all([
+    PaymentModel.countDocuments(scopedQuery).exec(),
+    PaymentModel.countDocuments({ ...scopedQuery, status: "open" }).exec(),
+    PaymentModel.countDocuments({
+      ...scopedQuery,
+      status: { $in: ["paid", "settling", "settled"] },
+    }).exec(),
+    PaymentModel.countDocuments({
+      ...scopedQuery,
+      "recurring.enabled": true,
+    }).exec(),
+  ]);
+
+  return {
+    total,
+    created,
+    paid,
+    recurring,
+  };
+}
+
 export async function listCollections(query: ListCollectionsQuery) {
-  const filters: Record<string, unknown>[] = [];
+  const scopedFilters: Record<string, unknown>[] = [];
 
   if (query.merchantId) {
-    filters.push({ merchantId: query.merchantId });
+    scopedFilters.push({ merchantId: query.merchantId });
   }
 
   if (query.environment) {
-    filters.push(createRuntimeModeCondition("environment", query.environment));
+    scopedFilters.push(createRuntimeModeCondition("environment", query.environment));
   }
+
+  const scopedQuery =
+    scopedFilters.length === 0
+      ? {}
+      : scopedFilters.length === 1
+        ? scopedFilters[0]
+        : { $and: scopedFilters };
+  const filters: Record<string, unknown>[] = [...scopedFilters];
 
   if (query.status) {
     if (query.status === "paid") {
@@ -996,17 +1026,22 @@ export async function listCollections(query: ListCollectionsQuery) {
   const pagination = resolvePagination(query);
 
   if (!pagination) {
-    const payments = await PaymentModel.find(mongoQuery)
-      .sort({ createdAt: -1 })
-      .exec();
+    const [summary, payments] = await Promise.all([
+      getCollectionSummary(scopedQuery),
+      PaymentModel.find(mongoQuery)
+        .sort({ createdAt: -1 })
+        .exec(),
+    ]);
 
     return {
       items: payments.map((payment) => toCollectionResponse(toPaymentResponse(payment))),
+      summary,
     } satisfies ListResult<ReturnType<typeof toCollectionResponse>>;
   }
 
-  const [total, payments] = await Promise.all([
+  const [total, summary, payments] = await Promise.all([
     PaymentModel.countDocuments(mongoQuery).exec(),
+    getCollectionSummary(scopedQuery),
     PaymentModel.find(mongoQuery)
       .sort({ createdAt: -1 })
       .skip(pagination.skip)
@@ -1017,6 +1052,7 @@ export async function listCollections(query: ListCollectionsQuery) {
   return {
     items: payments.map((payment) => toCollectionResponse(toPaymentResponse(payment))),
     pagination: buildPagination(pagination.page, pagination.limit, total),
+    summary,
   } satisfies ListResult<ReturnType<typeof toCollectionResponse>>;
 }
 

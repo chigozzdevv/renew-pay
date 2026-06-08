@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
@@ -114,18 +114,12 @@ export default function CollectionsPage() {
     return () => window.clearTimeout(timeout);
   }, [errorMessage, message]);
 
-  const metrics = useMemo(() => {
-    const created = collections.filter((collection) => collection.status === "created").length;
-    const paid = collections.filter((collection) => collection.status === "paid").length;
-    const recurringCount = collections.filter((collection) => collection.recurring.enabled).length;
-
-    return {
-      total: pagination.total,
-      created,
-      paid,
-      recurring: recurringCount,
-    };
-  }, [pagination.total, collections]);
+  const metrics = data?.summary ?? {
+    total: pagination.total,
+    created: 0,
+    paid: 0,
+    recurring: 0,
+  };
 
   async function handleCreate() {
     if (!token || !user?.merchantId) return;

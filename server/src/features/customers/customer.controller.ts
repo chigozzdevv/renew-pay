@@ -52,6 +52,7 @@ export const listCustomersController = asyncHandler(
       success: true,
       data: customers.items,
       ...(customers.pagination ? { pagination: customers.pagination } : {}),
+      ...(customers.summary ? { summary: customers.summary } : {}),
     });
   }
 );

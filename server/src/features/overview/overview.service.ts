@@ -77,7 +77,7 @@ export async function getOverview(query: OverviewQuery) {
     PaymentModel.countDocuments({
       ...scopedMerchantMatch,
       status: { $in: ["paid", "settling", "settled"] },
-      updatedAt: { $gte: dayStart, $lte: dayEnd },
+      "collection.paidAt": { $gte: dayStart, $lte: dayEnd },
     }).exec(),
     PaymentModel.countDocuments({
       ...scopedMerchantMatch,
@@ -85,7 +85,7 @@ export async function getOverview(query: OverviewQuery) {
     }).exec(),
     PayoutModel.countDocuments({
       ...scopedMerchantMatch,
-      status: { $in: ["queued", "confirming", "pending"] },
+      status: { $in: ["queued", "confirming", "held"] },
     }).exec(),
     SettlementAccountModel.countDocuments({
       ...scopedMerchantMatch,
@@ -136,7 +136,7 @@ export async function getOverview(query: OverviewQuery) {
           count: { $sum: 1 },
         },
       },
-      { $sort: { totalVolume: -1 } },
+      { $sort: { count: -1, totalVolume: -1 } },
       { $limit: 8 },
     ]).exec(),
     PaymentModel.find(scopedMerchantMatch)
@@ -153,8 +153,8 @@ export async function getOverview(query: OverviewQuery) {
       .exec(),
   ]);
 
-  const totalMarketVolume = marketMixAggregation.reduce(
-    (sum, item) => sum + item.totalVolume,
+  const totalMarketCount = marketMixAggregation.reduce(
+    (sum, item) => sum + item.count,
     0
   );
 
@@ -174,8 +174,8 @@ export async function getOverview(query: OverviewQuery) {
       totalVolume: item.totalVolume,
       count: item.count,
       share:
-        totalMarketVolume > 0
-          ? Number(((item.totalVolume / totalMarketVolume) * 100).toFixed(1))
+        totalMarketCount > 0
+          ? Number(((item.count / totalMarketCount) * 100).toFixed(1))
           : 0,
     })),
     recentActivity: [

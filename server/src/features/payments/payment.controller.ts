@@ -127,6 +127,7 @@ export const listCollectionsController = asyncHandler(
       success: true,
       data: collections.items,
       ...(collections.pagination ? { pagination: collections.pagination } : {}),
+      ...(collections.summary ? { summary: collections.summary } : {}),
     });
   }
 );

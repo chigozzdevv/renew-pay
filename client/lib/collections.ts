@@ -34,9 +34,17 @@ export type CollectionRecord = {
   updatedAt: string;
 };
 
+export type CollectionSummary = {
+  total: number;
+  created: number;
+  paid: number;
+  recurring: number;
+};
+
 export type CollectionPage = {
   collections: CollectionRecord[];
   pagination: ApiPagination;
+  summary: CollectionSummary;
 };
 
 function resolvePagination(
@@ -55,6 +63,23 @@ function resolvePagination(
   );
 }
 
+function resolveCollectionSummary(
+  summary: CollectionSummary | undefined,
+  collections: CollectionRecord[],
+  pagination: ApiPagination
+) {
+  if (summary) {
+    return summary;
+  }
+
+  return {
+    total: pagination.total,
+    created: collections.filter((collection) => collection.status === "created").length,
+    paid: collections.filter((collection) => collection.status === "paid").length,
+    recurring: collections.filter((collection) => collection.recurring.enabled).length,
+  };
+}
+
 export async function loadCollectionPage(input: {
   token: string;
   merchantId: string;
@@ -66,7 +91,7 @@ export async function loadCollectionPage(input: {
   limit?: number;
 }) {
   const limit = input.limit ?? 20;
-  const response = await fetchApi<CollectionRecord[]>("/collections", {
+  const response = await fetchApi<CollectionRecord[], CollectionSummary>("/collections", {
     token: input.token,
     query: {
       merchantId: input.merchantId,
@@ -78,10 +103,17 @@ export async function loadCollectionPage(input: {
       limit,
     },
   });
+  const pagination = resolvePagination(
+    response.pagination,
+    input.page,
+    limit,
+    response.data.length
+  );
 
   return {
     collections: response.data,
-    pagination: resolvePagination(response.pagination, input.page, limit, response.data.length),
+    pagination,
+    summary: resolveCollectionSummary(response.summary, response.data, pagination),
   } satisfies CollectionPage;
 }
 
