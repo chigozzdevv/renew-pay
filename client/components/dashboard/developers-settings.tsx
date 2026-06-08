@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Ban, Check, Copy, Pencil, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
@@ -17,13 +17,11 @@ import {
   Field,
   Input,
   LoadingState,
-  MetricCard,
   Modal,
   PaginationControls,
   PageState,
   RowActionButton,
   Select,
-  StatGrid,
   Table,
   TableRow,
 } from "@/components/dashboard/ui";
@@ -233,16 +231,6 @@ export default function DevelopersPage() {
     setEditingWebhook(createWebhookDraft(refreshedWebhook));
   }, [manageWebhook?.id, webhooks]);
 
-  const metrics = useMemo(
-    () => ({
-      keys: keysPagination.total,
-      activeKeys: keys.filter((key) => key.status === "active").length,
-      webhooks: webhooksPagination.total,
-      activeWebhooks: webhooks.filter((webhook) => webhook.status === "active").length,
-    }),
-    [keys, keysPagination.total, webhooks, webhooksPagination.total]
-  );
-
   async function runAction(key: string, runner: () => Promise<void>) {
     setIsBusy(key);
     setMessage(null);
@@ -446,19 +434,6 @@ export default function DevelopersPage() {
 
   return (
     <div className="space-y-6">
-      <StatGrid>
-        <MetricCard
-          label="Server keys"
-          value={String(metrics.keys)}
-          note={`${metrics.activeKeys} active on page`}
-        />
-        <MetricCard
-          label="Webhooks"
-          value={String(metrics.webhooks)}
-          note={`${metrics.activeWebhooks} active on page`}
-        />
-      </StatGrid>
-
       {message ? (
         <div className="rounded-2xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-3 text-sm font-medium text-[color:var(--ink)]">
           {message}
