@@ -71,7 +71,7 @@ export function statusTone(
   }
 
   if (
-    ["open", "pending", "confirming", "awaiting_settlement", "settling", "queued", "invited"].includes(status)
+    ["open", "pending", "confirming", "held", "awaiting_settlement", "settling", "queued", "invited"].includes(status)
   ) {
     return "warning";
   }

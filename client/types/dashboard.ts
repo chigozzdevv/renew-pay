@@ -3,7 +3,6 @@ export type DashboardRouteKey =
   | "collections"
   | "settlement"
   | "customers"
-  | "payouts"
   | "history"
   | "settings";
 

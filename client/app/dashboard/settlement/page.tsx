@@ -1,21 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Plus } from "lucide-react";
+import { Eye } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
-import { useDashboardSession } from "@/components/dashboard/session-provider";
 import {
   StatusBadge,
+  formatCurrency,
   formatDateTime,
+  formatTxHash,
+  getStellarTxUrl,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
+import { useDashboardSession } from "@/components/dashboard/session-provider";
 import { useResource } from "@/components/dashboard/use-resource";
 import {
+  Badge,
   Button,
   Card,
   Field,
-  Input,
   LoadingState,
   MetricCard,
   Modal,
@@ -25,48 +29,55 @@ import {
   Table,
   TableRow,
 } from "@/components/dashboard/ui";
-import {
-  createSettlementAccount,
-  loadSettlementAccounts,
-  type SettlementAccountRecord,
-} from "@/lib/settlement";
+import { loadPayouts, type PayoutRecord } from "@/lib/payouts";
 import { loadWorkspaceSettings } from "@/lib/settings";
-
-type SettlementAccountDraft = {
-  name: string;
-  isDefault: boolean;
-};
-
-const EMPTY_DRAFT: SettlementAccountDraft = {
-  name: "",
-  isDefault: false,
-};
+import {
+  checkStellarUsdcTrustline,
+  type StellarUsdcTrustlineStatus,
+} from "@/lib/stellar-wallet";
 
 function formatAddress(value: string | null) {
   if (!value) {
-    return "Not set";
+    return "Not connected";
   }
 
   return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
 }
 
+function isPendingSettlement(payout: PayoutRecord) {
+  return ["queued", "confirming", "held"].includes(payout.status);
+}
+
+function getEarliestRelease(payouts: PayoutRecord[]) {
+  return payouts.reduce<string | null>((earliest, payout) => {
+    if (!isPendingSettlement(payout)) {
+      return earliest;
+    }
+
+    if (!earliest) {
+      return payout.scheduledFor;
+    }
+
+    return new Date(payout.scheduledFor).getTime() < new Date(earliest).getTime()
+      ? payout.scheduledFor
+      : earliest;
+  }, null);
+}
+
 export default function SettlementPage() {
-  const { token, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
-  const [showCreate, setShowCreate] = useState(false);
-  const [draft, setDraft] = useState<SettlementAccountDraft>({ ...EMPTY_DRAFT });
-  const [detailAccount, setDetailAccount] = useState<SettlementAccountRecord | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [detailPayout, setDetailPayout] = useState<PayoutRecord | null>(null);
+  const [walletTrustline, setWalletTrustline] =
+    useState<StellarUsdcTrustlineStatus | null>(null);
+  const [walletStatusError, setWalletStatusError] = useState<string | null>(null);
+  const [isCheckingWallet, setIsCheckingWallet] = useState(false);
 
   const { data, isLoading, error, reload } = useResource(
     async ({ token, merchantId }) =>
-      loadSettlementAccounts({
+      loadPayouts({
         token,
         merchantId,
         environment: mode,
-        limit: 50,
       }),
     [mode]
   );
@@ -79,70 +90,64 @@ export default function SettlementPage() {
       }),
     [mode]
   );
-  const accounts = data?.accounts ?? [];
-  const defaultPayoutWallet = settingsData?.wallets.primaryWallet ?? "";
-  const canUseSettlementWallet = defaultPayoutWallet.length > 0;
+
+  const payouts = data ?? [];
+  const settlementWallet = settingsData?.wallets.primaryWallet ?? "";
 
   useEffect(() => {
-    if (!message && !errorMessage) return;
-    const timeout = window.setTimeout(() => {
-      setMessage(null);
-      setErrorMessage(null);
-    }, 3000);
-    return () => window.clearTimeout(timeout);
-  }, [errorMessage, message]);
-
-  const metrics = useMemo(() => {
-    const active = accounts.filter((account) => account.status === "active").length;
-    const defaultAccount = accounts.find((account) => account.isDefault);
-
-    return {
-      total: accounts.length,
-      active,
-      defaultAccount: defaultAccount?.name ?? "None",
-    };
-  }, [accounts]);
-
-  function openCreateModal() {
-    if (!canUseSettlementWallet) {
-      setErrorMessage("Add a Stellar payout wallet in Settings first.");
+    if (!settlementWallet.trim()) {
+      setWalletTrustline(null);
+      setWalletStatusError(null);
+      setIsCheckingWallet(false);
       return;
     }
 
-    setDraft({ ...EMPTY_DRAFT });
-    setShowCreate(true);
-  }
+    let isCurrent = true;
 
-  async function handleCreate() {
-    if (!token || !user?.merchantId) return;
-
-    setIsBusy(true);
-    setMessage(null);
-    setErrorMessage(null);
-
-    try {
-      await createSettlementAccount({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-        name: draft.name.trim(),
-        destinationAddress: defaultPayoutWallet,
-        isDefault: draft.isDefault,
+    setIsCheckingWallet(true);
+    setWalletStatusError(null);
+    void checkStellarUsdcTrustline(mode, settlementWallet)
+      .then((status) => {
+        if (isCurrent) {
+          setWalletTrustline(status);
+        }
+      })
+      .catch((statusError) => {
+        if (isCurrent) {
+          setWalletTrustline(null);
+          setWalletStatusError(toErrorMessage(statusError));
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsCheckingWallet(false);
+        }
       });
-      setDraft({ ...EMPTY_DRAFT });
-      setShowCreate(false);
-      setMessage("Settlement account created.");
-      await reload();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setIsBusy(false);
-    }
-  }
 
-  const canCreate =
-    draft.name.trim().length >= 2 &&
-    canUseSettlementWallet;
+    return () => {
+      isCurrent = false;
+    };
+  }, [mode, settlementWallet]);
+
+  const metrics = useMemo(() => {
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+    const pending = payouts.filter(isPendingSettlement);
+    const settled30d = payouts
+      .filter(
+        (payout) =>
+          payout.status === "settled" &&
+          new Date(payout.settledAt ?? payout.updatedAt).getTime() >= thirtyDaysAgo
+      )
+      .reduce((sum, payout) => sum + payout.netUsdc, 0);
+
+    return {
+      pendingNet: pending.reduce((sum, payout) => sum + payout.netUsdc, 0),
+      nextRelease: getEarliestRelease(payouts),
+      settled30d,
+      failed: payouts.filter((payout) => payout.status === "failed").length,
+    };
+  }, [payouts]);
 
   if (isLoading && !data) {
     return <LoadingState />;
@@ -152,9 +157,13 @@ export default function SettlementPage() {
     return (
       <PageState
         title="Settlement unavailable"
-        message={error ?? "Unable to load settlement accounts."}
+        message={error ?? "Unable to load settlement activity."}
         tone="danger"
-        action={<button className="text-sm font-semibold" onClick={() => void reload()}>Retry</button>}
+        action={
+          <button className="text-sm font-semibold" onClick={() => void reload()}>
+            Retry
+          </button>
+        }
       />
     );
   }
@@ -162,94 +171,129 @@ export default function SettlementPage() {
   return (
     <div className="space-y-5">
       <StatGrid>
-        <MetricCard label="Accounts" value={String(metrics.total)} />
-        <MetricCard label="Active" value={String(metrics.active)} />
-        <MetricCard label="Asset" value="USDC" />
-        <MetricCard label="Default account" value={metrics.defaultAccount} />
+        <MetricCard label="Pending net" value={formatCurrency(metrics.pendingNet)} />
+        <MetricCard label="Next release" value={formatDateTime(metrics.nextRelease)} />
+        <MetricCard label="Settled 30d" value={formatCurrency(metrics.settled30d)} />
+        <MetricCard label="Failed" value={String(metrics.failed)} />
       </StatGrid>
 
       <Card
-        title="Settlement"
+        title="Settlement wallet"
         action={
-          <Button tone="brand" className="gap-2" disabled={!canUseSettlementWallet} onClick={openCreateModal}>
-            <Plus className="h-4 w-4" strokeWidth={2.2} />
-            New account
-          </Button>
+          <Link
+            href="/dashboard/settings?tab=settlement"
+            className="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-white px-3.5 py-2.5 text-sm font-semibold text-[color:var(--ink)] transition-colors hover:bg-[color:var(--soft)]"
+          >
+            Settings
+          </Link>
         }
       >
-        <div className="space-y-4">
-          {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
-          {errorMessage ? <p className="text-sm text-[#9a3a31]">{errorMessage}</p> : null}
-
-          <Table columns={["Account", "Asset", "Payout wallet", "Status", "Actions"]}>
-            {accounts.map((account) => (
-              <TableRow key={account.id} columns={5}>
-                <button type="button" className="min-w-0 text-left" onClick={() => setDetailAccount(account)}>
-                  <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{account.name}</p>
-                </button>
-                <p className="self-center text-sm font-semibold text-[color:var(--ink)]">Stellar USDC</p>
-                <p className="truncate self-center text-sm text-[color:var(--muted)]" title={account.destinationAddress ?? undefined}>
-                  {formatAddress(account.destinationAddress)}
-                </p>
-                <div className="flex items-center gap-2 self-center">
-                  {account.isDefault ? <StatusBadge value="active">Default</StatusBadge> : null}
-                  <StatusBadge value={account.status} />
-                </div>
-                <div className="flex items-center gap-2 self-center">
-                  <RowActionButton
-                    label="View account"
-                    onClick={() => setDetailAccount(account)}
-                  >
-                    <Eye className="h-4 w-4" strokeWidth={2.1} />
-                  </RowActionButton>
-                </div>
-              </TableRow>
-            ))}
-          </Table>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-[color:var(--ink)]">
+              {formatAddress(settlementWallet)}
+            </p>
+            {walletStatusError ? (
+              <p className="mt-2 text-sm font-medium text-[#9a3a31]">
+                {walletStatusError}
+              </p>
+            ) : null}
+          </div>
+          {settlementWallet ? (
+            <Badge tone={walletTrustline?.trusted ? "brand" : "warning"}>
+              {isCheckingWallet
+                ? "Checking USDC"
+                : walletTrustline?.trusted
+                  ? "USDC enabled"
+                  : walletTrustline?.funded === false
+                    ? "Needs XLM"
+                    : "Enable USDC"}
+            </Badge>
+          ) : (
+            <Badge tone="warning">Not connected</Badge>
+          )}
         </div>
       </Card>
 
+      <Card title="Recent settlements">
+        <Table columns={["Settlement", "Net", "Release", "Status", "Actions"]}>
+          {payouts.slice(0, 12).map((payout) => (
+            <TableRow key={payout.id} columns={5}>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-[color:var(--ink)]">
+                  {payout.batchRef}
+                </p>
+                <p className="mt-1 text-xs text-[color:var(--muted)]">
+                  {payout.commercialRef ?? payout.sourceKind}
+                </p>
+              </div>
+              <p className="self-center text-sm font-semibold text-[color:var(--ink)]">
+                {formatCurrency(payout.netUsdc)}
+              </p>
+              <p className="self-center text-sm text-[color:var(--muted)]">
+                {formatDateTime(payout.scheduledFor)}
+              </p>
+              <div className="self-center">
+                <StatusBadge value={payout.status} />
+              </div>
+              <div className="flex items-center gap-2 self-center">
+                <RowActionButton
+                  label="View settlement"
+                  onClick={() => setDetailPayout(payout)}
+                >
+                  <Eye className="h-4 w-4" strokeWidth={2.1} />
+                </RowActionButton>
+              </div>
+            </TableRow>
+          ))}
+        </Table>
+
+        {payouts.length === 0 ? (
+          <div className="rounded-lg border border-[color:var(--line)] bg-[#fafafd] px-5 py-8 text-center">
+            <p className="text-sm font-semibold text-[color:var(--ink)]">
+              No settlements yet
+            </p>
+          </div>
+        ) : null}
+      </Card>
+
       <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="New settlement account"
+        open={!!detailPayout}
+        onClose={() => setDetailPayout(null)}
+        title={detailPayout?.batchRef ?? "Settlement"}
+        size="lg"
         footer={
-          <div className="flex items-center justify-end gap-3">
-            <Button onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button tone="brand" disabled={isBusy || !canCreate} onClick={() => void handleCreate()}>
-              {isBusy ? "Saving..." : "Create"}
-            </Button>
+          <div className="flex justify-end">
+            <Button onClick={() => setDetailPayout(null)}>Close</Button>
           </div>
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-1.5 md:col-span-2">
-            <span className="text-xs font-medium text-[color:var(--muted)]">Account name</span>
-            <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
-          </label>
-          <Field label="Settlement" value="Stellar USDC" />
-          <Field label="Payout wallet" value={formatAddress(defaultPayoutWallet)} />
-          <label className="flex items-center gap-3 md:col-span-2">
-            <input type="checkbox" checked={draft.isDefault} onChange={(event) => setDraft((current) => ({ ...current, isDefault: event.target.checked }))} />
-            <span className="text-sm font-medium text-[color:var(--ink)]">Make default</span>
-          </label>
-        </div>
-      </Modal>
-
-      <Modal
-        open={!!detailAccount}
-        onClose={() => setDetailAccount(null)}
-        title={detailAccount?.name ?? "Settlement account"}
-        size="lg"
-        footer={<div className="flex justify-end"><Button onClick={() => setDetailAccount(null)}>Close</Button></div>}
-      >
-        {detailAccount ? (
+        {detailPayout ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Settlement" value="Stellar USDC" />
-            <Field label="Payout wallet" value={detailAccount.destinationAddress ?? "Not set"} />
-            <Field label="Default" value={detailAccount.isDefault ? "Yes" : "No"} />
-            <Field label="Status" value={detailAccount.status} />
-            <Field label="Created" value={formatDateTime(detailAccount.createdAt)} />
+            <Field label="Gross" value={formatCurrency(detailPayout.grossUsdc)} />
+            <Field label="Fee" value={formatCurrency(detailPayout.feeUsdc)} />
+            <Field label="Net" value={formatCurrency(detailPayout.netUsdc)} />
+            <Field label="Wallet" value={detailPayout.destinationWallet} />
+            <Field label="Release" value={formatDateTime(detailPayout.scheduledFor)} />
+            <Field label="Settled" value={formatDateTime(detailPayout.settledAt)} />
+            <Field label="Status" value={detailPayout.status} />
+            <Field
+              label="Transaction"
+              value={
+                detailPayout.creditTxHash ? (
+                  <a
+                    href={getStellarTxUrl(mode, detailPayout.creditTxHash)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline decoration-black/20 underline-offset-4"
+                  >
+                    {formatTxHash(detailPayout.creditTxHash)}
+                  </a>
+                ) : (
+                  "Not set"
+                )
+              }
+            />
           </div>
         ) : null}
       </Modal>

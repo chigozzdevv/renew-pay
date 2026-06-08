@@ -51,7 +51,7 @@ export default function OverviewPage() {
           value={String(data.stats.openPayments)}
         />
         <MetricCard
-          label="Pending payouts"
+          label="Pending settlement"
           value={String(data.stats.pendingPayouts)}
         />
         <MetricCard
