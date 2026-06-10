@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@privy-io/node": "^0.11.0",
+    "@renew.sh/sdk": "^0.1.12",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "@stellar/stellar-sdk": "^15.1.0",
