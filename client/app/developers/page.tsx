@@ -7,28 +7,23 @@ import { Header } from "@/components/shared/header";
 import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
-const sdkSnippet = `const response = await fetch("https://sandbox.renew.sh/v1/collections", {
-  method: "POST",
-  headers: {
-    "x-renew-secret-key": process.env.RENEW_SECRET_KEY!,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    amount: 25000,
-    currency: "NGN",
-    reference: "order_1042",
-    description: "Order #1042",
-    settlement: "default",
-  }),
+const sdkSnippet = `import { renew } from "@renew.sh/sdk";
+
+const client = renew({
+  secretKey: process.env.RENEW_SECRET_KEY!,
 });
 
-if (!response.ok) {
-  throw new Error(await response.text());
-}
+const collection = await client.collections.create({
+  amount: 25000,
+  currency: "NGN",
+  reference: "order_1042",
+  description: "Order #1042",
+  items: [
+    { name: "Everyday Tote", amount: 12500, quantity: 2 },
+  ],
+});
 
-const { data: collection } = await response.json();
-
-console.log(collection.id, collection.checkoutUrl);`;
+return collection.checkoutUrl;`;
 
 export const metadata: Metadata = {
   title: "Renew Developers | APIs",
@@ -53,8 +48,8 @@ export default function DevelopersPage() {
                     <span className="inline-flex h-11 items-center rounded-full bg-[#111111] px-5 text-[0.74rem] font-semibold uppercase tracking-[0.18em] text-white">
                       API
                     </span>
-                    <h1 className="mt-8 max-w-[11ch] font-display text-[clamp(2.8rem,5.8vw,4.9rem)] leading-[0.92] tracking-[-0.06em] text-[#111111]">
-                      Build collection flows without rebuilding the stack.
+                    <h1 className="mt-8 max-w-[12ch] font-display text-[clamp(2.8rem,5.8vw,4.9rem)] leading-[0.92] tracking-[-0.06em] text-[#111111]">
+                      One API, Unified Fiat Collection
                     </h1>
 
                     <div className="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -78,7 +73,7 @@ export default function DevelopersPage() {
                 <div className="px-7 py-9 sm:px-10 sm:py-12 lg:px-14 lg:py-16">
                   <div className="mx-auto w-full max-w-[34rem]">
                     <CodeBlock
-                      label="API quickstart"
+                      label="SDK quickstart"
                       language="ts"
                       code={sdkSnippet}
                       className="mt-0"
