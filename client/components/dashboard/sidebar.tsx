@@ -52,7 +52,7 @@ export function DashboardSidebar({
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-black/4 text-[color:var(--ink)]"
                     : "text-[color:var(--muted)] hover:bg-black/4 hover:text-[color:var(--ink)]",

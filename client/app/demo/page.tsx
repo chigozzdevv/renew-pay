@@ -133,7 +133,7 @@ export default function DemoPage() {
           </a>
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-black/10 bg-[#f2f7ef] px-3 py-1.5 text-sm font-semibold text-[#526058]">
-              Demo
+              Playground
             </span>
             <a
               href="/docs"

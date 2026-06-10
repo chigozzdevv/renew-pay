@@ -45,10 +45,7 @@ export default function DevelopersPage() {
               <div className="grid lg:grid-cols-[minmax(0,0.94fr)_1px_minmax(0,1.06fr)]">
                 <div className="px-7 py-9 sm:px-10 sm:py-12 lg:flex lg:items-center lg:px-14 lg:py-16">
                   <div className="mx-auto w-full max-w-[32rem]">
-                    <span className="inline-flex h-11 items-center rounded-full bg-[#111111] px-5 text-[0.74rem] font-semibold uppercase tracking-[0.18em] text-white">
-                      API
-                    </span>
-                    <h1 className="mt-8 max-w-[12ch] font-display text-[clamp(2.8rem,5.8vw,4.9rem)] leading-[0.92] tracking-[-0.06em] text-[#111111]">
+                    <h1 className="max-w-[12ch] font-display text-[clamp(2.8rem,5.8vw,4.9rem)] leading-[0.92] tracking-[-0.06em] text-[#111111]">
                       One API, Unified Fiat Collection
                     </h1>
 

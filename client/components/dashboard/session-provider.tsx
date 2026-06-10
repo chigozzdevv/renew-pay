@@ -148,6 +148,26 @@ export function DashboardSessionProvider({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
+  const authStateRef = useRef({ ready: false, authenticated: false });
+  const loginRedirectTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    authStateRef.current = { ready, authenticated };
+
+    if (authenticated && loginRedirectTimeoutRef.current !== null) {
+      window.clearTimeout(loginRedirectTimeoutRef.current);
+      loginRedirectTimeoutRef.current = null;
+    }
+  }, [authenticated, ready]);
+
+  useEffect(
+    () => () => {
+      if (loginRedirectTimeoutRef.current !== null) {
+        window.clearTimeout(loginRedirectTimeoutRef.current);
+      }
+    },
+    []
+  );
 
   const exchangePrivyAccess = useCallback(async () => {
     const authToken = await getAccessToken();
@@ -173,6 +193,22 @@ export function DashboardSessionProvider({
     return session.accessToken;
   }, [privyUser]);
 
+  const scheduleLoginRedirect = useCallback(() => {
+    if (typeof window === "undefined" || loginRedirectTimeoutRef.current !== null) {
+      return;
+    }
+
+    loginRedirectTimeoutRef.current = window.setTimeout(() => {
+      loginRedirectTimeoutRef.current = null;
+
+      const authState = authStateRef.current;
+
+      if (authState.ready && !authState.authenticated && !readAccessToken()) {
+        redirectToLogin();
+      }
+    }, 800);
+  }, []);
+
   const refresh = useCallback(async () => {
     if (refreshPromiseRef.current) {
       return refreshPromiseRef.current;
@@ -183,6 +219,7 @@ export function DashboardSessionProvider({
       const nextToken = readAccessToken();
 
       if (!nextToken && !ready) {
+        keepLoading = true;
         setIsLoading(true);
         return false;
       }
@@ -190,6 +227,7 @@ export function DashboardSessionProvider({
       let activeToken = nextToken;
 
       if (!activeToken && authenticated) {
+        setIsLoading(true);
         try {
           activeToken = await exchangePrivyAccess();
         } catch {
@@ -200,10 +238,25 @@ export function DashboardSessionProvider({
       setToken(activeToken);
 
       if (!activeToken) {
+        if (!ready) {
+          setToken(null);
+          setUser(null);
+          setError(null);
+          keepLoading = true;
+          return false;
+        }
+
+        if (authenticated) {
+          setToken(null);
+          setUser(null);
+          setError("Unable to restore dashboard session.");
+          return false;
+        }
+
         setUser(null);
         setError("Dashboard session is missing. Sign in again.");
         setIsLoading(false);
-        redirectToLogin();
+        scheduleLoginRedirect();
         return false;
       }
 
@@ -235,7 +288,6 @@ export function DashboardSessionProvider({
               setToken(null);
               setUser(null);
               setError(nextError);
-              redirectToLogin();
               return false;
             }
           }
@@ -251,7 +303,7 @@ export function DashboardSessionProvider({
           setToken(null);
           setUser(null);
           setError(error.message);
-          redirectToLogin();
+          scheduleLoginRedirect();
           return false;
         }
 
@@ -274,7 +326,7 @@ export function DashboardSessionProvider({
     } finally {
       refreshPromiseRef.current = null;
     }
-  }, [authenticated, exchangePrivyAccess, ready]);
+  }, [authenticated, exchangePrivyAccess, ready, scheduleLoginRedirect]);
 
   useEffect(() => {
     void refresh();
