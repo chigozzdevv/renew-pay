@@ -134,55 +134,46 @@ export default function PlaygroundPage() {
       </Suspense>
 
       <main className="flex-1">
-        <section className="pb-16 pt-12 sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20">
+        <section className="pb-16 pt-8 sm:pb-20 sm:pt-10 lg:pb-24 lg:pt-12">
           <Container>
             <Reveal offset={28}>
               <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_1px_380px] lg:gap-10">
                 <div className="min-w-0">
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                      <h1 className="max-w-[12ch] font-display text-5xl leading-[0.94] text-[#111111] sm:text-6xl lg:text-7xl">
-                        Checkout playground
-                      </h1>
-                      <p className="mt-5 max-w-xl text-base font-medium leading-7 text-[#5f6b63] sm:text-lg">
-                        Create a collection, open Renew Checkout, and test local payment flows.
-                      </p>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      {playgroundUseCases.map((useCase) => (
+                        <button
+                          key={useCase.id}
+                          type="button"
+                          onClick={() => setUseCaseId(useCase.id)}
+                          className={cn(
+                            "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+                            useCase.id === useCaseId
+                              ? "bg-[#111111] text-white"
+                              : "bg-white/60 text-[#5e6761] hover:bg-white"
+                          )}
+                        >
+                          {useCase.label}
+                        </button>
+                      ))}
                     </div>
 
-                    <label className="grid w-full gap-1.5 sm:max-w-[240px]">
+                    <label className="grid w-[132px] gap-1.5">
                       <span className="text-xs font-semibold uppercase text-[#7b837d]">
-                        Country
+                        Currency
                       </span>
                       <select
                         value={marketCode}
                         onChange={(event) => setMarketCode(event.target.value)}
-                        className="h-12 rounded-lg border border-black/10 bg-white/70 px-3 text-base font-semibold text-[#111111] outline-none transition-colors focus:border-[#2f6f4e]"
+                        className="h-11 rounded-lg border border-black/10 bg-white/70 px-3 text-base font-semibold text-[#111111] outline-none transition-colors focus:border-[#2f6f4e]"
                       >
                         {playgroundMarkets.map((market) => (
                           <option key={market.code} value={market.code}>
-                            {market.label} - {market.currency}
+                            {market.currency}
                           </option>
                         ))}
                       </select>
                     </label>
-                  </div>
-
-                  <div className="mt-10 flex flex-wrap gap-2">
-                    {playgroundUseCases.map((useCase) => (
-                      <button
-                        key={useCase.id}
-                        type="button"
-                        onClick={() => setUseCaseId(useCase.id)}
-                        className={cn(
-                          "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-                          useCase.id === useCaseId
-                            ? "bg-[#111111] text-white"
-                            : "bg-white/60 text-[#5e6761] hover:bg-white"
-                        )}
-                      >
-                        {useCase.label}
-                      </button>
-                    ))}
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-1.5">
