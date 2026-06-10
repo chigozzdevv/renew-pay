@@ -1,7 +1,15 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, Loader2, Minus, Plus, ShoppingBag } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Loader2,
+  Minus,
+  Plus,
+  ShoppingBag,
+} from "lucide-react";
 import { checkout } from "@renew.sh/sdk";
 
 import { Footer } from "@/components/landing/footer";
@@ -158,14 +166,15 @@ export default function PlaygroundPage() {
                       ))}
                     </div>
 
-                    <label className="grid w-[132px] gap-1.5">
-                      <span className="text-xs font-semibold uppercase text-[#7b837d]">
+                    <label className="relative inline-flex w-[78px] items-center justify-end">
+                      <span className="sr-only">
                         Currency
                       </span>
                       <select
                         value={marketCode}
+                        aria-label="Currency"
                         onChange={(event) => setMarketCode(event.target.value)}
-                        className="h-11 rounded-lg border border-black/10 bg-white/70 px-3 text-base font-semibold text-[#111111] outline-none transition-colors focus:border-[#2f6f4e]"
+                        className="h-10 w-full appearance-none bg-transparent py-0 pl-1 pr-6 text-right text-base font-semibold text-[#111111] outline-none transition-colors focus:text-[#2f6f4e]"
                       >
                         {playgroundMarkets.map((market) => (
                           <option key={market.code} value={market.code}>
@@ -173,6 +182,7 @@ export default function PlaygroundPage() {
                           </option>
                         ))}
                       </select>
+                      <ChevronDown className="pointer-events-none absolute right-0 h-4 w-4 text-[#5f6b63]" />
                     </label>
                   </div>
 
