@@ -30,7 +30,7 @@ const envSchema = z
     MONGODB_DB_NAME: z.string().trim().min(1).default("renew_v2"),
     CORS_ORIGINS: z.string().trim().default("http://localhost:3000"),
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
-    DEMO_RENEW_SECRET_KEY: z.string().trim().default(""),
+    PLAYGROUND_RENEW_SECRET_KEY: z.string().trim().default(""),
     COLLECTION_WALLET_TEST: z.string().trim().default(""),
     COLLECTION_WALLET_LIVE: z.string().trim().default(""),
     COLLECTION_PRIVATE_KEY_TEST: z.string().trim().default(""),

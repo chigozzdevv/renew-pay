@@ -1,26 +1,26 @@
-export type DemoUseCase = "ecommerce" | "marketplace" | "saas" | "fintech";
+export type PlaygroundUseCase = "ecommerce" | "marketplace" | "saas" | "fintech";
 
-export type DemoMarketCode = "NG" | "GH" | "KE";
+export type PlaygroundMarketCode = "NG" | "GH" | "KE";
 
-export type DemoVariant = {
+export type PlaygroundVariant = {
   readonly id: string;
   readonly label: string;
 };
 
-export type DemoItem = {
+export type PlaygroundItem = {
   readonly id: string;
   readonly name: string;
   readonly detail: string;
   readonly amount: Record<string, number>;
 };
 
-export type DemoUseCaseConfig = {
-  readonly id: DemoUseCase;
+export type PlaygroundUseCaseConfig = {
+  readonly id: PlaygroundUseCase;
   readonly label: string;
   readonly title: string;
   readonly action: string;
-  readonly variants: readonly DemoVariant[];
-  readonly items: Record<string, readonly DemoItem[]>;
+  readonly variants: readonly PlaygroundVariant[];
+  readonly items: Record<string, readonly PlaygroundItem[]>;
   readonly recurring?: {
     readonly enabled: boolean;
     readonly interval: "month";
@@ -28,13 +28,13 @@ export type DemoUseCaseConfig = {
   };
 };
 
-export const demoMarkets = [
+export const playgroundMarkets = [
   { code: "NG", label: "Nigeria", currency: "NGN", locale: "en-NG" },
   { code: "GH", label: "Ghana", currency: "GHS", locale: "en-GH" },
   { code: "KE", label: "Kenya", currency: "KES", locale: "en-KE" },
 ] as const;
 
-export const demoUseCases: readonly DemoUseCaseConfig[] = [
+export const playgroundUseCases: readonly PlaygroundUseCaseConfig[] = [
   {
     id: "ecommerce",
     label: "Ecommerce",
@@ -330,26 +330,26 @@ export const demoUseCases: readonly DemoUseCaseConfig[] = [
   },
 ] as const;
 
-export function getDemoMarket(code: string) {
-  return demoMarkets.find((market) => market.code === code) ?? demoMarkets[0];
+export function getPlaygroundMarket(code: string) {
+  return playgroundMarkets.find((market) => market.code === code) ?? playgroundMarkets[0];
 }
 
-export function getDemoUseCase(id: string) {
-  return demoUseCases.find((useCase) => useCase.id === id) ?? demoUseCases[0];
+export function getPlaygroundUseCase(id: string) {
+  return playgroundUseCases.find((useCase) => useCase.id === id) ?? playgroundUseCases[0];
 }
 
-export function getDemoVariant(useCase: DemoUseCaseConfig, id: string) {
+export function getPlaygroundVariant(useCase: PlaygroundUseCaseConfig, id: string) {
   return (
     useCase.variants.find((variant) => variant.id === id) ?? useCase.variants[0]
   );
 }
 
-export function getDemoItems(useCase: DemoUseCaseConfig, variantId: string) {
+export function getPlaygroundItems(useCase: PlaygroundUseCaseConfig, variantId: string) {
   return useCase.items[variantId] ?? useCase.items[useCase.variants[0].id] ?? [];
 }
 
-export function formatDemoAmount(amount: number, marketCode: string) {
-  const market = getDemoMarket(marketCode);
+export function formatPlaygroundAmount(amount: number, marketCode: string) {
+  const market = getPlaygroundMarket(marketCode);
 
   return new Intl.NumberFormat(market.locale, {
     style: "currency",

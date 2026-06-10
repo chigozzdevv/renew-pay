@@ -1,17 +1,17 @@
 import type { Request, Response } from "express";
 
-import { createDemoCollection } from "@/features/demo/demo.service";
-import { createDemoCollectionSchema } from "@/features/demo/demo.validation";
+import { createPlaygroundCollection } from "@/features/playground/playground.service";
+import { createPlaygroundCollectionSchema } from "@/features/playground/playground.validation";
 import { asyncHandler } from "@/shared/utils/async-handler";
 
-export const createDemoCollectionController = asyncHandler(
+export const createPlaygroundCollectionController = asyncHandler(
   async (request: Request, response: Response) => {
-    const input = createDemoCollectionSchema.parse(request.body);
-    const collection = await createDemoCollection(input);
+    const input = createPlaygroundCollectionSchema.parse(request.body);
+    const collection = await createPlaygroundCollection(input);
 
     response.status(201).json({
       success: true,
-      message: "Demo collection created.",
+      message: "Playground collection created.",
       data: {
         id: collection.id,
         reference: collection.reference,

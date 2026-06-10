@@ -5,7 +5,7 @@ import { getAllowedCorsOrigins } from "@/config/env.config";
 import { auditRouter } from "@/features/audit/audit.routes";
 import { authRouter } from "@/features/auth/auth.routes";
 import { customerRouter } from "@/features/customers/customer.routes";
-import { demoRouter } from "@/features/demo/demo.routes";
+import { playgroundRouter } from "@/features/playground/playground.routes";
 import { developerRouter } from "@/features/developers/developer.routes";
 import { historyRouter } from "@/features/history/history.routes";
 import { kycRouter } from "@/features/kyc/kyc.routes";
@@ -74,7 +74,7 @@ export function createApp() {
 
   const registerApiRoutes = (apiBasePath: string) => {
     app.use(`${apiBasePath}/auth`, authRouter);
-    app.use(`${apiBasePath}/demo`, demoRouter);
+    app.use(`${apiBasePath}/playground`, playgroundRouter);
     app.use(`${apiBasePath}/onboarding`, onboardingRouter);
     app.use(`${apiBasePath}/kyc`, kycRouter);
     app.use(`${apiBasePath}/onramps`, onrampRouter);

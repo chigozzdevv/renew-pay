@@ -2,27 +2,27 @@ import { randomUUID } from "node:crypto";
 
 import { env } from "@/config/env.config";
 import {
-  getDemoMarket,
-  getDemoUseCase,
-  getDemoVariant,
-} from "@/features/demo/demo.catalog";
-import type { CreateDemoCollectionInput } from "@/features/demo/demo.validation";
+  getPlaygroundMarket,
+  getPlaygroundUseCase,
+  getPlaygroundVariant,
+} from "@/features/playground/playground.catalog";
+import type { CreatePlaygroundCollectionInput } from "@/features/playground/playground.validation";
 import { HttpError } from "@/shared/errors/http-error";
 
 function createReference(useCase: string) {
   const suffix = randomUUID().slice(0, 8);
 
-  return `demo_${useCase}_${suffix}`;
+  return `playground_${useCase}_${suffix}`;
 }
 
-export async function createDemoCollection(input: CreateDemoCollectionInput) {
-  if (!env.DEMO_RENEW_SECRET_KEY) {
-    throw new HttpError(500, "Demo Renew server key is not configured.");
+export async function createPlaygroundCollection(input: CreatePlaygroundCollectionInput) {
+  if (!env.PLAYGROUND_RENEW_SECRET_KEY) {
+    throw new HttpError(500, "Playground Renew server key is not configured.");
   }
 
-  const useCase = getDemoUseCase(input.useCase);
-  const variant = getDemoVariant(useCase, input.variant ?? "");
-  const market = getDemoMarket(input.market);
+  const useCase = getPlaygroundUseCase(input.useCase);
+  const variant = getPlaygroundVariant(useCase, input.variant ?? "");
+  const market = getPlaygroundMarket(input.market);
   const items = useCase.items[variant] ?? [];
   const quantities = input.itemIds.reduce<Map<string, number>>((next, itemId) => {
     next.set(itemId, (next.get(itemId) ?? 0) + 1);
@@ -46,7 +46,7 @@ export async function createDemoCollection(input: CreateDemoCollectionInput) {
 
   const { renew } = await import("@renew.sh/sdk");
   const client = renew({
-    secretKey: env.DEMO_RENEW_SECRET_KEY,
+    secretKey: env.PLAYGROUND_RENEW_SECRET_KEY,
   });
 
   return client.collections.create({
@@ -57,7 +57,7 @@ export async function createDemoCollection(input: CreateDemoCollectionInput) {
     items: lineItems,
     recurring: useCase.recurring ?? { enabled: false },
     metadata: {
-      demo: true,
+      playground: true,
       useCase: useCase.id,
       market: market.code,
       variant,

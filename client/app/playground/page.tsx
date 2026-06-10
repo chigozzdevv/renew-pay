@@ -7,37 +7,37 @@ import { checkout } from "@renew.sh/sdk";
 import { Logo } from "@/components/shared/logo";
 import { fetchApi } from "@/lib/api";
 import {
-  demoMarkets,
-  demoUseCases,
-  formatDemoAmount,
-  getDemoItems,
-  getDemoMarket,
-  getDemoUseCase,
-  getDemoVariant,
-  type DemoUseCase,
-} from "@/lib/demo-catalog";
+  playgroundMarkets,
+  playgroundUseCases,
+  formatPlaygroundAmount,
+  getPlaygroundItems,
+  getPlaygroundMarket,
+  getPlaygroundUseCase,
+  getPlaygroundVariant,
+  type PlaygroundUseCase,
+} from "@/lib/playground-catalog";
 import { cn } from "@/lib/utils";
 
-type DemoCollectionResponse = {
+type PlaygroundCollectionResponse = {
   readonly checkoutUrl: string;
 };
 
-function getDefaultItemIds(useCaseId: DemoUseCase, variantId: string) {
-  const useCase = getDemoUseCase(useCaseId);
-  const items = getDemoItems(useCase, variantId);
+function getDefaultItemIds(useCaseId: PlaygroundUseCase, variantId: string) {
+  const useCase = getPlaygroundUseCase(useCaseId);
+  const items = getPlaygroundItems(useCase, variantId);
 
   return items[0] ? [items[0].id] : [];
 }
 
-export default function DemoPage() {
-  const [useCaseId, setUseCaseId] = useState<DemoUseCase>("ecommerce");
-  const activeUseCase = getDemoUseCase(useCaseId);
+export default function PlaygroundPage() {
+  const [useCaseId, setUseCaseId] = useState<PlaygroundUseCase>("ecommerce");
+  const activeUseCase = getPlaygroundUseCase(useCaseId);
   const [variantId, setVariantId] = useState(activeUseCase.variants[0].id);
-  const activeVariant = getDemoVariant(activeUseCase, variantId);
+  const activeVariant = getPlaygroundVariant(activeUseCase, variantId);
   const [marketCode, setMarketCode] = useState("NG");
-  const activeMarket = getDemoMarket(marketCode);
+  const activeMarket = getPlaygroundMarket(marketCode);
   const items = useMemo(
-    () => getDemoItems(activeUseCase, activeVariant.id),
+    () => getPlaygroundItems(activeUseCase, activeVariant.id),
     [activeUseCase, activeVariant.id]
   );
   const [cartIds, setCartIds] = useState(() =>
@@ -102,7 +102,7 @@ export default function DemoPage() {
     setError(null);
 
     try {
-      const { data } = await fetchApi<DemoCollectionResponse>("/demo/collections", {
+      const { data } = await fetchApi<PlaygroundCollectionResponse>("/playground/collections", {
         method: "POST",
         body: JSON.stringify({
           useCase: useCaseId,
@@ -149,7 +149,7 @@ export default function DemoPage() {
             <div className="flex flex-col gap-4 border-b border-black/10 pb-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-semibold text-[#6b746d]">
-                  Renew checkout demo
+                  Renew checkout playground
                 </p>
                 <h1 className="mt-1 max-w-xl text-4xl font-semibold tracking-normal text-[#111111] sm:text-5xl">
                   Collect local payments.
@@ -165,7 +165,7 @@ export default function DemoPage() {
                   onChange={(event) => setMarketCode(event.target.value)}
                   className="h-12 rounded-lg border border-black/10 bg-white px-3 text-base font-semibold text-[#111111] outline-none transition-colors focus:border-[#2f6f4e]"
                 >
-                  {demoMarkets.map((market) => (
+                  {playgroundMarkets.map((market) => (
                     <option key={market.code} value={market.code}>
                       {market.label} - {market.currency}
                     </option>
@@ -175,7 +175,7 @@ export default function DemoPage() {
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2">
-              {demoUseCases.map((useCase) => (
+              {playgroundUseCases.map((useCase) => (
                 <button
                   key={useCase.id}
                   type="button"
@@ -246,7 +246,7 @@ export default function DemoPage() {
                         {item.detail}
                       </p>
                       <p className="mt-5 text-xl font-semibold text-[#111111]">
-                        {formatDemoAmount(item.amount[activeMarket.currency], marketCode)}
+                        {formatPlaygroundAmount(item.amount[activeMarket.currency], marketCode)}
                       </p>
                     </div>
                   </button>
@@ -285,7 +285,7 @@ export default function DemoPage() {
                       </p>
                       <p className="mt-1 text-sm font-medium text-white/50">
                         {quantity} x{" "}
-                        {formatDemoAmount(item.amount[activeMarket.currency], marketCode)}
+                        {formatPlaygroundAmount(item.amount[activeMarket.currency], marketCode)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ export default function DemoPage() {
                         </button>
                       ) : null}
                       <p className="min-w-20 text-right text-base font-semibold text-white">
-                        {formatDemoAmount(
+                        {formatPlaygroundAmount(
                           item.amount[activeMarket.currency] * quantity,
                           marketCode
                         )}
@@ -318,7 +318,7 @@ export default function DemoPage() {
               </div>
               <div className="mt-2 flex items-end justify-between gap-4">
                 <p className="text-4xl font-semibold tracking-normal text-white">
-                  {formatDemoAmount(total, marketCode)}
+                  {formatPlaygroundAmount(total, marketCode)}
                 </p>
                 {activeUseCase.recurring?.enabled ? (
                   <span className="pb-1 text-sm font-semibold text-white/50">

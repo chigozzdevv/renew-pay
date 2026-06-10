@@ -1,15 +1,15 @@
-export type DemoUseCaseId = "ecommerce" | "marketplace" | "saas" | "fintech";
-export type DemoMarketCode = "NG" | "GH" | "KE";
+export type PlaygroundUseCaseId = "ecommerce" | "marketplace" | "saas" | "fintech";
+export type PlaygroundMarketCode = "NG" | "GH" | "KE";
 
-export type DemoItem = {
+export type PlaygroundItem = {
   id: string;
   name: string;
   detail: string;
   amount: Record<string, number>;
 };
 
-export type DemoUseCase = {
-  id: DemoUseCaseId;
+export type PlaygroundUseCase = {
+  id: PlaygroundUseCaseId;
   title: string;
   variants: string[];
   recurring?: {
@@ -17,16 +17,16 @@ export type DemoUseCase = {
     interval: "month";
     intervalCount: 1;
   };
-  items: Record<string, DemoItem[]>;
+  items: Record<string, PlaygroundItem[]>;
 };
 
-export const demoMarkets = [
+export const playgroundMarkets = [
   { code: "NG", currency: "NGN" },
   { code: "GH", currency: "GHS" },
   { code: "KE", currency: "KES" },
 ] as const;
 
-export const demoUseCases: DemoUseCase[] = [
+export const playgroundUseCases: PlaygroundUseCase[] = [
   {
     id: "ecommerce",
     title: "Cart checkout",
@@ -118,14 +118,14 @@ export const demoUseCases: DemoUseCase[] = [
   },
 ];
 
-export function getDemoMarket(code: string) {
-  return demoMarkets.find((market) => market.code === code) ?? demoMarkets[0];
+export function getPlaygroundMarket(code: string) {
+  return playgroundMarkets.find((market) => market.code === code) ?? playgroundMarkets[0];
 }
 
-export function getDemoUseCase(id: string) {
-  return demoUseCases.find((useCase) => useCase.id === id) ?? demoUseCases[0];
+export function getPlaygroundUseCase(id: string) {
+  return playgroundUseCases.find((useCase) => useCase.id === id) ?? playgroundUseCases[0];
 }
 
-export function getDemoVariant(useCase: DemoUseCase, id: string) {
+export function getPlaygroundVariant(useCase: PlaygroundUseCase, id: string) {
   return useCase.variants.includes(id) ? id : useCase.variants[0];
 }
