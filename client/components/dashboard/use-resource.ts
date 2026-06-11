@@ -9,7 +9,7 @@ type ResourceState<T> = {
   data: T | null;
   isLoading: boolean;
   error: string | null;
-  reload: () => Promise<void>;
+  reload: (options?: { silent?: boolean }) => Promise<void>;
 };
 
 export function useResource<T>(
@@ -22,7 +22,7 @@ export function useResource<T>(
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = async () => {
+  const reload = async (options?: { silent?: boolean }) => {
     if (!token || !user?.merchantId) {
       setData(null);
       setError(sessionError ?? "Dashboard session is missing.");
@@ -30,7 +30,9 @@ export function useResource<T>(
       return;
     }
 
-    setIsLoading(true);
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
 
     try {
       const nextData = await loader({

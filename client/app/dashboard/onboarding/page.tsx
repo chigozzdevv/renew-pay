@@ -25,6 +25,10 @@ import {
   startOnboardingVerification,
   type OnboardingState,
 } from "@/lib/onboarding";
+import {
+  shouldPollVerificationStatus,
+  syncOwnerVerification,
+} from "@/lib/verification";
 
 const ONBOARDING_PRIMARY_BUTTON_CLASS =
   "!border-[#111111] !bg-[#111111] !text-white hover:!bg-[#333333]";
@@ -53,6 +57,7 @@ const STEP_META: Record<string, { title: string; subtitle: string }> = {
 type RegisterCardState = {
   label: string;
   disabled: boolean;
+  disabledReason: string | null;
   signerLabel: string;
   signerNote: string;
   onRegister?: () => void;
@@ -184,6 +189,47 @@ function useOnboardingWorkspace() {
 
     return () => window.clearTimeout(timeout);
   }, [actionError]);
+
+  useEffect(() => {
+    const status = data?.verification.ownerKyc.status;
+
+    if (
+      !token ||
+      !data?.merchantId ||
+      !status ||
+      !shouldPollVerificationStatus(status)
+    ) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    const sync = async () => {
+      try {
+        await syncOwnerVerification({
+          token,
+          merchantId: data.merchantId,
+          environment: mode,
+        });
+        if (isCurrent) {
+          await reload({ silent: true });
+          await refreshSession();
+        }
+      } catch {
+        if (isCurrent) {
+          await reload({ silent: true });
+        }
+      }
+    };
+
+    void sync();
+    const interval = window.setInterval(() => void sync(), 7000);
+
+    return () => {
+      isCurrent = false;
+      window.clearInterval(interval);
+    };
+  }, [data?.merchantId, data?.verification.ownerKyc.status, mode, refreshSession, token]);
 
   async function runAction(actionKey: string, runner: () => Promise<void>) {
     setBusyAction(actionKey);
@@ -424,12 +470,10 @@ function VerificationStep({
   data,
   busyAction,
   onStartKyc,
-  onRefresh,
 }: {
   data: OnboardingState;
   busyAction: string | null;
   onStartKyc: () => void;
-  onRefresh: () => void;
 }) {
   const ownerKycApproved = data.verification.ownerKyc.status === "approved";
 
@@ -461,13 +505,6 @@ function VerificationStep({
         </Button>
       </div>
 
-      <button
-        type="button"
-        onClick={onRefresh}
-        className="text-sm font-medium text-[color:var(--muted)] transition-colors hover:text-[color:var(--ink)]"
-      >
-        Refresh status
-      </button>
     </div>
   );
 }
@@ -592,6 +629,11 @@ function RegisterStep({
       >
         {registerCard.label}
       </Button>
+      {registerCard.disabledReason ? (
+        <p className="text-center text-sm font-medium text-[color:var(--muted)]">
+          {registerCard.disabledReason}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -690,11 +732,6 @@ function OnboardingModal({
                 onStepClick={setActiveStepIndex}
               />
             </div>
-            {isLoading ? (
-              <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-                Syncing your workspace...
-              </p>
-            ) : null}
             <h2 className="mt-4 font-display text-xl font-semibold tracking-[-0.04em] text-[color:var(--ink)]">
               {meta.title}
             </h2>
@@ -763,7 +800,6 @@ function OnboardingModal({
                     throw new Error("Verification did not return a session.");
                   })
                 }
-                onRefresh={() => void reload()}
               />
             )}
 
@@ -855,16 +891,28 @@ function OnboardingModal({
 function OnboardingSurface() {
   const state = useOnboardingWorkspace();
   const { token, user, mode, busyAction, data, runAction } = state;
+  const missingSteps = data?.steps
+    .filter((step) => step.key !== "register" && step.status !== "complete")
+    .map((step) => step.label);
+  const registerDisabledReason =
+    user?.role !== "owner"
+      ? "Only the workspace owner can register."
+      : missingSteps && missingSteps.length > 0
+        ? `Complete ${missingSteps[0].toLowerCase()} first.`
+        : null;
 
   const registerCard: RegisterCardState = {
-    label:
-      busyAction === "register"
-        ? "Registering..."
-        : "Register merchant",
+    label: busyAction === "register" ? "Registering..." : "Register",
     disabled:
       !data?.canComplete ||
       busyAction === "register" ||
       user?.role !== "owner",
+    disabledReason:
+      busyAction === "register"
+        ? null
+        : user?.role !== "owner" || !data?.canComplete
+          ? registerDisabledReason
+          : null,
     signerLabel: formatAddress(data?.payout.payoutWallet ?? null),
     signerNote: "This settlement wallet receives Stellar USDC.",
     onRegister: () =>

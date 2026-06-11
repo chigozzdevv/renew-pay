@@ -26,7 +26,9 @@ import {
 } from "@/lib/settings";
 import {
   loadVerificationSummary,
+  shouldPollVerificationStatus,
   startOwnerVerification,
+  syncOwnerVerification,
   type VerificationStatus,
 } from "@/lib/verification";
 import {
@@ -172,6 +174,51 @@ export default function SettingsPage() {
       walletAlerts: data.wallets.walletAlerts,
     });
   }, [data]);
+
+  useEffect(() => {
+    const status = verificationData?.ownerKyc.status;
+
+    if (
+      activeTab !== "verification" ||
+      !token ||
+      !user?.merchantId ||
+      !status ||
+      !shouldPollVerificationStatus(status)
+    ) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    const sync = async () => {
+      try {
+        await syncOwnerVerification({
+          token,
+          merchantId: user.merchantId,
+          environment: mode,
+        });
+      } catch {
+      } finally {
+        if (isCurrent) {
+          await reloadVerification({ silent: true });
+        }
+      }
+    };
+
+    void sync();
+    const interval = window.setInterval(() => void sync(), 7000);
+
+    return () => {
+      isCurrent = false;
+      window.clearInterval(interval);
+    };
+  }, [
+    activeTab,
+    mode,
+    token,
+    user?.merchantId,
+    verificationData?.ownerKyc.status,
+  ]);
 
   useEffect(() => {
     const address = walletDraft.primaryWallet.trim();
@@ -729,7 +776,7 @@ export default function SettingsPage() {
                 />
               </div>
               {verificationData.ownerKyc.status === "approved" ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3">
+                <div className="rounded-lg border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-[color:var(--ink)]">
                       Verification complete
@@ -738,15 +785,6 @@ export default function SettingsPage() {
                       Starter settlement limits
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    disabled={busyAction === "verification-refresh"}
-                    onClick={() =>
-                      void runVerificationAction("verification-refresh", async () => {})
-                    }
-                  >
-                    Refresh
-                  </Button>
                 </div>
               ) : null}
             </div>

@@ -23,6 +23,19 @@ export type VerificationSession = {
   userId?: string;
 };
 
+const activeVerificationStatuses = new Set([
+  "init",
+  "started",
+  "pending",
+  "submitted",
+  "in_review",
+  "on_hold",
+]);
+
+export function shouldPollVerificationStatus(status: string) {
+  return activeVerificationStatuses.has(status.trim().toLowerCase());
+}
+
 export async function loadVerificationSummary(input: {
   token: string;
   merchantId: string;
@@ -47,6 +60,23 @@ export async function startOwnerVerification(input: {
   environment: "test" | "live";
 }) {
   const response = await fetchApi<VerificationSession>("/kyc/owner/start-kyc", {
+    method: "POST",
+    token: input.token,
+    body: JSON.stringify({
+      merchantId: input.merchantId,
+      environment: input.environment,
+    }),
+  });
+
+  return response.data;
+}
+
+export async function syncOwnerVerification(input: {
+  token: string;
+  merchantId: string;
+  environment: "test" | "live";
+}) {
+  const response = await fetchApi<VerificationStatus>("/kyc/owner/sync", {
     method: "POST",
     token: input.token,
     body: JSON.stringify({
