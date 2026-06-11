@@ -39,6 +39,9 @@ import type {
 } from "@/features/payments/payment.validation";
 import { SettingModel } from "@/features/settings/setting.model";
 import { SettlementAccountModel } from "@/features/settlement/settlement-account.model";
+import {
+  upsertDefaultSettlementAccountForWallet,
+} from "@/features/settlement/settlement.service";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import {
@@ -719,9 +722,24 @@ async function resolvePaymentSettlementAccountId(input: {
     .exec();
 
   if (!defaultAccount) {
+    const merchant = await MerchantModel.findById(input.merchantId)
+      .select({ payoutWallet: 1 })
+      .exec();
+    const payoutWallet = readString(merchant?.payoutWallet);
+
+    if (payoutWallet) {
+      const account = await upsertDefaultSettlementAccountForWallet({
+        merchantId: input.merchantId,
+        environment: input.environment,
+        destinationAddress: payoutWallet,
+      });
+
+      return new Types.ObjectId(account.id);
+    }
+
     throw new HttpError(
       409,
-      "Create an active default settlement account before creating payments."
+      "Connect a settlement wallet before creating collections."
     );
   }
 

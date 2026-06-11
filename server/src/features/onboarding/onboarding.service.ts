@@ -10,6 +10,9 @@ import { assertSupportedCollectionMarkets } from "@/features/onramps/onramp.serv
 import {
   assertStellarUsdcTrustline,
 } from "@/features/settlement/providers/stellar/trustline.service";
+import {
+  upsertDefaultSettlementAccountForWallet,
+} from "@/features/settlement/settlement.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import { SettingModel } from "@/features/settings/setting.model";
 import type {
@@ -344,6 +347,11 @@ export async function saveOnboardingPayout(input: {
 
   merchant.payoutWallet = payoutWallet;
   setting.wallets.primaryWallet = payoutWallet;
+  await upsertDefaultSettlementAccountForWallet({
+    merchantId: input.merchantId,
+    environment: input.payload.environment,
+    destinationAddress: payoutWallet,
+  });
   await Promise.all([merchant.save(), setting.save()]);
 
   await appendAuditLog({
@@ -396,6 +404,11 @@ export async function registerOnboardingMerchant(input: {
     environment: input.payload.environment,
     address: merchantPayoutWallet,
     ownerLabel: "Settlement wallet",
+  });
+  await upsertDefaultSettlementAccountForWallet({
+    merchantId: input.merchantId,
+    environment: input.payload.environment,
+    destinationAddress: merchantPayoutWallet,
   });
 
   state.merchant.onboardingStatus = "workspace_active";

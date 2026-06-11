@@ -18,6 +18,7 @@ import {
   type UpdateSettlementAccountInput,
 } from "@/features/settlement/settlement.validation";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
+import { normalizeStellarAddress } from "@/shared/constants/stellar";
 import { HttpError } from "@/shared/errors/http-error";
 import {
   buildPagination,
@@ -177,6 +178,80 @@ export async function createSettlementAccount(input: CreateSettlementAccountInpu
     status: normalized.status,
     metadata: normalized.metadata ?? {},
   });
+
+  return toSettlementAccountResponse(account);
+}
+
+export async function upsertDefaultSettlementAccountForWallet(input: {
+  merchantId: string;
+  environment: RuntimeMode;
+  destinationAddress: string;
+}) {
+  const destinationAddress = normalizeStellarAddress(input.destinationAddress);
+
+  if (!destinationAddress) {
+    throw new HttpError(400, "Settlement wallet is invalid.");
+  }
+
+  const normalized = normalizeAccountInput({
+    merchantId: input.merchantId,
+    environment: input.environment,
+    accountCode: "default",
+    name: "Default settlement",
+    destinationAddress,
+    isDefault: true,
+    status: "active",
+    metadata: {
+      source: "settlement_wallet",
+    },
+  });
+
+  assertStellarVaultAccountConfig(normalized);
+  await assertStellarUsdcTrustline({
+    environment: normalized.environment,
+    address: destinationAddress,
+    ownerLabel: "Settlement wallet",
+  });
+
+  await applyDefaultAccountPolicy({
+    merchantId: normalized.merchantId,
+    environment: normalized.environment,
+  });
+
+  const account = await SettlementAccountModel.findOneAndUpdate(
+    {
+      merchantId: normalized.merchantId,
+      accountCode: normalized.accountCode,
+      ...createRuntimeModeCondition("environment", normalized.environment),
+    },
+    {
+      $set: {
+        environment: normalized.environment,
+        name: normalized.name,
+        mode: normalized.mode,
+        provider: normalized.provider,
+        chain: normalized.chain,
+        assetSymbol: normalized.assetSymbol,
+        destinationAddress,
+        isDefault: true,
+        status: normalized.status,
+        metadata: normalized.metadata ?? {},
+      },
+      $setOnInsert: {
+        merchantId: normalized.merchantId,
+        accountCode: normalized.accountCode,
+      },
+    },
+    {
+      new: true,
+      setDefaultsOnInsert: true,
+      upsert: true,
+    }
+  ).exec();
+
+  if (!account) {
+    throw new HttpError(500, "Settlement account could not be configured.");
+  }
 
   return toSettlementAccountResponse(account);
 }

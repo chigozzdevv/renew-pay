@@ -8,6 +8,9 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import {
   assertStellarUsdcTrustline,
 } from "@/features/settlement/providers/stellar/trustline.service";
+import {
+  upsertDefaultSettlementAccountForWallet,
+} from "@/features/settlement/settlement.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
 import type { SettingDocument } from "@/features/settings/setting.model";
 import type {
@@ -158,6 +161,11 @@ export async function updateSettingsByMerchantId(
         address: primaryWallet ?? "",
         ownerLabel: "Settlement wallet",
       });
+      await upsertDefaultSettlementAccountForWallet({
+        merchantId,
+        environment: input.environment,
+        destinationAddress: primaryWallet ?? "",
+      });
       setting.wallets.primaryWallet = primaryWallet;
       merchant.payoutWallet = primaryWallet;
     }
@@ -254,6 +262,11 @@ export async function saveWalletSettings(
     environment: input.environment,
     address: primaryWallet ?? "",
     ownerLabel: "Settlement wallet",
+  });
+  await upsertDefaultSettlementAccountForWallet({
+    merchantId,
+    environment: input.environment,
+    destinationAddress: primaryWallet ?? "",
   });
 
   setting.wallets.primaryWallet = primaryWallet;
