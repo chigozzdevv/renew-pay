@@ -25,7 +25,6 @@ import {
 } from "@/lib/settings";
 import {
   loadVerificationSummary,
-  startBusinessVerification,
   startOwnerVerification,
   type VerificationStatus,
 } from "@/lib/verification";
@@ -456,27 +455,6 @@ export default function SettingsPage() {
     });
   }
 
-  async function handleStartBusinessVerification() {
-    if (!token || !user?.merchantId) {
-      return;
-    }
-
-    await runVerificationAction("merchant-kyb", async () => {
-      const result = await startBusinessVerification({
-        token,
-        merchantId: user.merchantId,
-        environment: mode,
-      });
-      const verificationUrl = result.verificationUrl?.trim();
-
-      if (!verificationUrl) {
-        throw new Error("Verification did not return a link.");
-      }
-
-      window.location.assign(verificationUrl);
-    });
-  }
-
   if (isLoading) {
     return <LoadingState />;
   }
@@ -731,8 +709,8 @@ export default function SettingsPage() {
               }
             />
           ) : (
-            <div className="space-y-4">
-              <div className="grid gap-3 lg:grid-cols-2">
+            <div className="max-w-xl space-y-4">
+              <div className="grid gap-3">
                 <VerificationCard
                   title="Owner KYC"
                   status={verificationData.ownerKyc}
@@ -740,27 +718,15 @@ export default function SettingsPage() {
                   actionLabel="Start KYC"
                   onStart={() => void handleStartOwnerVerification()}
                 />
-                <VerificationCard
-                  title="Business KYB"
-                  status={verificationData.merchantKyb}
-                  busy={busyAction === "merchant-kyb"}
-                  actionLabel="Start KYB"
-                  onStart={() => void handleStartBusinessVerification()}
-                />
               </div>
-              {verificationData.merchantKyb.status === "approved" ||
-              verificationData.ownerKyc.status === "approved" ? (
+              {verificationData.ownerKyc.status === "approved" ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[#f8f8fb] px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-[color:var(--ink)]">
-                      {verificationData.merchantKyb.status === "approved"
-                        ? "Business verified"
-                        : "Owner verified"}
+                      Verification complete
                     </p>
                     <p className="mt-1 text-xs font-medium text-[color:var(--muted)]">
-                      {verificationData.merchantKyb.status === "approved"
-                        ? "Higher settlement limits"
-                        : "Starter settlement limits"}
+                      Starter settlement limits
                     </p>
                   </div>
                   <Button

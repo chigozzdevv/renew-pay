@@ -120,7 +120,6 @@ function useOnboardingWorkspace() {
     [mode]
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [businessDraft, setBusinessDraft] = useState<OnboardingState["business"] | null>(
     null
@@ -174,33 +173,25 @@ function useOnboardingWorkspace() {
   }, [mode, payoutWallet]);
 
   useEffect(() => {
-    if (!actionMessage && !actionError) {
+    if (!actionError) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      setActionMessage(null);
       setActionError(null);
     }, 4200);
 
     return () => window.clearTimeout(timeout);
-  }, [actionError, actionMessage]);
+  }, [actionError]);
 
-  async function runAction(
-    actionKey: string,
-    runner: () => Promise<string | void>
-  ) {
+  async function runAction(actionKey: string, runner: () => Promise<void>) {
     setBusyAction(actionKey);
     setActionError(null);
-    setActionMessage(null);
 
     try {
-      const message = await runner();
+      await runner();
       await reload();
       await refreshSession();
-      if (message) {
-        setActionMessage(message);
-      }
     } catch (mutationError) {
       setActionError(toErrorMessage(mutationError));
     } finally {
@@ -211,7 +202,6 @@ function useOnboardingWorkspace() {
   async function connectSettlementWallet() {
     setBusyAction("settlement-connect");
     setActionError(null);
-    setActionMessage(null);
 
     try {
       const address = await connectStellarWallet(mode);
@@ -219,7 +209,6 @@ function useOnboardingWorkspace() {
 
       setPayoutWallet(address);
       setPayoutTrustline(status);
-      setActionMessage("Wallet connected.");
     } catch (connectError) {
       setActionError(toErrorMessage(connectError));
     } finally {
@@ -230,13 +219,11 @@ function useOnboardingWorkspace() {
   async function enableSettlementUsdc() {
     setBusyAction("settlement-enable");
     setActionError(null);
-    setActionMessage(null);
 
     try {
       await enableStellarUsdcTrustline(mode, payoutWallet);
       const status = await checkStellarUsdcTrustline(mode, payoutWallet);
       setPayoutTrustline(status);
-      setActionMessage("USDC enabled.");
     } catch (enableError) {
       setActionError(toErrorMessage(enableError));
     } finally {
@@ -253,7 +240,6 @@ function useOnboardingWorkspace() {
     error,
     reload,
     busyAction,
-    actionMessage,
     actionError,
     marketCatalog,
     isMarketCatalogLoading,
@@ -437,17 +423,14 @@ function VerificationStep({
   data,
   busyAction,
   onStartKyc,
-  onStartKyb,
   onRefresh,
 }: {
   data: OnboardingState;
   busyAction: string | null;
   onStartKyc: () => void;
-  onStartKyb: () => void;
   onRefresh: () => void;
 }) {
   const ownerKycApproved = data.verification.ownerKyc.status === "approved";
-  const merchantKybApproved = data.verification.merchantKyb.status === "approved";
 
   return (
     <div className="space-y-4">
@@ -474,32 +457,6 @@ function VerificationStep({
           onClick={onStartKyc}
         >
           {busyAction === "owner-kyc" ? "Starting..." : ownerKycApproved ? "Verified" : "Start KYC"}
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between rounded-2xl border border-[color:var(--line)] bg-white px-4 py-3.5">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/4">
-            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-[color:var(--ink)]">
-              <rect x="4" y="4" width="12" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
-              <path d="M7 9.5L9 11.5L13 7.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-[color:var(--ink)]">Business KYB</p>
-            <Badge tone={toBadgeTone(data.verification.merchantKyb.status)}>
-              {data.verification.merchantKyb.status.replace(/_/g, " ")}
-            </Badge>
-          </div>
-        </div>
-        <Button
-          type="button"
-          tone={merchantKybApproved ? "neutral" : "brand"}
-          className={ONBOARDING_PRIMARY_BUTTON_CLASS}
-          disabled={busyAction === "merchant-kyb" || merchantKybApproved}
-          onClick={onStartKyb}
-        >
-          {busyAction === "merchant-kyb" ? "Starting..." : merchantKybApproved ? "Verified" : "Start KYB"}
         </Button>
       </div>
 
@@ -653,7 +610,6 @@ function OnboardingModal({
     error,
     reload,
     busyAction,
-    actionMessage,
     actionError,
     marketCatalog,
     isMarketCatalogLoading,
@@ -746,11 +702,6 @@ function OnboardingModal({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-            {actionMessage && (
-              <div className="mb-4 rounded-xl border border-[color:var(--line)] bg-[#f2f1eb] px-4 py-2.5 text-sm text-[color:var(--ink)]">
-                {actionMessage}
-              </div>
-            )}
             {actionError && (
               <div className="mb-4 rounded-xl border border-[#ecd0cc] bg-[#fff6f5] px-4 py-2.5 text-sm text-[#9b3d31]">
                 {actionError}
@@ -778,7 +729,6 @@ function OnboardingModal({
                       supportedMarkets: businessDraft.supportedMarkets,
                     });
                     goNext();
-                    return "Business basics saved.";
                   })
                 }
               />
@@ -802,24 +752,6 @@ function OnboardingModal({
                     }
 
                     window.location.assign(verificationUrl);
-                    return "Owner KYC started.";
-                  })
-                }
-                onStartKyb={() =>
-                  void runAction("merchant-kyb", async () => {
-                    const result = await startOnboardingVerification({
-                      token,
-                      environment: mode,
-                      subject: "merchant_kyb",
-                    });
-                    const verificationUrl = result.verificationUrl?.trim();
-
-                    if (!verificationUrl) {
-                      throw new Error("Verification did not return a link.");
-                    }
-
-                    window.location.assign(verificationUrl);
-                    return "Merchant KYB started.";
                   })
                 }
                 onRefresh={() => void reload()}
@@ -842,7 +774,6 @@ function OnboardingModal({
                       payoutWallet,
                     });
                     goNext();
-                    return "Settlement saved.";
                   })
                 }
               />
@@ -928,7 +859,6 @@ function OnboardingSurface() {
           token,
           environment: mode,
         });
-        return "Merchant registered.";
       }),
   };
 
