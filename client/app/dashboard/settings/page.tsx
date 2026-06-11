@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
+import { SumsubVerificationModal } from "@/components/dashboard/sumsub-verification-modal";
 import { useResource } from "@/components/dashboard/use-resource";
 import {
   Badge,
@@ -129,6 +130,7 @@ export default function SettingsPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
 
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft | null>(null);
   const [checkoutDraft, setCheckoutDraft] = useState<CheckoutDraft | null>(null);
@@ -445,13 +447,20 @@ export default function SettingsPage() {
         merchantId: user.merchantId,
         environment: mode,
       });
+      const sessionToken = result.sessionToken?.trim();
       const verificationUrl = result.verificationUrl?.trim();
 
-      if (!verificationUrl) {
-        throw new Error("Verification did not return a link.");
+      if (sessionToken) {
+        setVerificationToken(sessionToken);
+        return;
       }
 
-      window.location.assign(verificationUrl);
+      if (verificationUrl) {
+        window.location.assign(verificationUrl);
+        return;
+      }
+
+      throw new Error("Verification did not return a session.");
     });
   }
 
@@ -782,6 +791,19 @@ export default function SettingsPage() {
           </div>
         </Card>
       ) : null}
+
+      <SumsubVerificationModal
+        open={Boolean(verificationToken)}
+        accessToken={verificationToken}
+        onClose={() => {
+          setVerificationToken(null);
+          void reloadVerification();
+        }}
+        onSubmitted={() => {
+          setVerificationToken(null);
+          void reloadVerification();
+        }}
+      />
     </div>
   );
 }

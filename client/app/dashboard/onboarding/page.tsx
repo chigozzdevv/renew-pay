@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { MarketMultiSelect } from "@/components/dashboard/market-controls";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
+import { SumsubVerificationModal } from "@/components/dashboard/sumsub-verification-modal";
 import { useResource } from "@/components/dashboard/use-resource";
 import { Badge, Button, InlineLoading, Input, LoadingState } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
@@ -602,6 +603,7 @@ function OnboardingModal({
   state: ReturnType<typeof useOnboardingWorkspace>;
   registerCard: RegisterCardState;
 }) {
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const {
     token,
     mode,
@@ -745,13 +747,20 @@ function OnboardingModal({
                       environment: mode,
                       subject: "owner_kyc",
                     });
+                    const sessionToken = result.sessionToken?.trim();
                     const verificationUrl = result.verificationUrl?.trim();
 
-                    if (!verificationUrl) {
-                      throw new Error("Verification did not return a link.");
+                    if (sessionToken) {
+                      setVerificationToken(sessionToken);
+                      return;
                     }
 
-                    window.location.assign(verificationUrl);
+                    if (verificationUrl) {
+                      window.location.assign(verificationUrl);
+                      return;
+                    }
+
+                    throw new Error("Verification did not return a session.");
                   })
                 }
                 onRefresh={() => void reload()}
@@ -827,6 +836,18 @@ function OnboardingModal({
           </div>
         </div>
       </div>
+      <SumsubVerificationModal
+        open={Boolean(verificationToken)}
+        accessToken={verificationToken}
+        onClose={() => {
+          setVerificationToken(null);
+          void reload();
+        }}
+        onSubmitted={() => {
+          setVerificationToken(null);
+          void reload();
+        }}
+      />
     </>
   );
 }

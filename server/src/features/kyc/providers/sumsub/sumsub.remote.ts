@@ -136,14 +136,14 @@ export class SumsubRemoteProvider implements VerificationProvider {
       toStringOrNull(applicant?.applicantId) ??
       (await this.createApplicant(input));
     const status = await this.getApplicantReviewStatus(applicantId).catch(() => null);
-    const link = await this.generateWebSdkLink(input);
+    const accessToken = await this.generateAccessToken(input);
 
     return {
       provider: this.name,
       sessionId: applicantId,
       sessionKind: input.subjectType === "merchant" ? "business" : "user",
-      sessionToken: null,
-      url: link.url,
+      sessionToken: accessToken.token,
+      url: "",
       vendorData: input.vendorData,
       levelName: input.levelName,
       review: status ? extractReviewSnapshot(status) : {
@@ -157,7 +157,10 @@ export class SumsubRemoteProvider implements VerificationProvider {
       raw: {
         applicant,
         applicantId,
-        link,
+        accessToken: {
+          issued: true,
+          userId: accessToken.userId,
+        },
         status,
       },
     } satisfies VerificationSessionSummary;
@@ -222,30 +225,34 @@ export class SumsubRemoteProvider implements VerificationProvider {
     return applicantId;
   }
 
-  private async generateWebSdkLink(input: CreateVerificationSessionInput) {
-    const params = new URLSearchParams({
-      ttlInSecs: "1800",
-      externalUserId: input.vendorData,
-    });
+  private async generateAccessToken(input: CreateVerificationSessionInput) {
+    const payload = {
+      userId: input.vendorData,
+      levelName: input.levelName,
+      ttlInSecs: 1800,
+      applicantIdentifiers: {
+        email: input.contactDetails?.email,
+        phone: input.contactDetails?.phone,
+      },
+    };
 
-    if (input.language) {
-      params.set("lang", input.language);
-    }
-
-    return this.requestJson<{ url?: string }>(
-      `/resources/sdkIntegrations/levels/${encodeURIComponent(input.levelName)}/websdkLink?${params.toString()}`,
+    return this.requestJson<{ token?: string; userId?: string }>(
+      "/resources/accessTokens/sdk",
       {
         method: "POST",
-        body: "{}",
+        body: JSON.stringify(payload),
       }
     ).then((response) => {
-      const url = toStringOrNull(response.url);
+      const token = toStringOrNull(response.token);
 
-      if (!url) {
-        throw new HttpError(502, "Verification session response is missing url.");
+      if (!token) {
+        throw new HttpError(502, "Verification session response is missing token.");
       }
 
-      return { url };
+      return {
+        token,
+        userId: toStringOrNull(response.userId),
+      };
     });
   }
 

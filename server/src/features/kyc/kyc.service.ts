@@ -581,7 +581,6 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
     ...(record.metadata as Record<string, unknown>),
     sessionKind: session.sessionKind,
     verificationUrl: session.url,
-    sessionToken: session.sessionToken,
     lastSession: session.raw,
   };
   await record.save();
@@ -669,7 +668,6 @@ export async function startOwnerKycSession(input: StartOwnerKycInput) {
     ...(record.metadata as Record<string, unknown>),
     sessionKind: session.sessionKind,
     verificationUrl: session.url,
-    sessionToken: session.sessionToken,
     lastSession: session.raw,
   };
   await record.save();
