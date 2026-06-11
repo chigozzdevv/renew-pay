@@ -95,7 +95,7 @@ export const docsPages: DocsPage[] = [
         ],
         steps: [
           "Create test keys in Settings > Developers.",
-          "Set checkout mode, site domains, and return page in Settings > Checkout.",
+          "Set an optional return URL in Settings > Developers.",
           "Connect a default Stellar settlement account with the API or dashboard.",
           "Create a collection with amount, currency, and reference.",
           "Open the returned checkout URL with the SDK or redirect the customer to it.",
@@ -184,16 +184,15 @@ export const docsPages: DocsPage[] = [
     group: "Start here",
     navTitle: "Checkout setup",
     title: "Checkout setup",
-    description: "Configure how customers enter and leave checkout.",
+    description: "Configure where hosted checkout sends customers after payment.",
     sections: [
       {
         id: "api-checkout-settings-dashboard",
         title: "Dashboard settings",
-        paragraphs: ["Checkout settings live in Dashboard > Settings > Checkout."],
+        paragraphs: ["Checkout return settings live in Dashboard > Settings > Developers."],
         references: [
-          { label: "Mode", value: "modal | redirect", detail: "Modal opens over the merchant site. Redirect sends the customer to hosted checkout." },
           { label: "Return page", value: "https://merchant.com/checkout/return", detail: "Hosted checkout redirects here after a confirmed successful payment." },
-          { label: "Domains", value: "merchant.com", detail: "Site domains your team uses for modal checkout." },
+          { label: "Playground return", value: "https://www.renew.sh/playground", detail: "Use this for Renew's public playground." },
         ],
       },
       {

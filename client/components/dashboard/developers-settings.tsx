@@ -53,6 +53,13 @@ type SecretReveal = {
   note: string;
 };
 
+type DevelopersSettingsProps = {
+  returnPage: string | null;
+  isSavingReturnPage: boolean;
+  onReturnPageChange: (value: string | null) => void;
+  onSaveReturnPage: () => Promise<void>;
+};
+
 function createDefaultWebhookEvents(): SupportedWebhookEvent[] {
   return [...supportedWebhookEvents] as SupportedWebhookEvent[];
 }
@@ -120,6 +127,14 @@ function toggleEventType(
     : [...current, eventType];
 }
 
+function getPlaygroundReturnUrl() {
+  if (typeof window === "undefined") {
+    return "https://www.renew.sh/playground";
+  }
+
+  return `${window.location.origin}/playground`;
+}
+
 function DeveloperEmptyState({
   title,
 }: {
@@ -136,7 +151,12 @@ function DeveloperEmptyState({
   );
 }
 
-export default function DevelopersPage() {
+export default function DevelopersPage({
+  returnPage,
+  isSavingReturnPage,
+  onReturnPageChange,
+  onSaveReturnPage,
+}: DevelopersSettingsProps) {
   const { token, user } = useDashboardSession();
   const { mode } = useWorkspaceMode();
   const [keyPage, setKeyPage] = useState(1);
@@ -156,6 +176,7 @@ export default function DevelopersPage() {
     useState<SupportedWebhookEvent>("collection.paid");
   const [secretReveal, setSecretReveal] = useState<SecretReveal | null>(null);
   const [secretCopied, setSecretCopied] = useState(false);
+  const [returnUrlPlaceholder] = useState(() => getPlaygroundReturnUrl());
 
   const keyPageSize = 12;
   const webhookPageSize = 12;
@@ -444,6 +465,29 @@ export default function DevelopersPage() {
           {errorMessage}
         </div>
       ) : null}
+
+      <Card>
+        <div className="grid gap-4 max-w-2xl">
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium text-[color:var(--muted)]">Return URL</span>
+            <Input
+              placeholder={returnUrlPlaceholder}
+              value={returnPage ?? ""}
+              onChange={(event) => onReturnPageChange(event.target.value || null)}
+            />
+          </label>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <Button
+            type="button"
+            tone="brand"
+            disabled={isSavingReturnPage}
+            onClick={() => void onSaveReturnPage()}
+          >
+            Save
+          </Button>
+        </div>
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card

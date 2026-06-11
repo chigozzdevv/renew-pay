@@ -13,7 +13,6 @@ import {
   Input,
   LoadingState,
   PageState,
-  Select,
 } from "@/components/dashboard/ui";
 import { ImageUpload } from "@/components/shared/image-upload";
 import DevelopersSettings from "@/components/dashboard/developers-settings";
@@ -41,7 +40,6 @@ import { cn } from "@/lib/utils";
 
 type SettingsTabKey =
   | "workspace"
-  | "checkout"
   | "developers"
   | "verification"
   | "settlement"
@@ -54,7 +52,6 @@ type NotificationsDraft = WorkspaceSettings["notifications"];
 const settingsTabKeys = [
   "workspace",
   "verification",
-  "checkout",
   "developers",
   "settlement",
   "notifications",
@@ -71,7 +68,15 @@ function readTabFromLocation() {
 
   const tab = new URLSearchParams(window.location.search).get("tab");
 
-  return tab === "wallets" ? "settlement" : tab;
+  if (tab === "wallets") {
+    return "settlement";
+  }
+
+  if (tab === "checkout") {
+    return "developers";
+  }
+
+  return tab;
 }
 
 function formatAddress(value: string | null) {
@@ -84,10 +89,6 @@ function formatAddress(value: string | null) {
   }
 
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
-function formatCheckoutMode(value: CheckoutDraft["mode"]) {
-  return value === "modal" ? "Embedded modal" : "Hosted redirect";
 }
 
 function toErrorMessage(error: unknown) {
@@ -279,7 +280,6 @@ export default function SettingsPage() {
       [
         { key: "workspace", label: "Business" },
         { key: "verification", label: "Verification" },
-        { key: "checkout", label: "Checkout" },
         { key: "developers", label: "Developers" },
         { key: "settlement", label: "Settlement" },
         { key: "notifications", label: "Notifications" },
@@ -386,21 +386,20 @@ export default function SettingsPage() {
     });
   }
 
-  async function handleCheckoutSave() {
-    if (!token || !user?.merchantId || !checkoutDraft || !businessDraft) {
+  async function handleReturnUrlSave() {
+    if (!token || !user?.merchantId || !checkoutDraft) {
       return;
     }
 
-    await runMutation("checkout-save", async () => {
+    await runMutation("return-url-save", async () => {
       await updateWorkspaceSettings({
         token,
         merchantId: user.merchantId,
         environment: mode,
         payload: {
-          business: {
-            customerDomain: businessDraft.customerDomain,
+          checkout: {
+            returnPage: checkoutDraft.returnPage,
           },
-          checkout: checkoutDraft,
         },
       });
       setActionMessage("Saved.");
@@ -689,65 +688,14 @@ export default function SettingsPage() {
         </Card>
       ) : null}
 
-      {activeTab === "checkout" ? (
-        <Card>
-          <div className="grid gap-4 max-w-2xl sm:grid-cols-2">
-            <SettingsField label="Checkout opens as">
-              <Select
-                value={checkoutDraft.mode}
-                wrapperClassName="w-56 max-w-full"
-                onChange={(event) =>
-                  patchCheckout("mode", event.target.value as CheckoutDraft["mode"])
-                }
-              >
-                <option value="modal">{formatCheckoutMode("modal")}</option>
-                <option value="redirect">{formatCheckoutMode("redirect")}</option>
-              </Select>
-            </SettingsField>
-            <SettingsField label="Return URL">
-              <Input
-                placeholder="https://example.com/orders/{ref}"
-                value={checkoutDraft.returnPage ?? ""}
-                onChange={(event) => patchCheckout("returnPage", event.target.value || null)}
-              />
-            </SettingsField>
-            <SettingsField label="Checkout domain">
-              <Input
-                value={businessDraft.customerDomain}
-                placeholder="checkout.example.com"
-                onChange={(event) => patchBusiness("customerDomain", event.target.value)}
-              />
-            </SettingsField>
-            <SettingsField label="Allowed domains">
-              <Input
-                placeholder="example.com"
-                value={checkoutDraft.allowedDomains.join(", ")}
-                onChange={(event) =>
-                  patchCheckout(
-                    "allowedDomains",
-                    event.target.value
-                      .split(",")
-                      .map((value) => value.trim())
-                      .filter(Boolean)
-                  )
-                }
-              />
-            </SettingsField>
-          </div>
-          <div className="mt-6 flex justify-end">
-            <Button
-              type="button"
-              tone="brand"
-              disabled={busyAction === "checkout-save"}
-              onClick={() => void handleCheckoutSave()}
-            >
-              Save
-            </Button>
-          </div>
-        </Card>
+      {activeTab === "developers" ? (
+        <DevelopersSettings
+          returnPage={checkoutDraft.returnPage}
+          isSavingReturnPage={busyAction === "return-url-save"}
+          onReturnPageChange={(value) => patchCheckout("returnPage", value)}
+          onSaveReturnPage={() => handleReturnUrlSave()}
+        />
       ) : null}
-
-      {activeTab === "developers" ? <DevelopersSettings /> : null}
 
       {activeTab === "verification" ? (
         <Card>
