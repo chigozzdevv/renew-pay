@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
@@ -37,6 +37,8 @@ import { loadSettlementAccounts } from "@/lib/settlement";
 
 type CollectionStatusFilter = CollectionRecord["status"] | "all";
 type RecurringFilter = "all" | "true" | "false";
+
+const FALLBACK_CURRENCIES = ["NGN", "GHS", "KES"];
 
 const EMPTY_DRAFT = {
   amount: "",
@@ -80,7 +82,7 @@ export default function CollectionsPage() {
       }),
     [mode, page, recurring, search, status]
   );
-  const { data: settlementData } = useResource(
+  const { data: settlementData, isLoading: isSettlementLoading } = useResource(
     async ({ token, merchantId }) =>
       loadSettlementAccounts({
         token,
@@ -94,6 +96,15 @@ export default function CollectionsPage() {
 
   const collections = data?.collections ?? [];
   const settlementAccounts = settlementData?.accounts ?? [];
+  const defaultSettlementAccount =
+    settlementAccounts.find((account) => account.isDefault) ?? null;
+  const currencyOptions = useMemo(
+    () =>
+      user?.markets && user.markets.length > 0
+        ? user.markets.map((market) => market.toUpperCase())
+        : FALLBACK_CURRENCIES,
+    [user?.markets]
+  );
   const pagination = data?.pagination ?? {
     page,
     limit: pageSize,
@@ -106,6 +117,17 @@ export default function CollectionsPage() {
   }, [mode, recurring, search, status]);
 
   useEffect(() => {
+    if (currencyOptions.includes(draft.currency)) {
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      currency: currencyOptions[0] ?? "NGN",
+    }));
+  }, [currencyOptions, draft.currency]);
+
+  useEffect(() => {
     if (!message && !errorMessage) return;
     const timeout = window.setTimeout(() => {
       setMessage(null);
@@ -113,6 +135,27 @@ export default function CollectionsPage() {
     }, 3000);
     return () => window.clearTimeout(timeout);
   }, [errorMessage, message]);
+
+  useEffect(() => {
+    if (settlementAccounts.length === 0) {
+      if (draft.settlement) {
+        setDraft((current) => ({ ...current, settlement: "" }));
+      }
+      return;
+    }
+
+    if (
+      draft.settlement &&
+      settlementAccounts.some((account) => account.id === draft.settlement)
+    ) {
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      settlement: defaultSettlementAccount ? "" : settlementAccounts[0]?.id ?? "",
+    }));
+  }, [defaultSettlementAccount, draft.settlement, settlementAccounts]);
 
   const metrics = data?.summary ?? {
     total: pagination.total,
@@ -159,6 +202,7 @@ export default function CollectionsPage() {
     Number(draft.amount) > 0 &&
     draft.currency.trim().length >= 2 &&
     draft.reference.trim().length >= 2 &&
+    !isSettlementLoading &&
     (!draft.recurringEnabled || Number(draft.intervalCount) > 0);
 
   if (isLoading && !data) {
@@ -285,7 +329,21 @@ export default function CollectionsPage() {
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-[color:var(--muted)]">Currency</span>
-            <Input value={draft.currency} onChange={(event) => setDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} />
+            <Select
+              value={draft.currency}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  currency: event.target.value,
+                }))
+              }
+            >
+              {currencyOptions.map((currency) => (
+                <option key={currency} value={currency}>
+                  {currency}
+                </option>
+              ))}
+            </Select>
           </label>
           <label className="space-y-1.5 md:col-span-2">
             <span className="text-xs font-medium text-[color:var(--muted)]">Reference</span>
@@ -297,14 +355,31 @@ export default function CollectionsPage() {
           </label>
           <label className="space-y-1.5 md:col-span-2">
             <span className="text-xs font-medium text-[color:var(--muted)]">Settlement</span>
-            <Select value={draft.settlement} onChange={(event) => setDraft((current) => ({ ...current, settlement: event.target.value }))}>
-              <option value="">Default</option>
-              {settlementAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} · Stellar USDC
-                </option>
-              ))}
+            <Select
+              value={draft.settlement}
+              disabled={isSettlementLoading}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, settlement: event.target.value }))
+              }
+            >
+              {defaultSettlementAccount ? (
+                <option value="">Default · {defaultSettlementAccount.name}</option>
+              ) : (
+                <option value="">Default settlement</option>
+              )}
+              {settlementAccounts
+                .filter((account) => !account.isDefault)
+                .map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} · Stellar USDC
+                  </option>
+                ))}
             </Select>
+            {isSettlementLoading ? (
+              <p className="text-xs font-medium text-[color:var(--muted)]">
+                Loading settlement accounts.
+              </p>
+            ) : null}
           </label>
           <label className="flex items-center gap-3 rounded-lg border border-[color:var(--line)] px-3 py-3 md:col-span-2">
             <input
