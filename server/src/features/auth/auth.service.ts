@@ -42,9 +42,11 @@ function toAuthenticatedUser(document: {
 
   return {
     accountId,
+    teamMemberId: accountId,
     merchantId: accountId,
     name: displayName,
     email,
+    role: "owner",
     status: document.status,
     workspaceMode: "test" as const,
     permissions: normalizePermissions(getOwnerPermissions()),
