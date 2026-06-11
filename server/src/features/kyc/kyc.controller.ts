@@ -4,6 +4,7 @@ import {
   getMerchantKybStatusByMerchantId,
   getOwnerKycStatusByMerchantId,
   processDiditWebhook,
+  processSumsubWebhook,
   startMerchantKybSession,
   startOwnerKycSession,
   syncMerchantKybStatus,
@@ -14,6 +15,7 @@ import {
   merchantKybStatusQuerySchema,
   ownerKycStatusQuerySchema,
   diditWebhookSchema,
+  sumsubWebhookSchema,
   startMerchantKybSchema,
   startOwnerKycSchema,
   syncMerchantKybSchema,
@@ -155,6 +157,26 @@ export const processDiditWebhookController = asyncHandler(
       signatureHeader: request.header("x-signature") ?? null,
       signatureV2Header: request.header("x-signature-v2") ?? null,
       signatureSimpleHeader: request.header("x-signature-simple") ?? null,
+    });
+
+    response.status(200).json({
+      success: true,
+      message: "Verification webhook processed.",
+      data: result,
+    });
+  }
+);
+
+export const processSumsubWebhookController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const payload = sumsubWebhookSchema.parse({
+      ...request.body,
+    });
+    const result = await processSumsubWebhook({
+      payload,
+      rawBody: request.rawBody ?? JSON.stringify(payload),
+      digestHeader: request.header("x-payload-digest") ?? null,
+      digestAlgorithmHeader: request.header("x-payload-digest-alg") ?? null,
     });
 
     response.status(200).json({

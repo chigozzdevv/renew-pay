@@ -85,6 +85,20 @@ export const diditWebhookSchema = z
   })
   .passthrough();
 
+export const sumsubWebhookSchema = z
+  .object({
+    applicantId: z.string().trim().min(1).optional(),
+    inspectionId: z.string().trim().min(1).optional(),
+    correlationId: z.string().trim().min(1).optional(),
+    externalUserId: z.string().trim().min(1).optional(),
+    type: z.string().trim().min(1).optional(),
+    reviewStatus: z.string().trim().min(1).optional(),
+    reviewResult: z.record(z.string(), z.unknown()).optional(),
+    createdAtMs: z.union([z.string().trim().min(1), z.number()]).optional(),
+    clientId: z.string().trim().min(1).optional(),
+  })
+  .passthrough();
+
 export type StartMerchantKybInput = z.infer<typeof startMerchantKybSchema>;
 export type SyncMerchantKybInput = z.infer<typeof syncMerchantKybSchema>;
 export type StartOwnerKycInput = z.infer<typeof startOwnerKycSchema>;
@@ -92,3 +106,4 @@ export type SyncOwnerKycInput = z.infer<typeof syncOwnerKycSchema>;
 export type MerchantKybStatusQuery = z.infer<typeof merchantKybStatusQuerySchema>;
 export type OwnerKycStatusQuery = z.infer<typeof ownerKycStatusQuerySchema>;
 export type DiditWebhookInput = z.infer<typeof diditWebhookSchema>;
+export type SumsubWebhookInput = z.infer<typeof sumsubWebhookSchema>;

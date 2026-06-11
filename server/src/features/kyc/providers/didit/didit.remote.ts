@@ -115,6 +115,8 @@ function extractReviewSnapshot(payload: Record<string, unknown>): DiditReviewSna
 }
 
 export class DiditRemoteProvider implements DiditProvider {
+  readonly name = "didit" as const;
+
   private readonly config: ReturnType<typeof getDiditConfig>;
 
   constructor() {
@@ -123,7 +125,7 @@ export class DiditRemoteProvider implements DiditProvider {
 
   async createSession(input: CreateDiditSessionInput) {
     const payload = {
-      workflow_id: input.workflowId,
+      workflow_id: input.levelName,
       vendor_data: input.vendorData,
       callback: input.callback,
       callback_method: "both",
@@ -167,7 +169,8 @@ export class DiditRemoteProvider implements DiditProvider {
       sessionToken: toStringOrNull(response.session_token),
       url,
       vendorData: toStringOrNull(response.vendor_data) ?? input.vendorData,
-      workflowId: toStringOrNull(response.workflow_id) ?? input.workflowId,
+      levelName: toStringOrNull(response.workflow_id) ?? input.levelName,
+      provider: this.name,
       review: extractReviewSnapshot(response),
       raw: response,
     } satisfies DiditSessionSummary;
@@ -190,28 +193,33 @@ export class DiditRemoteProvider implements DiditProvider {
       return true;
     }
 
-    if (!isFreshTimestamp(input.timestamp)) {
+    const timestamp = input.headers["x-timestamp"] ?? null;
+    const signature = input.headers["x-signature"] ?? null;
+    const signatureV2 = input.headers["x-signature-v2"] ?? null;
+    const signatureSimple = input.headers["x-signature-simple"] ?? null;
+
+    if (!isFreshTimestamp(timestamp)) {
       return false;
     }
 
-    if (input.signatureV2) {
+    if (signatureV2) {
       const canonical = JSON.stringify(sortKeys(input.payload));
       const expected = sign(this.config.webhookSecret, canonical);
 
-      if (safeCompare(expected, input.signatureV2.trim())) {
+      if (safeCompare(expected, signatureV2.trim())) {
         return true;
       }
     }
 
-    if (input.signature) {
+    if (signature) {
       const expected = sign(this.config.webhookSecret, input.rawBody);
 
-      if (safeCompare(expected, input.signature.trim())) {
+      if (safeCompare(expected, signature.trim())) {
         return true;
       }
     }
 
-    if (input.signatureSimple) {
+    if (signatureSimple) {
       const canonical = [
         input.payload.timestamp ?? "",
         input.payload.session_id ?? "",
@@ -220,7 +228,7 @@ export class DiditRemoteProvider implements DiditProvider {
       ].join(":");
       const expected = sign(this.config.webhookSecret, canonical);
 
-      return safeCompare(expected, input.signatureSimple.trim());
+      return safeCompare(expected, signatureSimple.trim());
     }
 
     return false;

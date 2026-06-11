@@ -4,6 +4,7 @@ import {
   getMerchantKybStatusController,
   getOwnerKycStatusController,
   processDiditWebhookController,
+  processSumsubWebhookController,
   startMerchantKybController,
   startOwnerKycController,
   syncMerchantKybController,
@@ -17,6 +18,7 @@ import {
 const kycRouter = Router();
 
 kycRouter.post("/webhooks/didit", processDiditWebhookController);
+kycRouter.post("/webhooks/sumsub", processSumsubWebhookController);
 
 kycRouter.use(requirePlatformAuth);
 

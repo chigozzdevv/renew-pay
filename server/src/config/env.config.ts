@@ -146,6 +146,7 @@ const envSchema = z
     CLOUDINARY_API_SECRET: z.string().trim().default(""),
     CLOUDINARY_UPLOAD_FOLDER: z.string().trim().default("renew"),
     VERIFICATION_ONBOARDING_ENABLED: booleanEnv.default(true),
+    VERIFICATION_PROVIDER: z.enum(["didit", "sumsub"]).default("sumsub"),
     DIDIT_BASE_URL: z
       .string()
       .trim()
@@ -156,6 +157,17 @@ const envSchema = z
     DIDIT_WORKFLOW_ID_KYB: z.string().trim().default(""),
     DIDIT_WEBHOOK_SECRET: z.string().trim().default(""),
     DIDIT_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    SUMSUB_BASE_URL: z
+      .string()
+      .trim()
+      .min(1)
+      .default("https://api.sumsub.com"),
+    SUMSUB_APP_TOKEN: z.string().trim().default(""),
+    SUMSUB_SECRET_KEY: z.string().trim().default(""),
+    SUMSUB_LEVEL_NAME_KYC: z.string().trim().default(""),
+    SUMSUB_LEVEL_NAME_KYB: z.string().trim().default(""),
+    SUMSUB_WEBHOOK_SECRET: z.string().trim().default(""),
+    SUMSUB_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
     KYC_ONLY_DAILY_SETTLEMENT_LIMIT_USD: z.coerce
       .number()
       .positive()

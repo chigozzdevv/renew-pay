@@ -1,15 +1,21 @@
 import { createHash } from "crypto";
 
 import { getDiditConfig } from "@/config/didit.config";
+import { getSumsubConfig } from "@/config/sumsub.config";
+import { getVerificationConfig } from "@/config/verification.config";
 import { appendAuditLog } from "@/features/audit/audit.service";
 import { KycEventModel } from "@/features/kyc/kyc-event.model";
 import { KycCheckModel } from "@/features/kyc/kyc.model";
-import { getDiditProvider } from "@/features/kyc/providers/didit/didit.factory";
-import type { DiditReviewSnapshot } from "@/features/kyc/providers/didit/didit.types";
+import { getVerificationProvider } from "@/features/kyc/providers/verification.factory";
+import type {
+  VerificationProviderName,
+  VerificationReviewSnapshot,
+} from "@/features/kyc/providers/verification.types";
 import type {
   DiditWebhookInput,
   StartMerchantKybInput,
   StartOwnerKycInput,
+  SumsubWebhookInput,
   SyncMerchantKybInput,
   SyncOwnerKycInput,
 } from "@/features/kyc/kyc.validation";
@@ -21,6 +27,38 @@ import { HttpError } from "@/shared/errors/http-error";
 type KycSubjectType = "merchant" | "owner";
 type KycStatus = "not_started" | "pending" | "approved" | "rejected" | "on_hold";
 const VERIFICATION_SCOPE = "global";
+
+function getProviderSettings(
+  providerName: VerificationProviderName = getVerificationConfig().provider
+) {
+  const verification = getVerificationConfig();
+
+  if (providerName === "sumsub") {
+    const sumsub = getSumsubConfig();
+
+    return {
+      enabled: verification.enabled,
+      provider: "sumsub" as const,
+      levelNameKyc: sumsub.levelNameKyc,
+      levelNameKyb: sumsub.levelNameKyb,
+      callbackUrl: verification.callbackUrl,
+    };
+  }
+
+  const didit = getDiditConfig();
+
+  return {
+    enabled: verification.enabled,
+    provider: "didit" as const,
+    levelNameKyc: didit.workflowIdKyc,
+    levelNameKyb: didit.workflowIdKyb,
+    callbackUrl: verification.callbackUrl,
+  };
+}
+
+function normalizeProviderName(value: string | null | undefined): VerificationProviderName {
+  return value === "sumsub" ? "sumsub" : "didit";
+}
 
 function toStringOrNull(value: unknown) {
   if (typeof value !== "string") {
@@ -64,7 +102,7 @@ function buildExternalUserId(input: {
   return `renew:verification:owner:${input.merchantId}:${input.subjectRef}`;
 }
 
-function deriveStatusFromReview(review: DiditReviewSnapshot, eventType?: string): KycStatus {
+function deriveStatusFromReview(review: VerificationReviewSnapshot, eventType?: string): KycStatus {
   const reviewAnswer = review.reviewAnswer?.toUpperCase() ?? null;
   const reviewStatus = review.status?.toLowerCase() ?? null;
   const normalizedEvent = eventType?.trim().toLowerCase() ?? "";
@@ -172,7 +210,8 @@ async function getOrCreateKycRecord(input: {
   merchantId: string;
   subjectType: KycSubjectType;
   subjectRef: string;
-  workflowId: string;
+  provider: VerificationProviderName;
+  levelName: string;
   actor: string;
 }) {
   const externalUserId = buildExternalUserId(input);
@@ -188,22 +227,20 @@ async function getOrCreateKycRecord(input: {
       merchantId: input.merchantId,
       subjectType: input.subjectType,
       subjectRef: input.subjectRef,
-      provider: "didit",
+      provider: input.provider,
       mode: VERIFICATION_SCOPE,
       externalUserId,
-      levelName: input.workflowId,
+      levelName: input.levelName,
       status: "not_started",
       createdBy: input.actor,
     });
   } else {
-    record.provider = "didit";
+    record.provider = input.provider;
     record.externalUserId = externalUserId;
 
-    if (record.levelName !== input.workflowId) {
-      record.levelName = input.workflowId;
+    if (record.levelName !== input.levelName) {
+      record.levelName = input.levelName;
     }
-
-    await record.save();
   }
 
   return record;
@@ -211,7 +248,7 @@ async function getOrCreateKycRecord(input: {
 
 function applyReviewSnapshot(input: {
   record: Awaited<ReturnType<typeof getOrCreateKycRecord>>;
-  review: DiditReviewSnapshot;
+  review: VerificationReviewSnapshot;
   eventType: string;
 }) {
   const status = deriveStatusFromReview(input.review, input.eventType);
@@ -235,7 +272,7 @@ function applyReviewSnapshot(input: {
   }
 }
 
-function extractReviewFromWebhook(payload: DiditWebhookInput): DiditReviewSnapshot {
+function extractReviewFromDiditWebhook(payload: DiditWebhookInput): VerificationReviewSnapshot {
   const decision =
     typeof payload.decision === "object" && payload.decision !== null
       ? (payload.decision as Record<string, unknown>)
@@ -274,10 +311,27 @@ function extractReviewFromWebhook(payload: DiditWebhookInput): DiditReviewSnapsh
   };
 }
 
+function extractReviewFromSumsubWebhook(payload: SumsubWebhookInput): VerificationReviewSnapshot {
+  const reviewResult =
+    typeof payload.reviewResult === "object" && payload.reviewResult !== null
+      ? (payload.reviewResult as Record<string, unknown>)
+      : {};
+
+  return {
+    status: toStringOrNull(payload.reviewStatus),
+    reviewAnswer: toStringOrNull(reviewResult.reviewAnswer),
+    rejectType: toStringOrNull(reviewResult.reviewRejectType),
+    rejectLabels: toStringArray(reviewResult.rejectLabels),
+    moderationComment: toStringOrNull(reviewResult.moderationComment),
+    clientComment: toStringOrNull(reviewResult.clientComment),
+  };
+}
+
 function createUnavailableKycResponse(input: {
   subjectType: KycSubjectType;
   subjectRef: string;
-  workflowId: string;
+  provider: VerificationProviderName;
+  levelName: string;
   required?: boolean;
   available?: boolean;
   reason?: string | null;
@@ -287,7 +341,7 @@ function createUnavailableKycResponse(input: {
     subjectType: input.subjectType,
     subjectRef: input.subjectRef,
     status: input.status ?? "not_started",
-    provider: "didit",
+    provider: input.provider,
     mode: VERIFICATION_SCOPE,
     applicantId: null,
     reviewStatus: null,
@@ -300,7 +354,7 @@ function createUnavailableKycResponse(input: {
     lastEventAt: null,
     completedAt: null,
     lastSyncedAt: null,
-    levelName: input.workflowId,
+    levelName: input.levelName,
     metadata: {
       available: input.available ?? false,
       required: input.required ?? false,
@@ -309,24 +363,25 @@ function createUnavailableKycResponse(input: {
   };
 }
 
-function getConfiguredWorkflowId(value: string | undefined, fallback: string) {
-  const workflowId = (value ?? fallback).trim();
+function getConfiguredLevelName(value: string | undefined, fallback: string) {
+  const levelName = (value ?? fallback).trim();
 
-  if (!workflowId) {
-    throw new HttpError(500, "Verification workflow is not configured.");
+  if (!levelName) {
+    throw new HttpError(500, "Verification level is not configured.");
   }
 
-  return workflowId;
+  return levelName;
 }
 
 function getVerificationCallbackUrl() {
-  return `${getDiditConfig().callbackUrl.replace(/\/+$/, "")}/dashboard/onboarding`;
+  return `${getVerificationConfig().callbackUrl.replace(/\/+$/, "")}/dashboard/onboarding`;
 }
 
 function getBypassedVerificationResponse(input: {
   subjectType: KycSubjectType;
   subjectRef: string;
-  workflowId: string;
+  provider: VerificationProviderName;
+  levelName: string;
 }) {
   return createUnavailableKycResponse({
     ...input,
@@ -337,7 +392,8 @@ function getBypassedVerificationResponse(input: {
   });
 }
 
-function buildDiditWebhookRecordQueries(input: {
+function buildWebhookRecordQueries(input: {
+  provider: VerificationProviderName;
   applicantId: string | null;
   externalUserId: string | null;
 }) {
@@ -345,6 +401,7 @@ function buildDiditWebhookRecordQueries(input: {
 
   if (input.applicantId) {
     queries.push({
+      provider: input.provider,
       applicantId: input.applicantId,
       mode: VERIFICATION_SCOPE,
     });
@@ -352,6 +409,7 @@ function buildDiditWebhookRecordQueries(input: {
 
   if (input.externalUserId) {
     queries.push({
+      provider: input.provider,
       externalUserId: input.externalUserId,
       mode: VERIFICATION_SCOPE,
     });
@@ -360,11 +418,12 @@ function buildDiditWebhookRecordQueries(input: {
   return queries;
 }
 
-async function findKycRecordForDiditWebhook(input: {
+async function findKycRecordForWebhook(input: {
+  provider: VerificationProviderName;
   applicantId: string | null;
   externalUserId: string | null;
 }) {
-  for (const query of buildDiditWebhookRecordQueries(input)) {
+  for (const query of buildWebhookRecordQueries(input)) {
     const record = await KycCheckModel.findOne(query).exec();
 
     if (record) {
@@ -379,13 +438,14 @@ export async function getMerchantKybStatusByMerchantId(
   merchantId: string
 ) {
   await getMerchantOrThrow(merchantId);
-  const config = getDiditConfig();
+  const config = getProviderSettings();
 
   if (!config.enabled) {
     return getBypassedVerificationResponse({
       subjectType: "merchant",
       subjectRef: merchantId,
-      workflowId: config.workflowIdKyb,
+      provider: config.provider,
+      levelName: config.levelNameKyb,
     });
   }
 
@@ -400,7 +460,8 @@ export async function getMerchantKybStatusByMerchantId(
     return createUnavailableKycResponse({
       subjectType: "merchant",
       subjectRef: merchantId,
-      workflowId: config.workflowIdKyb,
+      provider: config.provider,
+      levelName: config.levelNameKyb,
       required: false,
       available: true,
       reason: null,
@@ -424,13 +485,14 @@ export async function getOwnerKycStatusByMerchantId(input: {
   environment?: RuntimeMode;
 }) {
   await getMerchantOrThrow(input.merchantId);
-  const config = getDiditConfig();
+  const config = getProviderSettings();
 
   if (!config.enabled) {
     return getBypassedVerificationResponse({
       subjectType: "owner",
       subjectRef: input.merchantId,
-      workflowId: config.workflowIdKyc,
+      provider: config.provider,
+      levelName: config.levelNameKyc,
     });
   }
 
@@ -445,7 +507,8 @@ export async function getOwnerKycStatusByMerchantId(input: {
     return createUnavailableKycResponse({
       subjectType: "owner",
       subjectRef: input.merchantId,
-      workflowId: config.workflowIdKyc,
+      provider: config.provider,
+      levelName: config.levelNameKyc,
       required: true,
       available: true,
       reason: null,
@@ -466,27 +529,29 @@ export async function getOwnerKycStatusByMerchantId(input: {
 
 export async function startMerchantKybSession(input: StartMerchantKybInput) {
   const merchant = await getMerchantOrThrow(input.merchantId);
-  const config = getDiditConfig();
+  const config = getProviderSettings();
 
   if (!config.enabled) {
     throw new HttpError(409, "Verification onboarding is not enabled.");
   }
 
-  const diditProvider = getDiditProvider();
-  const workflowId = getConfiguredWorkflowId(input.workflowId ?? input.levelName, config.workflowIdKyb);
+  const verificationProvider = getVerificationProvider(config.provider);
+  const levelName = getConfiguredLevelName(input.workflowId ?? input.levelName, config.levelNameKyb);
 
   const record = await getOrCreateKycRecord({
     merchantId: input.merchantId,
     subjectType: "merchant",
     subjectRef: input.merchantId,
-    workflowId,
+    provider: verificationProvider.name,
+    levelName,
     actor: input.actor,
   });
 
-  const session = await diditProvider.createSession({
-    workflowId,
+  const session = await verificationProvider.createSession({
+    levelName,
     vendorData: record.externalUserId,
     callback: getVerificationCallbackUrl(),
+    subjectType: "merchant",
     language: input.lang,
     contactDetails: {
       email: merchant.supportEmail ?? undefined,
@@ -503,9 +568,10 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
     },
   });
 
+  record.provider = session.provider;
   record.applicantId = session.sessionId;
   record.externalUserId = session.vendorData;
-  record.levelName = session.workflowId;
+  record.levelName = session.levelName;
   applyReviewSnapshot({
     record,
     review: session.review,
@@ -530,7 +596,7 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
     detail: "Merchant KYB verification was initiated.",
     metadata: {
       subjectType: record.subjectType,
-      workflowId: record.levelName,
+      levelName: record.levelName,
       sessionId: record.applicantId,
     },
     ipAddress: null,
@@ -548,7 +614,7 @@ export async function startMerchantKybSession(input: StartMerchantKybInput) {
 
 export async function startOwnerKycSession(input: StartOwnerKycInput) {
   const merchant = await getMerchantOrThrow(input.merchantId);
-  const config = getDiditConfig();
+  const config = getProviderSettings();
 
   if (!config.enabled) {
     throw new HttpError(409, "Verification onboarding is not enabled.");
@@ -557,22 +623,24 @@ export async function startOwnerKycSession(input: StartOwnerKycInput) {
   if (!merchant.ownerName?.trim()) {
     throw new HttpError(409, "Save business details before starting owner verification.");
   }
-  const diditProvider = getDiditProvider();
-  const workflowId = getConfiguredWorkflowId(input.workflowId ?? input.levelName, config.workflowIdKyc);
+  const verificationProvider = getVerificationProvider(config.provider);
+  const levelName = getConfiguredLevelName(input.workflowId ?? input.levelName, config.levelNameKyc);
   const names = splitName(merchant.ownerName);
 
   const record = await getOrCreateKycRecord({
     merchantId: input.merchantId,
     subjectType: "owner",
     subjectRef: input.merchantId,
-    workflowId,
+    provider: verificationProvider.name,
+    levelName,
     actor: input.actor,
   });
 
-  const session = await diditProvider.createSession({
-    workflowId,
+  const session = await verificationProvider.createSession({
+    levelName,
     vendorData: record.externalUserId,
     callback: getVerificationCallbackUrl(),
+    subjectType: "owner",
     language: input.lang,
     contactDetails: {
       email: merchant.supportEmail ?? undefined,
@@ -588,9 +656,10 @@ export async function startOwnerKycSession(input: StartOwnerKycInput) {
     },
   });
 
+  record.provider = session.provider;
   record.applicantId = session.sessionId;
   record.externalUserId = session.vendorData;
-  record.levelName = session.workflowId;
+  record.levelName = session.levelName;
   applyReviewSnapshot({
     record,
     review: session.review,
@@ -615,7 +684,7 @@ export async function startOwnerKycSession(input: StartOwnerKycInput) {
     detail: "Owner KYC verification was initiated.",
     metadata: {
       subjectType: record.subjectType,
-      workflowId: record.levelName,
+      levelName: record.levelName,
       sessionId: record.applicantId,
     },
     ipAddress: null,
@@ -633,13 +702,12 @@ export async function startOwnerKycSession(input: StartOwnerKycInput) {
 
 export async function syncMerchantKybStatus(input: SyncMerchantKybInput) {
   await getMerchantOrThrow(input.merchantId);
-  const config = getDiditConfig();
+  const config = getProviderSettings();
 
   if (!config.enabled) {
     throw new HttpError(409, "Verification onboarding is not enabled.");
   }
 
-  const diditProvider = getDiditProvider();
   const record = await KycCheckModel.findOne({
     merchantId: input.merchantId,
     subjectType: "merchant",
@@ -651,7 +719,8 @@ export async function syncMerchantKybStatus(input: SyncMerchantKybInput) {
     throw new HttpError(409, "Merchant KYB has not been started yet.");
   }
 
-  const review = await diditProvider.getSessionDecision(record.applicantId);
+  const verificationProvider = getVerificationProvider(normalizeProviderName(record.provider));
+  const review = await verificationProvider.getSessionDecision(record.applicantId);
   applyReviewSnapshot({
     record,
     review,
@@ -685,13 +754,12 @@ export async function syncMerchantKybStatus(input: SyncMerchantKybInput) {
 
 export async function syncOwnerKycStatus(input: SyncOwnerKycInput) {
   await getMerchantOrThrow(input.merchantId);
-  const config = getDiditConfig();
+  const config = getProviderSettings();
 
   if (!config.enabled) {
     throw new HttpError(409, "Verification onboarding is not enabled.");
   }
 
-  const diditProvider = getDiditProvider();
   const record = await KycCheckModel.findOne({
     merchantId: input.merchantId,
     subjectType: "owner",
@@ -703,7 +771,8 @@ export async function syncOwnerKycStatus(input: SyncOwnerKycInput) {
     throw new HttpError(409, "Owner KYC has not been started yet.");
   }
 
-  const review = await diditProvider.getSessionDecision(record.applicantId);
+  const verificationProvider = getVerificationProvider(normalizeProviderName(record.provider));
+  const review = await verificationProvider.getSessionDecision(record.applicantId);
   applyReviewSnapshot({
     record,
     review,
@@ -749,15 +818,17 @@ export async function processDiditWebhook(input: {
     toStringOrNull(input.payload.externalUserId) ??
     toStringOrNull(input.payload.vendor_user_id);
   const config = getDiditConfig();
-  const diditProvider = getDiditProvider();
+  const verificationProvider = getVerificationProvider("didit");
   const hasConfiguredWebhookSecret = config.webhookSecret.length > 0;
-  const signatureMatches = diditProvider.verifyWebhookSignature({
+  const signatureMatches = verificationProvider.verifyWebhookSignature({
     rawBody: input.rawBody,
     payload: input.payload,
-    timestamp: input.timestampHeader,
-    signature: input.signatureHeader,
-    signatureV2: input.signatureV2Header,
-    signatureSimple: input.signatureSimpleHeader,
+    headers: {
+      "x-timestamp": input.timestampHeader,
+      "x-signature": input.signatureHeader,
+      "x-signature-v2": input.signatureV2Header,
+      "x-signature-simple": input.signatureSimpleHeader,
+    },
   });
 
   if (hasConfiguredWebhookSecret && !signatureMatches) {
@@ -772,7 +843,7 @@ export async function processDiditWebhook(input: {
     toStringOrNull(input.payload.event_id) ??
     createHash("sha256").update(input.rawBody, "utf8").digest("hex");
   const existingEvent = await KycEventModel.findOne({
-    provider: "didit",
+    provider: verificationProvider.name,
     environment: VERIFICATION_SCOPE,
     eventKey,
   }).exec();
@@ -791,7 +862,7 @@ export async function processDiditWebhook(input: {
   if (!event) {
     try {
       event = await KycEventModel.create({
-        provider: "didit",
+        provider: verificationProvider.name,
         environment: VERIFICATION_SCOPE,
         eventKey,
         eventType,
@@ -804,7 +875,7 @@ export async function processDiditWebhook(input: {
 
       if (maybeDuplicate.code === 11000) {
         event = await KycEventModel.findOne({
-          provider: "didit",
+          provider: verificationProvider.name,
           environment: VERIFICATION_SCOPE,
           eventKey,
         }).exec();
@@ -819,7 +890,8 @@ export async function processDiditWebhook(input: {
   }
 
   const applicantId = toStringOrNull(input.payload.session_id);
-  const record = await findKycRecordForDiditWebhook({
+  const record = await findKycRecordForWebhook({
+    provider: verificationProvider.name,
     applicantId,
     externalUserId,
   });
@@ -845,7 +917,173 @@ export async function processDiditWebhook(input: {
     };
   }
 
-  const review = extractReviewFromWebhook(input.payload);
+  const review = extractReviewFromDiditWebhook(input.payload);
+  applyReviewSnapshot({
+    record,
+    review,
+    eventType,
+  });
+  record.metadata = {
+    ...(record.metadata as Record<string, unknown>),
+    lastWebhook: input.payload,
+  };
+  await record.save();
+
+  await appendAuditLog({
+    merchantId: record.merchantId.toString(),
+    actor: "verification-webhook",
+    action: "Processed verification webhook",
+    category: "security",
+    status: "ok",
+    target: record.subjectRef,
+    detail: `Verification update received for ${record.subjectType}.`,
+    metadata: {
+      eventType,
+      subjectType: record.subjectType,
+      status: record.status,
+      reviewStatus: record.reviewStatus,
+      reviewAnswer: record.reviewAnswer,
+      rejectType: record.rejectType,
+    },
+    ipAddress: null,
+    userAgent: null,
+  });
+
+  await queueVerificationNotification({
+    merchantId: record.merchantId.toString(),
+    environment: "live",
+    subjectType: record.subjectType,
+    status: record.status,
+    reviewAnswer: record.reviewAnswer ?? null,
+  }).catch((notificationError) => {
+    console.error("[verification-webhook] Failed to queue verification notification:", notificationError);
+  });
+
+  const result = {
+    processed: true,
+    idempotent: false,
+    matched: true,
+    eventType,
+    subjectType: record.subjectType,
+    subjectRef: record.subjectRef,
+    status: record.status,
+    applicantId: record.applicantId,
+  };
+
+  event.result = result;
+  event.processedAt = new Date();
+  await event.save();
+
+  return result;
+}
+
+export async function processSumsubWebhook(input: {
+  payload: SumsubWebhookInput;
+  rawBody: string;
+  digestHeader: string | null;
+  digestAlgorithmHeader: string | null;
+  environment?: RuntimeMode;
+}) {
+  const externalUserId = toStringOrNull(input.payload.externalUserId);
+  const applicantId = toStringOrNull(input.payload.applicantId);
+  const config = getSumsubConfig();
+  const verificationProvider = getVerificationProvider("sumsub");
+  const hasConfiguredWebhookSecret = config.webhookSecret.length > 0;
+  const signatureMatches = verificationProvider.verifyWebhookSignature({
+    rawBody: input.rawBody,
+    payload: input.payload,
+    headers: {
+      "x-payload-digest": input.digestHeader,
+      "x-payload-digest-alg": input.digestAlgorithmHeader,
+    },
+  });
+
+  if (hasConfiguredWebhookSecret && !signatureMatches) {
+    throw new HttpError(401, "Invalid verification webhook signature.");
+  }
+
+  const eventType =
+    toStringOrNull(input.payload.type) ??
+    toStringOrNull(input.payload.reviewStatus) ??
+    "unknown";
+  const eventKey =
+    toStringOrNull(input.payload.correlationId) ??
+    createHash("sha256").update(input.rawBody, "utf8").digest("hex");
+  const existingEvent = await KycEventModel.findOne({
+    provider: verificationProvider.name,
+    environment: VERIFICATION_SCOPE,
+    eventKey,
+  }).exec();
+
+  if (existingEvent?.processedAt) {
+    return {
+      processed: true,
+      idempotent: true,
+      matched: Boolean(existingEvent.result),
+      eventType,
+    };
+  }
+
+  let event = existingEvent;
+
+  if (!event) {
+    try {
+      event = await KycEventModel.create({
+        provider: verificationProvider.name,
+        environment: VERIFICATION_SCOPE,
+        eventKey,
+        eventType,
+        applicantId,
+        externalUserId,
+        payload: input.payload,
+      });
+    } catch (error) {
+      const maybeDuplicate = error as { code?: number };
+
+      if (maybeDuplicate.code === 11000) {
+        event = await KycEventModel.findOne({
+          provider: verificationProvider.name,
+          environment: VERIFICATION_SCOPE,
+          eventKey,
+        }).exec();
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  if (!event) {
+    throw new HttpError(500, "Unable to persist verification webhook event.");
+  }
+
+  const record = await findKycRecordForWebhook({
+    provider: verificationProvider.name,
+    applicantId,
+    externalUserId,
+  });
+
+  if (!record) {
+    event.result = {
+      processed: false,
+      matched: false,
+      eventType,
+      applicantId,
+      externalUserId,
+    };
+    event.processedAt = new Date();
+    await event.save();
+
+    return {
+      processed: true,
+      idempotent: false,
+      matched: false,
+      eventType,
+      applicantId,
+      externalUserId,
+    };
+  }
+
+  const review = extractReviewFromSumsubWebhook(input.payload);
   applyReviewSnapshot({
     record,
     review,
@@ -909,7 +1147,7 @@ export async function getMerchantVerificationAccessForLive(
   merchantId: string,
   mode: RuntimeMode
 ) {
-  const config = getDiditConfig();
+  const config = getVerificationConfig();
 
   if (mode !== "live" || !config.enabled) {
     return {
@@ -958,5 +1196,5 @@ export async function assertMerchantKybApprovedForLive(
 }
 
 export const __test__ = {
-  buildDiditWebhookRecordQueries,
+  buildWebhookRecordQueries,
 };
