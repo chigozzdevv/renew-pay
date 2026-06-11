@@ -1,8 +1,21 @@
 import type { Metadata } from "next";
+import { Inter, Space_Grotesk } from "next/font/google";
 
 import { RenewPrivyProvider } from "@/components/shared/privy-provider";
 
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Renew | Local Payments with Stable Settlement",
@@ -17,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body className={`${inter.variable} ${spaceGrotesk.variable}`}>
         <RenewPrivyProvider>{children}</RenewPrivyProvider>
       </body>
     </html>

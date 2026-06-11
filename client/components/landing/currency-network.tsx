@@ -234,7 +234,7 @@ export function CurrencyNetwork() {
                   fill={isStable ? "#15803d" : "#1f2937"}
                   fontSize="14"
                   fontWeight="700"
-                  fontFamily="var(--font-geist), system-ui, sans-serif"
+                  fontFamily="var(--font-sans)"
                   letterSpacing="-0.01em"
                 >
                   {node.label}
@@ -247,7 +247,7 @@ export function CurrencyNetwork() {
                   dominantBaseline="central"
                   fill="#9ca3af"
                   fontSize="9"
-                  fontFamily="var(--font-geist), system-ui, sans-serif"
+                  fontFamily="var(--font-sans)"
                 >
                   {node.sub}
                 </text>
