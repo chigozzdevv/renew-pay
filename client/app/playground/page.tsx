@@ -99,7 +99,7 @@ export default function PlaygroundPage() {
         next.splice(index, 1);
       }
 
-      return next.length > 0 ? next : current;
+      return next;
     });
   }
 
@@ -238,13 +238,20 @@ export default function PlaygroundPage() {
                             </span>
                             <span
                               className={cn(
-                                "grid h-9 min-w-9 place-items-center rounded-full px-2 transition-colors",
+                                "inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-bold transition-colors",
                                 quantity > 0
-                                  ? "bg-[#111111] text-sm font-bold text-white"
+                                  ? "bg-[#111111] text-white"
                                   : "bg-white/70 text-[#66706a] group-hover:bg-[#111111] group-hover:text-white"
                               )}
                             >
-                              {quantity > 0 ? quantity : <Plus className="h-4 w-4" />}
+                              {quantity > 0 ? (
+                                <>
+                                  <Check className="h-4 w-4" />
+                                  {quantity}
+                                </>
+                              ) : (
+                                <Plus className="h-4 w-4" />
+                              )}
                             </span>
                           </span>
                         </button>
@@ -270,48 +277,68 @@ export default function PlaygroundPage() {
                     </div>
                   </div>
 
-                  <div className="min-h-[220px] py-5">
-                    {cartItems.map((item) => {
-                      const quantity = quantities.get(item.id) ?? 1;
+                  <div className="min-h-[180px] py-5">
+                    {cartItems.length > 0 ? (
+                      <div className="divide-y divide-white/10">
+                        {cartItems.map((item) => {
+                          const quantity = quantities.get(item.id) ?? 1;
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-base font-semibold text-white">
-                              {item.name}
-                            </p>
-                            <p className="mt-1 text-sm font-medium text-white/50">
-                              {quantity} x{" "}
-                              {formatPlaygroundAmount(
-                                item.amount[activeMarket.currency],
-                                marketCode
-                              )}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {!oneShotFlow ? (
-                              <button
-                                type="button"
-                                aria-label={`Remove ${item.name}`}
-                                onClick={() => removeItem(item.id)}
-                                className="grid h-8 w-8 place-items-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </button>
-                            ) : null}
-                            <p className="min-w-20 text-right text-base font-semibold text-white">
-                              {formatPlaygroundAmount(
-                                item.amount[activeMarket.currency] * quantity,
-                                marketCode
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          return (
+                            <div
+                              key={item.id}
+                              className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-base font-semibold text-white">
+                                  {item.name}
+                                </p>
+                                <p className="mt-1 text-sm font-medium text-white/50">
+                                  {formatPlaygroundAmount(
+                                    item.amount[activeMarket.currency],
+                                    marketCode
+                                  )}
+                                </p>
+                              </div>
+                              <div className="grid justify-items-end gap-2">
+                                {!oneShotFlow ? (
+                                  <div className="inline-flex items-center rounded-full bg-white/10 p-1">
+                                    <button
+                                      type="button"
+                                      aria-label={`Remove ${item.name}`}
+                                      onClick={() => removeItem(item.id)}
+                                      className="grid h-8 w-8 place-items-center rounded-full text-white/70 transition-colors hover:bg-white hover:text-[#111111]"
+                                    >
+                                      <Minus className="h-4 w-4" />
+                                    </button>
+                                    <span className="min-w-7 text-center text-sm font-bold text-white">
+                                      {quantity}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      aria-label={`Add ${item.name}`}
+                                      onClick={() => addItem(item.id)}
+                                      className="grid h-8 w-8 place-items-center rounded-full text-white/70 transition-colors hover:bg-white hover:text-[#111111]"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ) : null}
+                                <p className="text-right text-base font-semibold text-white">
+                                  {formatPlaygroundAmount(
+                                    item.amount[activeMarket.currency] * quantity,
+                                    marketCode
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex h-[180px] items-center justify-center rounded-lg border border-dashed border-white/15 text-sm font-semibold text-white/45">
+                        Select an item
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t border-white/10 pt-4">
