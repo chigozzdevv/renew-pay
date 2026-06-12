@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Plus } from "lucide-react";
+import { ExternalLink, Eye, Plus } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -271,9 +271,9 @@ export default function CollectionsPage() {
           {message ? <p className="text-sm text-[color:var(--brand)]">{message}</p> : null}
           {errorMessage ? <p className="text-sm text-[#9a3a31]">{errorMessage}</p> : null}
 
-          <Table columns={["Collection", "Amount", "Settlement", "Status", "Actions"]}>
+          <Table columns={["Collection", "Amount", "Settlement", "Pay link", "Status", "Actions"]}>
             {collections.map((collection) => (
-              <TableRow key={collection.id} columns={5}>
+              <TableRow key={collection.id} columns={6}>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-[color:var(--ink)]">{collection.description}</p>
                   <p className="mt-1 text-xs text-[color:var(--muted)]">{collection.id}</p>
@@ -284,6 +284,16 @@ export default function CollectionsPage() {
                 <p className="self-center text-sm text-[color:var(--muted)]">
                   {collection.settlement ? collection.settlement.id.slice(-8) : "Default"}
                 </p>
+                <a
+                  href={collection.checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={collection.checkoutUrl}
+                  className="inline-flex w-fit items-center gap-1.5 self-center text-sm font-semibold text-[color:var(--ink)] underline-offset-4 hover:underline"
+                >
+                  Open link
+                  <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.1} />
+                </a>
                 <div className="self-center">
                   <StatusBadge value={collection.status} />
                 </div>
