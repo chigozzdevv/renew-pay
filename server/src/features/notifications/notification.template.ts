@@ -113,6 +113,7 @@ type NotificationTemplateDocument = {
   subject: string;
   eyebrow: string;
   heading: string;
+  bodyAlign?: "left" | "center";
   body: string[];
   cta?: {
     label: string;
@@ -176,6 +177,7 @@ function buildTemplateDocument(input: {
         subject: `Your payment to ${merchantName} was successful`,
         eyebrow: "Payment successful",
         heading: "",
+        bodyAlign: "center",
         body: [
           `${amountLabel} was paid to ${merchantName} for ${referenceLabel}.`,
           `Payment reference: ${paymentReference}.`,
@@ -191,6 +193,7 @@ function buildTemplateDocument(input: {
         subject: "We received your payment report",
         eyebrow: "Issue reported",
         heading: "",
+        bodyAlign: "center",
         body: [
           `We received your report for ${referenceLabel}.`,
           "Renew will review the payment details.",
@@ -396,12 +399,16 @@ function renderHtml(input: {
 }) {
   const ctaColor = "#272b25";
   const renewLogoUrl = input.branding.renewLogoUrl;
+  const bodyAlign = input.document.bodyAlign ?? "left";
   const brandHeader = `<img src="${escapeHtml(renewLogoUrl)}" alt="Renew" width="92" style="display:block;height:auto;border:0;margin:0 auto;" />`;
   const heading = input.document.heading.trim()
-    ? `<h1 style="margin:12px 0 18px;font-size:26px;line-height:1.18;color:#111827;">${escapeHtml(input.document.heading)}</h1>`
+    ? `<h1 style="margin:12px 0 18px;font-size:26px;line-height:1.18;color:#111827;text-align:${bodyAlign};">${escapeHtml(input.document.heading)}</h1>`
     : "";
   const body = input.document.body
-    .map((line) => `<p style="margin:0 0 14px;color:#374151;line-height:1.6;">${escapeHtml(line)}</p>`)
+    .map(
+      (line) =>
+        `<p style="margin:0 0 14px;color:#374151;line-height:1.6;text-align:${bodyAlign};">${escapeHtml(line)}</p>`
+    )
     .join("");
   const cta = input.document.cta
     ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto 0;"><tr><td align="center" bgcolor="${ctaColor}" style="border-radius:10px;"><a href="${escapeHtml(input.document.cta.url)}" style="display:inline-block;border-radius:10px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:13px 18px;">${escapeHtml(input.document.cta.label)}</a></td></tr></table>`
