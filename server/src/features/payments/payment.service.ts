@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { Types, type HydratedDocument } from "mongoose";
 
 import { env } from "@/config/env.config";
@@ -8,6 +8,7 @@ import { MerchantModel } from "@/features/merchants/merchant.model";
 import { createPaymentIssueFileUploadSignature } from "@/features/media/media.service";
 import { quoteLocalAmountInSettlementAsset } from "@/features/onramps/onramp.service";
 import {
+  confirmPartnaRampPayment,
   completePartnaCustomerPaymentProfileVerification,
   continuePartnaCustomerPaymentProfileVerificationAfterMethod,
   continuePartnaCustomerPaymentProfileVerificationAfterPhone,
@@ -59,6 +60,17 @@ function buildPaymentUrl(payId: string) {
 
 function createPayId() {
   return `pay_${randomBytes(12).toString("hex")}`;
+}
+
+function createPartnaSandboxBvn(payId: string) {
+  const digest = createHash("sha256").update(payId).digest("hex");
+  const suffix = (
+    BigInt(`0x${digest.slice(0, 16)}`) % 10_000_000_000n
+  )
+    .toString()
+    .padStart(10, "0");
+
+  return `9${suffix}`;
 }
 
 function asRecord(value: unknown) {
@@ -131,7 +143,6 @@ function readOrderItems(metadata: Record<string, unknown>) {
 }
 
 const PARTNA_SANDBOX_PHONE = "08030013843";
-const PARTNA_SANDBOX_OTP = "123456";
 
 type CustomerRecord = HydratedDocument<CustomerDocument>;
 
@@ -619,14 +630,19 @@ async function toPublicPaymentResponse(document: PaymentRecord) {
         sandbox:
           document.environment === "test"
             ? {
+                bvn:
+                  checkoutState === "needs_bvn"
+                    ? createPartnaSandboxBvn(document.payId)
+                    : null,
                 phone:
                   checkoutState === "needs_phone" ? PARTNA_SANDBOX_PHONE : null,
                 otp:
                   checkoutState === "needs_otp"
-                    ? readString(partnaRaw.sandboxOtp) ?? PARTNA_SANDBOX_OTP
+                    ? readString(partnaRaw.sandboxOtp)
                     : null,
               }
             : {
+                bvn: null,
                 phone: null,
                 otp: null,
               },
@@ -1189,6 +1205,7 @@ async function ensurePartnaRampForPayment(
     throw new HttpError(502, "Partna quote did not include a collection network.");
   }
 
+  const partnaRampReference = payment._id.toString();
   const ramp = await getPartnaProvider(environment).createRamp({
     accountName,
     cancelPendingRampRequest: true,
@@ -1197,7 +1214,7 @@ async function ensurePartnaRampForPayment(
     fromAmount: payment.amount,
     fromCurrency: payment.currency,
     fromNetwork,
-    rampReference: payment.payId,
+    rampReference: partnaRampReference,
     rateKey,
     toCurrency: "USDC",
     toNetwork: "solana",
@@ -1227,6 +1244,7 @@ async function ensurePartnaRampForPayment(
     partnaRamp: {
       ...ramp.raw,
       rampReference: ramp.rampReference,
+      payId: payment.payId,
       accountName: ramp.accountName,
       accountNumber: ramp.accountNumber,
       bankName: ramp.bankName,
@@ -1464,6 +1482,31 @@ export async function confirmPublicCheckoutOtp(
   await ensurePartnaRampForPayment(payment, verifiedCustomer);
 
   return toPublicPaymentResponse(payment);
+}
+
+export async function confirmPublicPayment(payId: string) {
+  const payment = await ensurePublicPaymentScope(payId);
+
+  if (checkoutIsComplete(payment)) {
+    return toPublicPaymentResponse(payment);
+  }
+
+  if (payment.collection.provider !== "partna" || !payment.collection.externalId) {
+    throw new HttpError(409, "Collection is not ready for confirmation.");
+  }
+
+  const confirmation = await confirmPartnaRampPayment({
+    payment,
+    environment: getPaymentRuntimeMode(payment),
+  });
+
+  if (!confirmation.confirmed) {
+    throw new HttpError(409, "Payment is still awaiting confirmation.");
+  }
+
+  const refreshedPayment = await PaymentModel.findById(payment._id).exec();
+
+  return toPublicPaymentResponse(refreshedPayment ?? payment);
 }
 
 export async function startPublicPayment(

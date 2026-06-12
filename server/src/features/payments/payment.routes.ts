@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   cancelCollectionController,
+  confirmPublicPaymentController,
   confirmPublicCheckoutOtpController,
   confirmPublicCheckoutPhoneController,
   createCollectionController,
@@ -39,6 +40,7 @@ publicPaymentRouter.post("/:payId/kyc/method", selectPublicCheckoutKycMethodCont
 publicPaymentRouter.post("/:payId/kyc/phone", confirmPublicCheckoutPhoneController);
 publicPaymentRouter.post("/:payId/kyc/otp", confirmPublicCheckoutOtpController);
 publicPaymentRouter.post("/:payId/start", startPublicPaymentController);
+publicPaymentRouter.post("/:payId/confirm", confirmPublicPaymentController);
 
 paymentRouter.get("/", listPaymentsController);
 paymentRouter.post(

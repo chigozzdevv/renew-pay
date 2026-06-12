@@ -75,6 +75,14 @@ function toRoundedFee(value: number) {
   return Number(Math.max(0, value).toFixed(6));
 }
 
+function normalizePartnaFxRate(rate: number | null) {
+  if (rate === null || !Number.isFinite(rate) || rate <= 0) {
+    return null;
+  }
+
+  return rate < 1 ? Number((1 / rate).toFixed(4)) : rate;
+}
+
 export function derivePartnaFeeAmountUsdc(input: {
   fxRate: number;
   payloadData?: Record<string, unknown> | null;
@@ -117,14 +125,21 @@ function sanitizePartnaAccountName(value: string) {
     .slice(0, 40);
 }
 
-function buildPartnaCustomerAccountName(customer: {
+export function buildPartnaCustomerAccountName(customer: {
   customerRef: string;
   _id: { toString(): string };
 }) {
-  const ref = sanitizePartnaAccountName(customer.customerRef);
-  const suffix = customer._id.toString().slice(-6).toLowerCase();
-  const accountName = sanitizePartnaAccountName(`${ref || "renew"}${suffix}`);
-  return accountName || `renew${suffix}`;
+  const accountId = customer._id
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-f0-9]+/g, "")
+    .slice(0, 40);
+
+  if (accountId.length >= 2) {
+    return accountId;
+  }
+
+  return "aa";
 }
 
 function readPartnaResponseMessage(payload: Record<string, unknown> | null) {
@@ -181,6 +196,13 @@ function isPartnaPhoneConfirmationRequiredError(error: unknown) {
   );
 }
 
+function isPartnaOtpConfirmationError(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    /otp|verification code|code|expired|session/i.test(error.message)
+  );
+}
+
 export function hasActivePartnaPaymentProfile(customer: {
   paymentProfile?: {
     provider?: string | null;
@@ -191,13 +213,16 @@ export function hasActivePartnaPaymentProfile(customer: {
       accountNumber?: string | null;
       currency?: string | null;
     } | null;
+    partna?: {
+      accountName?: string | null;
+    } | null;
   } | null;
 } | null, currency?: string | null) {
   return (
     Boolean(customer) &&
     customer?.paymentProfile?.provider === "partna" &&
     customer?.paymentProfile?.status === "active" &&
-    Boolean(customer?.paymentProfile?.bankTransfer?.accountNumber) &&
+    Boolean(customer?.paymentProfile?.partna?.accountName) &&
     (!currency ||
       !customer?.paymentProfile?.bankTransfer?.currency ||
       customer.paymentProfile.bankTransfer.currency === currency)
@@ -535,19 +560,46 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
     customer.paymentProfile.partna.raw !== null
       ? (customer.paymentProfile.partna.raw as Record<string, unknown>)
       : {};
-  const verifiedBankAccount = await provider
-    .confirmBvnOtp({
+  try {
+    await provider.confirmBvnOtp({
       accountName,
       currency: customer.market,
       otp: input.verification.otp,
-    })
-    .then(() =>
-      provider.createBankAccount({
+    });
+  } catch (error) {
+    if (!isPartnaOtpConfirmationError(error)) {
+      throw error;
+    }
+
+    customer.paymentProvider = "partna";
+    customer.paymentProfile = {
+      provider: "partna",
+      status: "pending",
+      verifiedAt: null,
+      bankTransfer: null,
+      partna: {
+        email: normalizeEmail(customer.email),
+        fullName: customer.name,
         accountName,
-        currency: customer.market,
-        preferredAccountName: customer.name,
-      })
-    );
+        bvnLast4: customer.paymentProfile?.partna?.bvnLast4 ?? null,
+        callbackUrl: buildPartnaCallbackUrl(input.environment),
+        raw: {
+          ...existingRaw,
+          kycStatus: "otp_pending",
+          otpDispatchMessage: "Verification code is invalid or expired.",
+        },
+      },
+    };
+    await customer.save();
+
+    throw new HttpError(409, "Verification code is invalid or expired.");
+  }
+
+  const verifiedBankAccount = await provider.createBankAccount({
+    accountName,
+    currency: customer.market,
+    preferredAccountName: customer.name,
+  });
 
   customer.paymentProvider = "partna";
   customer.paymentProfile = {
@@ -584,6 +636,7 @@ function readPartnaWebhookEventKey(payload: PartnaWebhookPayload, environment: R
   const data = asRecord(payload.data) ?? {};
   const id =
     readString(data.rampReference) ??
+    readString(data.transactionReference) ??
     readString(data.reference) ??
     readString(data.id) ??
     "none";
@@ -601,6 +654,7 @@ function extractPartnaRampReference(payload: PartnaWebhookPayload) {
   const data = asRecord(payload.data);
   return (
     readString(data?.rampReference) ??
+    readString(data?.transactionReference) ??
     readString(data?.reference) ??
     readString(data?.id)
   );
@@ -658,7 +712,7 @@ async function applyPartnaFeeState(input: {
   ) {
     input.linkedSettlement.feeUsdc = feeAmountUsdc;
     input.linkedSettlement.netUsdc = Number(
-      Math.max(0.01, input.linkedSettlement.grossUsdc - feeAmountUsdc).toFixed(2)
+      Math.max(0, input.linkedSettlement.grossUsdc - feeAmountUsdc).toFixed(6)
     );
     await input.linkedSettlement.save();
   }
@@ -730,6 +784,39 @@ function eventIsRampSuccess(payload: PartnaWebhookPayload) {
   const status = readString(asRecord(payload.data)?.status)?.toLowerCase() ?? "";
 
   return ["completed", "complete", "success", "paid"].includes(status);
+}
+
+function partnaRampRecordIsConfirmed(record: {
+  status?: string | null;
+  raw?: Record<string, unknown> | null;
+}) {
+  const status = readString(record.status)?.toLowerCase() ?? "";
+  const raw = asRecord(record.raw) ?? {};
+
+  return (
+    ["completed", "complete", "success", "paid"].includes(status) ||
+    raw.confirmed === true
+  );
+}
+
+function partnaMockFiatDepositSucceeded(value: unknown) {
+  const record = asRecord(value);
+
+  if (!record) {
+    return false;
+  }
+
+  if (record.success === true || record.confirmed === true) {
+    return true;
+  }
+
+  const status = readString(record.status)?.toLowerCase() ?? "";
+  const message = readString(record.message)?.toLowerCase() ?? "";
+
+  return (
+    ["completed", "complete", "success", "paid"].includes(status) ||
+    message.includes("success")
+  );
 }
 
 export function verifyPartnaWebhookSignature(input: {
@@ -842,11 +929,12 @@ export async function processPartnaWebhook(
     .exec();
 
   const previousPaymentStatus = payment.status;
+  let payoutQueueError: string | null = null;
 
   if (eventIsRampSuccess(payload)) {
     const rampToAmount = readNumber(payloadData?.toAmount);
     const rampFromAmount = readNumber(payloadData?.fromAmount);
-    const rampRate = readNumber(payloadData?.currentRate);
+    const rampRate = normalizePartnaFxRate(readNumber(payloadData?.currentRate));
 
     payment.collection.status = "paid";
     payment.collection.paidAt = payment.collection.paidAt ?? new Date();
@@ -896,10 +984,15 @@ export async function processPartnaWebhook(
     }
 
     if (linkedSettlement) {
-      await queuePayoutProcessing(linkedSettlement._id.toString(), {
-        merchantId: linkedSettlement.merchantId.toString(),
-        environment,
-      });
+      try {
+        await queuePayoutProcessing(linkedSettlement._id.toString(), {
+          merchantId: linkedSettlement.merchantId.toString(),
+          environment,
+        });
+      } catch (error) {
+        payoutQueueError =
+          error instanceof Error ? error.message : "Payout processing failed.";
+      }
     }
   } else if (state.includes("failed") || state.includes("cancel")) {
     payment.status = "failed";
@@ -977,6 +1070,7 @@ export async function processPartnaWebhook(
     paymentId: payment._id.toString(),
     paymentStatus: payment.status,
     payoutId: linkedSettlement?._id.toString() ?? null,
+    ...(payoutQueueError ? { payoutQueueError } : {}),
   };
 
   webhookEvent.result = result;
@@ -984,6 +1078,133 @@ export async function processPartnaWebhook(
   await webhookEvent.save();
 
   return result;
+}
+
+export async function confirmPartnaRampPayment(input: {
+  payment: PaymentRecord;
+  environment: RuntimeMode;
+}) {
+  const metadata = asRecord(input.payment.metadata) ?? {};
+  let rampMetadata = asRecord(metadata.partnaRamp) ?? {};
+  let sandboxMockPaymentConfirmed =
+    input.environment === "test" &&
+    partnaMockFiatDepositSucceeded(rampMetadata.mockFiatDeposit);
+  const rampReference =
+    input.payment.collection.externalId ?? readString(rampMetadata.rampReference);
+
+  if (!rampReference) {
+    throw new HttpError(409, "Collection is not ready for confirmation.");
+  }
+
+  const customer = input.payment.customerId
+    ? await CustomerModel.findById(input.payment.customerId).lean().exec()
+    : null;
+  const accountName =
+    readString(customer?.paymentProfile?.partna?.accountName) ??
+    readString(rampMetadata.partnaAccountName);
+
+  if (!accountName) {
+    throw new HttpError(409, "Customer payment account is not ready.");
+  }
+
+  const provider = getPartnaProvider(input.environment);
+  let ramps = await provider.getRampRequests({
+    accountName,
+    rampReference,
+  });
+  let ramp =
+    ramps.find((entry) => entry.rampReference === rampReference) ?? ramps[0] ?? null;
+
+  const shouldSimulateSandboxPayment =
+    input.environment === "test" &&
+    ramp &&
+    !partnaRampRecordIsConfirmed(ramp) &&
+    !readString(rampMetadata.mockFiatDepositRequestedAt);
+
+  if (shouldSimulateSandboxPayment) {
+    const mockAmount = ramp.fromAmount ?? input.payment.amount;
+    const mockCurrency = ramp.fromCurrency ?? input.payment.currency;
+
+    if (Number.isFinite(mockAmount) && mockAmount > 0 && mockCurrency) {
+      const mockResult = await provider.mockFiatDeposit({
+        accountName,
+        amount: mockAmount,
+        currency: mockCurrency,
+        username: accountName,
+      });
+      sandboxMockPaymentConfirmed = true;
+
+      rampMetadata = {
+        ...rampMetadata,
+        mockFiatDepositRequestedAt: new Date().toISOString(),
+        mockFiatDeposit: mockResult,
+      };
+
+      ramps = await provider.getRampRequests({
+        accountName,
+        rampReference,
+      });
+      ramp =
+        ramps.find((entry) => entry.rampReference === rampReference) ??
+        ramps[0] ??
+        ramp;
+    }
+  }
+
+  const rampConfirmed = ramp ? partnaRampRecordIsConfirmed(ramp) : false;
+  const paymentConfirmed = rampConfirmed || sandboxMockPaymentConfirmed;
+  const confirmedStatus = sandboxMockPaymentConfirmed
+    ? "completed"
+    : ramp?.status ?? "paid";
+
+  input.payment.metadata = {
+    ...metadata,
+    partnaRamp: {
+      ...rampMetadata,
+      ...(ramp?.raw ?? {}),
+      rampReference,
+      partnaAccountName: accountName,
+      status: paymentConfirmed
+        ? confirmedStatus
+        : ramp?.status ?? readString(rampMetadata.status) ?? null,
+      providerStatus: ramp?.status ?? readString(rampMetadata.status) ?? null,
+      confirmed: paymentConfirmed,
+      checkedAt: new Date().toISOString(),
+    },
+  };
+  await input.payment.save();
+
+  if (!paymentConfirmed) {
+    return {
+      confirmed: false,
+      status: ramp?.status ?? null,
+    };
+  }
+
+  const result = await processPartnaWebhook(
+    {
+      event: "ramp.confirmed",
+      data: {
+        ...(ramp?.raw ?? {}),
+        rampReference,
+        status: confirmedStatus,
+        confirmed: true,
+        fromAmount:
+          ramp?.fromAmount ?? input.payment.collection.localAmount ?? input.payment.amount,
+        fromCurrency: ramp?.fromCurrency ?? input.payment.currency,
+        toAmount: ramp?.toAmount ?? input.payment.collection.stableAmount ?? null,
+        toCurrency: ramp?.toCurrency ?? "USDC",
+        currentRate: ramp?.currentRate ?? input.payment.collection.fxRate ?? null,
+      },
+    },
+    input.environment
+  );
+
+  return {
+    confirmed: true,
+    status: confirmedStatus,
+    result,
+  };
 }
 
 export async function getCustomerPartnaBankAccount(
@@ -1010,3 +1231,8 @@ export async function getCustomerPartnaBankAccount(
     raw: asRecord(customer.paymentProfile.partna?.raw) ?? {},
   };
 }
+
+export const __test__ = {
+  extractPartnaRampReference,
+  partnaMockFiatDepositSucceeded,
+};

@@ -77,6 +77,18 @@ export type PartnaRampInput = {
   type: "fiatToCrypto";
 };
 
+export type PartnaRampStatusInput = {
+  accountName: string;
+  rampReference?: string | null;
+};
+
+export type PartnaMockFiatDepositInput = {
+  accountName: string;
+  amount: number;
+  currency: string;
+  username?: string | null;
+};
+
 export type PartnaRampRecord = {
   rampReference: string;
   status: string | null;
@@ -174,4 +186,6 @@ export interface PartnaProvider {
     input?: PartnaAccountDetailsInput
   ): Promise<PartnaAccountDetailsRecord[]>;
   createRamp(input: PartnaRampInput): Promise<PartnaRampRecord>;
+  getRampRequests(input: PartnaRampStatusInput): Promise<PartnaRampRecord[]>;
+  mockFiatDeposit(input: PartnaMockFiatDepositInput): Promise<Record<string, unknown>>;
 }

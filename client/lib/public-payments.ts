@@ -53,6 +53,7 @@ export type PublicPayment = {
       message: string | null;
       bvnLast4: string | null;
       sandbox: {
+        bvn: string | null;
         phone: string | null;
         otp: string | null;
       };
@@ -298,6 +299,14 @@ export async function startPublicPayment(input: {
       payerEmail: input.payerEmail || undefined,
       payerName: input.payerName || undefined,
     }),
+  });
+
+  return response.data;
+}
+
+export async function confirmPublicPayment(input: { payId: string }) {
+  const response = await fetchApi<PublicPayment>(`/pay/${input.payId}/confirm`, {
+    method: "POST",
   });
 
   return response.data;

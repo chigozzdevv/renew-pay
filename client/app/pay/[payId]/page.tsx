@@ -7,6 +7,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Logo } from "@/components/shared/logo";
 import {
+  confirmPublicPayment,
   confirmPublicCheckoutOtp,
   confirmPublicCheckoutPhone,
   loadPublicPaymentBanks,
@@ -471,6 +472,10 @@ export default function PayPage() {
   useEffect(() => {
     const sandbox = payment?.checkout.verification.sandbox;
 
+    if (payment?.checkout.state === "needs_bvn" && sandbox?.bvn) {
+      setBvn((current) => current || sandbox.bvn || "");
+    }
+
     if (payment?.checkout.state === "needs_phone" && sandbox?.phone) {
       setPhone((current) => current || sandbox.phone || "");
     }
@@ -634,7 +639,13 @@ export default function PayPage() {
     setError(null);
 
     try {
-      const nextPayment = await refreshPayment();
+      const nextPayment = payId
+        ? await confirmPublicPayment({ payId })
+        : await refreshPayment();
+
+      if (nextPayment) {
+        setPayment(nextPayment);
+      }
 
       if (nextPayment && nextPayment.checkout.state !== "paid") {
         setError("Waiting for confirmation.");
@@ -984,7 +995,8 @@ export default function PayPage() {
             <div className="text-left">
               <p className="text-sm font-semibold text-[#151713]">Verification code</p>
               <p className="mt-1 text-xs leading-5 text-[#66706a]">
-                Enter the code sent by the payment provider.
+                {payment.checkout.verification.message ??
+                  "Enter the code sent by the payment provider."}
               </p>
             </div>
             <input

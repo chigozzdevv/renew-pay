@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import {
   cancelCollection,
+  confirmPublicPayment,
   confirmPublicCheckoutOtp,
   confirmPublicCheckoutPhone,
   createCollection,
@@ -185,6 +186,18 @@ export const getPublicPaymentController = asyncHandler(
   async (request: Request, response: Response) => {
     const params = publicPaymentParamSchema.parse(request.params);
     const payment = await getPublicPayment(params.payId);
+
+    response.status(200).json({
+      success: true,
+      data: payment,
+    });
+  }
+);
+
+export const confirmPublicPaymentController = asyncHandler(
+  async (request: Request, response: Response) => {
+    const params = publicPaymentParamSchema.parse(request.params);
+    const payment = await confirmPublicPayment(params.payId);
 
     response.status(200).json({
       success: true,

@@ -16,9 +16,11 @@ import type {
   PartnaInitiateBvnKycInput,
   PartnaListBanksInput,
   PartnaManagedBankAccount,
+  PartnaMockFiatDepositInput,
   PartnaProvider,
   PartnaRampInput,
   PartnaRampRecord,
+  PartnaRampStatusInput,
   PartnaRateInput,
   PartnaRateQuote,
   PartnaSupportedAsset,
@@ -96,6 +98,17 @@ function extractPayloadData(payload: unknown) {
 
   const data = asRecord(record.data);
   return data ?? record;
+}
+
+function extractPayloadEnvelope(payload: unknown) {
+  const record = asRecord(payload);
+
+  if (!record) {
+    return {};
+  }
+
+  const data = asRecord(record.data);
+  return data ? { ...record, ...data } : record;
 }
 
 function extractPartnaErrorDetail(payload: unknown) {
@@ -506,7 +519,7 @@ export class PartnaRemoteProvider implements PartnaProvider {
       }
     );
 
-    return extractPayloadData(payload);
+    return extractPayloadEnvelope(payload);
   }
 
   async confirmPhone(input: PartnaConfirmPhoneInput) {
@@ -521,7 +534,7 @@ export class PartnaRemoteProvider implements PartnaProvider {
       }
     );
 
-    return extractPayloadData(payload);
+    return extractPayloadEnvelope(payload);
   }
 
   async confirmBvnOtp(input: PartnaConfirmBvnOtpInput) {
@@ -536,7 +549,7 @@ export class PartnaRemoteProvider implements PartnaProvider {
       }
     );
 
-    return extractPayloadData(payload);
+    return extractPayloadEnvelope(payload);
   }
 
   async createBankAccount(input: PartnaCreateBankAccountInput) {
@@ -647,5 +660,54 @@ export class PartnaRemoteProvider implements PartnaProvider {
     );
 
     return extractRampRecord(extractPayloadData(payload));
+  }
+
+  async getRampRequests(input: PartnaRampStatusInput) {
+    const searchParams = new URLSearchParams({
+      accountName: input.accountName,
+    });
+
+    if (input.rampReference?.trim()) {
+      searchParams.set("rampReference", input.rampReference.trim());
+    }
+
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/ramp",
+      "GET",
+      undefined,
+      searchParams
+    );
+    const data = extractPayloadData(payload);
+    const records =
+      (Array.isArray(data.rampRequests) ? data.rampRequests : null) ??
+      (Array.isArray(data.data) ? data.data : null) ??
+      (Array.isArray(data) ? data : null) ??
+      [];
+
+    return records
+      .map((entry) => asRecord(entry))
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .map(extractRampRecord);
+  }
+
+  async mockFiatDeposit(input: PartnaMockFiatDepositInput) {
+    if (this.config.mode !== "test") {
+      throw new HttpError(500, "Partna mock fiat deposit is only available in test.");
+    }
+
+    const payload = await this.requestJson(
+      this.config.v4BaseUrl,
+      "/mock/deposit-fiat",
+      "POST",
+      {
+        accountName: input.accountName,
+        amount: input.amount,
+        currency: input.currency.trim().toUpperCase(),
+        ...(input.username?.trim() ? { username: input.username.trim() } : {}),
+      }
+    );
+
+    return extractPayloadData(payload);
   }
 }
