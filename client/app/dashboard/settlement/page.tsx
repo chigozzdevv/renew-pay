@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { AlertCircle, Check, Clock, ExternalLink, Eye } from "lucide-react";
 
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import {
   StatusBadge,
   formatCurrency,
   formatDateTime,
-  formatTxHash,
   getStellarTxUrl,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
@@ -19,7 +18,6 @@ import {
   Badge,
   Button,
   Card,
-  Field,
   LoadingState,
   MetricCard,
   Modal,
@@ -62,6 +60,141 @@ function getEarliestRelease(payouts: PayoutRecord[]) {
       ? payout.scheduledFor
       : earliest;
   }, null);
+}
+
+type SettlementJourneyStep = {
+  title: "Deposit" | "Release";
+  status: "completed" | "scheduled" | "pending" | "held" | "failed";
+  label: string;
+  txHash: string | null;
+};
+
+function getSettlementJourney(payout: PayoutRecord): SettlementJourneyStep[] {
+  const failed = ["failed", "reversed"].includes(payout.status);
+  const releaseCompleted = Boolean(payout.vaultReleaseTxHash || payout.settledAt);
+  const depositCompleted = Boolean(payout.vaultDepositTxHash);
+
+  return [
+    {
+      title: "Deposit",
+      status: depositCompleted ? "completed" : failed ? "failed" : "pending",
+      label: depositCompleted
+        ? formatDateTime(payout.vaultHeldAt ?? payout.updatedAt)
+        : failed
+          ? "Failed"
+          : "Pending",
+      txHash: payout.vaultDepositTxHash,
+    },
+    {
+      title: "Release",
+      status: releaseCompleted
+        ? "completed"
+        : failed
+          ? "failed"
+          : payout.status === "held"
+            ? "held"
+            : depositCompleted
+              ? "scheduled"
+              : "pending",
+      label: releaseCompleted
+        ? formatDateTime(payout.settledAt ?? payout.updatedAt)
+        : failed
+          ? "Failed"
+          : payout.status === "held"
+            ? "Held"
+            : depositCompleted
+              ? formatDateTime(payout.scheduledFor)
+              : "Pending",
+      txHash: payout.vaultReleaseTxHash,
+    },
+  ];
+}
+
+function journeyStepTone(status: SettlementJourneyStep["status"]) {
+  if (status === "completed") {
+    return {
+      icon: Check,
+      dot: "border-[#cfe8d5] bg-[#e9f5ec] text-[#225c39]",
+      label: "Completed",
+      badge: "bg-[#e9f5ec] text-[#225c39]",
+    };
+  }
+
+  if (status === "failed") {
+    return {
+      icon: AlertCircle,
+      dot: "border-[#e0beb7] bg-[#fff0ef] text-[#9a3a31]",
+      label: "Failed",
+      badge: "bg-[#fff0ef] text-[#9a3a31]",
+    };
+  }
+
+  return {
+    icon: Clock,
+    dot: "border-[#efd9b2] bg-[#fff6e7] text-[#76511a]",
+    label: status === "held" ? "Held" : status === "scheduled" ? "Scheduled" : "Pending",
+    badge: "bg-[#fff6e7] text-[#76511a]",
+  };
+}
+
+function SettlementJourney({
+  payout,
+  mode,
+}: {
+  payout: PayoutRecord;
+  mode: "test" | "live";
+}) {
+  const steps = getSettlementJourney(payout);
+
+  return (
+    <div className="space-y-4">
+      {steps.map((step, index) => {
+        const tone = journeyStepTone(step.status);
+        const Icon = tone.icon;
+
+        return (
+          <div key={step.title} className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
+            {index < steps.length - 1 ? (
+              <span className="absolute left-4 top-9 h-[calc(100%-1rem)] w-px bg-[color:var(--line)]" />
+            ) : null}
+            <span
+              className={`relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border ${tone.dot}`}
+            >
+              <Icon className="h-4 w-4" strokeWidth={2.2} />
+            </span>
+            <div className="rounded-lg border border-[color:var(--line)] bg-white px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[color:var(--ink)]">
+                    {step.title}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-[color:var(--muted)]">
+                    {step.label}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${tone.badge}`}
+                >
+                  {tone.label}
+                </span>
+              </div>
+              {step.txHash ? (
+                <a
+                  href={getStellarTxUrl(mode, step.txHash)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[color:var(--ink)] underline decoration-black/20 underline-offset-4"
+                >
+                  View transaction
+                  <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.1} />
+                </a>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function SettlementPage() {
@@ -269,31 +402,32 @@ export default function SettlementPage() {
         }
       >
         {detailPayout ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Gross" value={formatCurrency(detailPayout.grossUsdc)} />
-            <Field label="Fee" value={formatCurrency(detailPayout.feeUsdc)} />
-            <Field label="Net" value={formatCurrency(detailPayout.netUsdc)} />
-            <Field label="Wallet" value={detailPayout.destinationWallet} />
-            <Field label="Release" value={formatDateTime(detailPayout.scheduledFor)} />
-            <Field label="Settled" value={formatDateTime(detailPayout.settledAt)} />
-            <Field label="Status" value={detailPayout.status} />
-            <Field
-              label="Transaction"
-              value={
-                detailPayout.creditTxHash ? (
-                  <a
-                    href={getStellarTxUrl(mode, detailPayout.creditTxHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-black/20 underline-offset-4"
-                  >
-                    {formatTxHash(detailPayout.creditTxHash)}
-                  </a>
-                ) : (
-                  "Not set"
-                )
-              }
-            />
+          <div className="space-y-5">
+            <div className="grid gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--soft)] px-4 py-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs font-medium text-[color:var(--muted)]">Net</p>
+                <p className="mt-1 text-sm font-semibold text-[color:var(--ink)]">
+                  {formatCurrency(detailPayout.netUsdc)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-[color:var(--muted)]">Status</p>
+                <div className="mt-1">
+                  <StatusBadge value={detailPayout.status} />
+                </div>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[color:var(--muted)]">Wallet</p>
+                <p
+                  className="mt-1 truncate text-sm font-semibold text-[color:var(--ink)]"
+                  title={detailPayout.destinationWallet}
+                >
+                  {formatAddress(detailPayout.destinationWallet)}
+                </p>
+              </div>
+            </div>
+
+            <SettlementJourney payout={detailPayout} mode={mode} />
           </div>
         ) : null}
       </Modal>
