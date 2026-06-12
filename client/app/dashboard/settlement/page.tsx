@@ -62,6 +62,22 @@ function getEarliestRelease(payouts: PayoutRecord[]) {
   }, null);
 }
 
+function getSettlementDisplayStatus(payout: PayoutRecord) {
+  if (payout.vaultReleaseTxHash || payout.settledAt) {
+    return "settled";
+  }
+
+  if (["failed", "reversed", "held"].includes(payout.status)) {
+    return payout.status;
+  }
+
+  if (payout.vaultDepositTxHash) {
+    return "scheduled";
+  }
+
+  return payout.status;
+}
+
 type SettlementJourneyStep = {
   title: "Deposit" | "Release";
   status: "completed" | "scheduled" | "pending" | "held" | "failed";
@@ -367,7 +383,7 @@ export default function SettlementPage() {
                 {formatDateTime(payout.scheduledFor)}
               </p>
               <div className="self-center">
-                <StatusBadge value={payout.status} />
+                <StatusBadge value={getSettlementDisplayStatus(payout)} />
               </div>
               <div className="flex items-center gap-2 self-center">
                 <RowActionButton
@@ -413,7 +429,7 @@ export default function SettlementPage() {
               <div>
                 <p className="text-xs font-medium text-[color:var(--muted)]">Status</p>
                 <div className="mt-1">
-                  <StatusBadge value={detailPayout.status} />
+                  <StatusBadge value={getSettlementDisplayStatus(detailPayout)} />
                 </div>
               </div>
               <div className="min-w-0">

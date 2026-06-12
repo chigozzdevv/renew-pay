@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Card, LoadingState, MetricCard, PageState, StatGrid } from "@/components/dashboard/ui";
 import { useWorkspaceMode } from "@/components/dashboard/mode-provider";
 import { useResource } from "@/components/dashboard/use-resource";
@@ -38,6 +40,7 @@ export default function OverviewPage() {
   }
 
   const marketMixPreview = data.marketMix.slice(0, 4);
+  const recentActivityPreview = data.recentActivity.slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -101,6 +104,16 @@ export default function OverviewPage() {
         <Card
           title="Recent activity"
           className="h-full min-h-[24rem] self-auto"
+          action={
+            data.recentActivity.length > recentActivityPreview.length ? (
+              <Link
+                href="/dashboard/history"
+                className="text-sm font-semibold text-[color:var(--ink)] underline-offset-4 hover:underline"
+              >
+                View more
+              </Link>
+            ) : null
+          }
         >
           <div className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-white">
             {data.recentActivity.length === 0 ? (
@@ -108,7 +121,7 @@ export default function OverviewPage() {
                 No activity
               </p>
             ) : (
-              data.recentActivity.map((item) => (
+              recentActivityPreview.map((item) => (
                 <div
                   key={`${item.type}-${item.id}`}
                   className="flex items-center justify-between gap-4 border-b border-[color:var(--line)] px-5 py-4 last:border-b-0"
