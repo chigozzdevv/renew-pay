@@ -90,6 +90,19 @@ export default function PlaygroundPage() {
     setCartIds((current) => (oneShotFlow ? [itemId] : [...current, itemId]));
   }
 
+  function toggleItemSelection(itemId: string) {
+    setError(null);
+    setCartIds((current) => {
+      const isSelected = current.includes(itemId);
+
+      if (isSelected) {
+        return current.filter((selectedItemId) => selectedItemId !== itemId);
+      }
+
+      return oneShotFlow ? [itemId] : [...current, itemId];
+    });
+  }
+
   function removeItem(itemId: string) {
     setCartIds((current) => {
       const next = [...current];
@@ -212,7 +225,7 @@ export default function PlaygroundPage() {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => addItem(item.id)}
+                          onClick={() => toggleItemSelection(item.id)}
                           className="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-5 py-5 text-left transition-colors hover:bg-white/40"
                         >
                           <span className="flex min-w-0 items-center gap-4">
