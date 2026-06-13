@@ -1,6 +1,6 @@
 {
   "name": "@renew.sh/sdk",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Renew SDK for collections, Stellar settlement accounts, checkout, and webhook verification.",
   "license": "MIT",
   "type": "module",
