@@ -2,19 +2,20 @@
 
 **Local fiat collection with stable settlement.**
 
-Renew helps merchants collect local payments and settle in stable assets. Merchants create a collection, open Renew checkout, and Renew handles local collection, reconciliation, fees, payout tracking, and Stellar USDC settlement.
+Renew helps merchants collect local payments and receive Stellar USDC settlement. Merchants create a collection, open Renew Checkout, and Renew handles local collection, reconciliation, fees, settlement tracking, and Stellar release.
 
-Renew uses Partna for local collection, Privy for authentication, Didit for KYC/KYB, and a Stellar settlement vault for released USDC payouts.
+Renew uses Partna for local collection, Privy for authentication, Sumsub for verification, Stellar Wallets Kit for wallet connection, Circle CCTP for USDC routing, and a Stellar settlement vault for released USDC settlement.
 
 ## Runtime Status
 
-Renew runs in test mode with Partna test collection, Didit test verification, and Stellar testnet settlement configuration.
+Renew runs in test mode with Partna test collection, Sumsub sandbox verification, and Stellar testnet settlement configuration.
 
 Live mode follows mainnet settlement configuration and production compliance controls.
 
 ## Quick Links
 
 - App: [www.renew.sh](https://www.renew.sh)
+- Playground: [www.renew.sh/playground](https://www.renew.sh/playground)
 - Docs: [www.renew.sh/docs](https://www.renew.sh/docs)
 - Sandbox API: [sandbox.renew.sh](https://sandbox.renew.sh)
 - Live API: [api.renew.sh](https://api.renew.sh)
@@ -24,33 +25,33 @@ Live mode follows mainnet settlement configuration and production compliance con
 
 - Partna sandbox: `https://sandbox.renew.sh/v1/onramps/webhooks/partna`
 - Partna live: `https://api.renew.sh/v1/onramps/webhooks/partna`
-- Didit verification: `https://api.renew.sh/v1/kyc/webhooks/didit`
+- Sumsub verification: `https://api.renew.sh/v1/kyc/webhooks/sumsub`
 
 ## Platform
 
 | Surface | Value |
 |---------|-------|
 | Auth | Privy |
-| Onboarding | Owner, business, markets, payout wallet, verification |
+| Onboarding | Owner, business, settlement wallet, verification |
 | Collection | Partna |
 | Local markets | `GHS`, `KES`, `NGN` |
 | Settlement | Stellar USDC |
-| Verification | Didit |
+| Verification | Sumsub |
 
 ## How Renew Works
 
 1. The merchant signs in with Privy.
-2. The merchant completes workspace setup and verification.
-3. The merchant creates a collection from the dashboard or API.
+2. The merchant completes workspace setup, verification, and settlement wallet connection.
+3. The merchant creates a collection from the dashboard, API, SDK, or playground.
 4. Renew returns a hosted checkout URL.
-5. The customer pays through Renew checkout.
-6. Renew reconciles the collection, fees, and stable amount.
-7. Renew queues settlement against the merchant’s settlement account.
+5. The customer pays through Renew Checkout.
+6. Renew reconciles the collection, fees, and settlement amount.
+7. Renew routes USDC settlement to the Stellar vault.
 8. The Stellar vault releases USDC to the merchant wallet after the release window.
 
 ## Architecture
 
-Off-chain handles product logic, customer data, collection orchestration, payout state, notifications, webhooks, and dashboard aggregation.
+Off-chain handles product logic, customer data, collection orchestration, settlement state, notifications, webhooks, and dashboard aggregation.
 
 On-chain activity is limited to Stellar USDC vault settlement and release transactions.
 
@@ -58,9 +59,9 @@ On-chain activity is limited to Stellar USDC vault settlement and release transa
 
 - Auth and workspace sessions
 - Onboarding and verification
-- Collections, customers, settlement accounts, payouts, and history
+- Collections, customers, settlement accounts, settlement records, and history
 - Partna collection, quotes, and webhooks
-- Stellar settlement vault payout execution
+- Stellar settlement vault release execution
 - Developer keys and webhook delivery
 
 ### Client
@@ -68,12 +69,13 @@ On-chain activity is limited to Stellar USDC vault settlement and release transa
 - Marketing site
 - Privy sign-in
 - Onboarding
-- Dashboard: overview, collections, customers, settlement, payouts, history, settings
+- Dashboard: overview, collections, customers, settlement, history, and settings
+- Playground checkout
 - Hosted public checkout page at `/pay/{payId}`
 
 ### SDK
 
-[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides collection creation, checkout, and webhook verification.
+[`@renew.sh/sdk`](https://www.npmjs.com/package/@renew.sh/sdk) provides collection creation, checkout, settlement account helpers, and webhook verification.
 
 ```ts
 import { checkout, renew } from "@renew.sh/sdk";
@@ -83,13 +85,13 @@ const client = renew({
 });
 
 const collection = await client.collections.create({
-  amount: 25000,
+  amount: 2000,
   currency: "NGN",
   reference: "order_1042",
   description: "Order #1042",
 });
 
-await checkout.open(collection.checkoutUrl);
+checkout.open(collection.checkoutUrl);
 ```
 
 ## Project Structure
@@ -110,7 +112,7 @@ renew-pay/
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, Framer Motion |
 | Backend | Node.js, Express, MongoDB, Mongoose, BullMQ, Zod |
 | Auth | Privy |
-| Verification | Didit |
+| Verification | Sumsub |
 | Collection | Partna |
 | Settlement | Stellar, Soroban, USDC |
 | SDK | TypeScript, npm |
