@@ -23,9 +23,9 @@ The server SDK infers test or live from the server key:
 
 Use `environment` or `apiOrigin` only for advanced overrides. The API host and key must still match.
 
-## One-Time Settlement Setup
+## Settlement
 
-Connect the Stellar wallet that should receive settlement.
+Connect the Stellar wallet that should receive settlement in Dashboard > Settings > Settlement. Use the server SDK only when you already have the Stellar address and want to manage settlement accounts from your backend.
 
 ```ts
 import { renew } from "@renew.sh/sdk";
@@ -42,7 +42,7 @@ await client.settlement.accounts.create({
 });
 ```
 
-The settlement wallet must be funded on Stellar and trust Circle USDC before it can receive payout.
+The settlement wallet must be funded on Stellar and trust Circle USDC before it can receive settlement.
 
 ## Settlement Path
 
@@ -60,7 +60,7 @@ const client = renew({
 });
 
 const collection = await client.collections.create({
-  amount: 25000,
+  amount: 2000,
   currency: "NGN",
   reference: "order_1042",
   description: "Order #1042",
@@ -85,7 +85,7 @@ export function PayButton({ orderId }: { orderId: string }) {
     });
     const collection = await response.json();
 
-    await checkout.open(collection.checkoutUrl);
+    checkout.open(collection.checkoutUrl);
   }
 
   return <button onClick={pay}>Pay</button>;

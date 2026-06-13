@@ -14,12 +14,13 @@ const client = renew({
 });
 
 const collection = await client.collections.create({
-  amount: 25000,
+  amount: 2000,
   currency: "NGN",
   reference: "order_1042",
   description: "Order #1042",
   items: [
-    { name: "Everyday Tote", amount: 12500, quantity: 2 },
+    { name: "Linen shirt", amount: 1200, quantity: 1 },
+    { name: "Classic cap", amount: 800, quantity: 1 },
   ],
 });
 
