@@ -27,6 +27,11 @@ Live mode follows mainnet settlement configuration and production compliance con
 - Partna live: `https://api.renew.sh/v1/onramps/webhooks/partna`
 - Sumsub verification: `https://api.renew.sh/v1/kyc/webhooks/sumsub`
 
+## Stellar Testnet
+
+- Settlement vault contract: `CDKH775MIG3KZJBNYCC2E3EPAS3MXZUTDKQ7SGY3EEYEKJZ3O52KLVV5`
+- Explorer: `https://stellar.expert/explorer/testnet/contract/CDKH775MIG3KZJBNYCC2E3EPAS3MXZUTDKQ7SGY3EEYEKJZ3O52KLVV5`
+
 ## Platform
 
 | Surface | Value |
