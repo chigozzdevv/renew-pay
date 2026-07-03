@@ -86,16 +86,16 @@ export const docsPages: DocsPage[] = [
     group: "Start here",
     navTitle: "Overview",
     title: "Overview",
-    description: "Collect local fiat payments and receive Stellar USDC settlement.",
+    description: "Collect local fiat payments and receive Avalanche USDC settlement.",
     sections: [
       {
         id: "api-overview-flow",
         title: "How Renew works",
         paragraphs: [
-          "Renew lets your customers pay in local currency while your business receives settlement in Stellar USDC.",
+          "Renew lets your customers pay in local currency while your business receives settlement in Avalanche USDC.",
         ],
         steps: [
-          "Connect your Stellar settlement wallet.",
+          "Connect your Avalanche settlement wallet.",
           "Create a server key.",
           "Create a collection from your backend.",
           "Open Renew Checkout for the customer.",
@@ -113,18 +113,18 @@ export const docsPages: DocsPage[] = [
           { label: "Collection", value: "Money to collect", detail: "An amount, currency, and reference for an order, invoice, or subscription." },
           { label: "Checkout", value: "Customer payment flow", detail: "The Renew-hosted page or modal where the customer completes payment." },
           { label: "Customer", value: "Payer profile", detail: "Renew creates or updates this from checkout details." },
-          { label: "Settlement", value: "Stellar USDC payout", detail: "The release state for collected value after payment is confirmed." },
+          { label: "Settlement", value: "Avalanche USDC payout", detail: "The release state for collected value after payment is confirmed." },
         ],
       },
       {
         id: "api-overview-settlement",
         title: "Settlement path",
         paragraphs: [
-          "After payment is confirmed, Renew routes the collected value to Stellar USDC through Circle CCTP, places it in the settlement vault, and releases it to your Stellar wallet after the release window.",
+          "After payment is confirmed, Renew routes the collected value to Avalanche USDC through Circle CCTP, places it in the settlement vault, and releases it to your Avalanche wallet after the release window.",
         ],
         references: [
           { label: "Asset", value: "USDC", detail: "Merchant settlement asset." },
-          { label: "Network", value: "Stellar", detail: "Wallet and settlement release network." },
+          { label: "Network", value: "Avalanche", detail: "Wallet and settlement release network." },
           { label: "Release", value: "Next day", detail: "Settlement can be held if a payment issue is reported before release." },
         ],
       },
@@ -421,19 +421,17 @@ checkout.open(collection.checkoutUrl);`,
     group: "Settle",
     navTitle: "Settlement",
     title: "Settlement",
-    description: "Connect your Stellar wallet and track USDC settlement.",
+    description: "Connect your Avalanche wallet and track USDC settlement.",
     sections: [
       {
         id: "api-settlement-wallet",
         title: "Settlement wallet",
         paragraphs: [
-          "Connect the Stellar wallet that should receive USDC settlement in Dashboard > Settings > Settlement.",
+          "Connect the Avalanche wallet that should receive USDC settlement in Dashboard > Settings > Settlement.",
         ],
         steps: [
           "Open Dashboard > Settings > Settlement.",
-          "Connect a Stellar wallet.",
-          "Renew checks that the wallet can receive Stellar USDC.",
-          "Enable the USDC trustline if needed.",
+          "Connect an Avalanche wallet.",
           "Save the wallet.",
         ],
       },
@@ -446,14 +444,14 @@ checkout.open(collection.checkoutUrl);`,
         references: [
           { label: "Deposit", value: "Completed", detail: "USDC has entered the settlement vault." },
           { label: "Release", value: "Scheduled", detail: "Settlement is waiting for the release window." },
-          { label: "Release", value: "Released", detail: "USDC has been sent to your Stellar wallet." },
+          { label: "Release", value: "Released", detail: "USDC has been sent to your Avalanche wallet." },
         ],
       },
       {
         id: "api-settlement-api",
         title: "Advanced API setup",
         paragraphs: [
-          "Most merchants should connect a wallet from the dashboard. Use the API only when you already have the Stellar address and want to manage settlement accounts from your backend.",
+          "Most merchants should connect a wallet from the dashboard. Use the API only when you already have the wallet address and want to manage settlement accounts from your backend.",
         ],
         sample: {
           label: "Create settlement account",
@@ -465,7 +463,7 @@ checkout.open(collection.checkoutUrl);`,
   -d '{
     "accountCode": "main-wallet",
     "name": "Main wallet",
-    "destinationAddress": "YOUR_STELLAR_WALLET",
+    "destinationAddress": "YOUR_AVALANCHE_WALLET",
     "isDefault": true
   }'`,
         },
@@ -497,7 +495,7 @@ checkout.open(collection.checkoutUrl);`,
         title: "Endpoints",
         paragraphs: ["Use these endpoints when managing settlement accounts from your backend."],
         references: [
-          { label: "POST", value: "/settlement/accounts", detail: "Create a Stellar settlement account." },
+          { label: "POST", value: "/settlement/accounts", detail: "Create an Avalanche settlement account." },
           { label: "GET", value: "/settlement/accounts", detail: "List settlement accounts." },
           { label: "GET", value: "/settlement/accounts/default", detail: "Fetch the default account." },
           { label: "GET", value: "/settlement/accounts/:accountId", detail: "Fetch one account." },

@@ -15,7 +15,7 @@ const faqs = [
   },
   {
     question: "What do merchants settle in?",
-    answer: "Merchants settle in Stellar USDC after the release window.",
+    answer: "Merchants settle in Avalanche USDC after the release window.",
   },
   {
     question: "Do customers need crypto wallets?",

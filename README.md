@@ -2,13 +2,13 @@
 
 **Local fiat collection with stable settlement.**
 
-Renew helps merchants collect local payments and receive Stellar USDC settlement. Merchants create a collection, open Renew Checkout, and Renew handles local collection, reconciliation, fees, settlement tracking, and Stellar release.
+Renew helps merchants collect local payments and receive Avalanche USDC settlement. Merchants create a collection, open Renew Checkout, and Renew handles local collection, reconciliation, fees, settlement tracking, and Avalanche release.
 
-Renew uses Partna for local collection, Privy for authentication, Sumsub for verification, Stellar Wallets Kit for wallet connection, Circle CCTP for USDC routing, and a Stellar settlement vault for released USDC settlement.
+Renew uses Partna for local collection, Privy for authentication, Sumsub for verification, Privy embedded wallets for wallet connection, Circle CCTP for USDC routing, and an Avalanche settlement vault for released USDC settlement.
 
 ## Runtime Status
 
-Renew runs in test mode with Partna test collection, Sumsub sandbox verification, and Stellar testnet settlement configuration.
+Renew runs in test mode with Partna test collection, Sumsub sandbox verification, and Avalanche testnet settlement configuration.
 
 Live mode follows mainnet settlement configuration and production compliance controls.
 
@@ -27,11 +27,6 @@ Live mode follows mainnet settlement configuration and production compliance con
 - Partna live: `https://api.renew.sh/v1/onramps/webhooks/partna`
 - Sumsub verification: `https://api.renew.sh/v1/kyc/webhooks/sumsub`
 
-## Stellar Testnet
-
-- Settlement vault contract: `CDKH775MIG3KZJBNYCC2E3EPAS3MXZUTDKQ7SGY3EEYEKJZ3O52KLVV5`
-- Explorer: `https://stellar.expert/explorer/testnet/contract/CDKH775MIG3KZJBNYCC2E3EPAS3MXZUTDKQ7SGY3EEYEKJZ3O52KLVV5`
-
 ## Platform
 
 | Surface | Value |
@@ -40,7 +35,7 @@ Live mode follows mainnet settlement configuration and production compliance con
 | Onboarding | Owner, business, settlement wallet, verification |
 | Collection | Partna |
 | Local markets | `GHS`, `KES`, `NGN` |
-| Settlement | Stellar USDC |
+| Settlement | Avalanche USDC |
 | Verification | Sumsub |
 
 ## How Renew Works
@@ -51,14 +46,14 @@ Live mode follows mainnet settlement configuration and production compliance con
 4. Renew returns a hosted checkout URL.
 5. The customer pays through Renew Checkout.
 6. Renew reconciles the collection, fees, and settlement amount.
-7. Renew routes USDC settlement to the Stellar vault.
-8. The Stellar vault releases USDC to the merchant wallet after the release window.
+7. Renew routes USDC settlement to the Avalanche vault.
+8. The Avalanche vault releases USDC to the merchant wallet after the release window.
 
 ## Architecture
 
 Off-chain handles product logic, customer data, collection orchestration, settlement state, notifications, webhooks, and dashboard aggregation.
 
-On-chain activity is limited to Stellar USDC vault settlement and release transactions.
+On-chain activity is limited to Avalanche USDC vault settlement and release transactions.
 
 ### Server
 
@@ -66,7 +61,7 @@ On-chain activity is limited to Stellar USDC vault settlement and release transa
 - Onboarding and verification
 - Collections, customers, settlement accounts, settlement records, and history
 - Partna collection, quotes, and webhooks
-- Stellar settlement vault release execution
+- Avalanche settlement vault release execution
 - Developer keys and webhook delivery
 
 ### Client
@@ -105,7 +100,6 @@ checkout.open(collection.checkoutUrl);
 renew-pay/
 ├── client/                # Next.js app
 ├── server/                # Express API, workers, webhooks
-├── contracts/             # Stellar settlement vault contract workspace
 └── packages/
     └── renew-sdk/         # Published SDK (@renew.sh/sdk)
 ```
@@ -119,7 +113,7 @@ renew-pay/
 | Auth | Privy |
 | Verification | Sumsub |
 | Collection | Partna |
-| Settlement | Stellar, Soroban, USDC |
+| Settlement | Avalanche, USDC |
 | SDK | TypeScript, npm |
 
 ## Getting Started
@@ -129,7 +123,6 @@ renew-pay/
 - Node.js `20.x`
 - MongoDB
 - Redis
-- Rust and Stellar CLI if working in `contracts/`
 
 ### Client
 

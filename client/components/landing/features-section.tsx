@@ -24,8 +24,8 @@ const featureCards: Array<{
     visualSide: "left",
   },
   {
-    title: ["Stellar", "settlement."],
-    body: "Settle collected value as Stellar USDC, with a release window that gives Renew time to handle payment issues before payout.",
+    title: ["Avalanche", "settlement."],
+    body: "Settle collected value as Avalanche USDC, with a release window that gives Renew time to handle payment issues before payout.",
     visual: "settlement",
     visualSide: "right",
   },

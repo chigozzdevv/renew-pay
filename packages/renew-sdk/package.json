@@ -1,7 +1,7 @@
 {
   "name": "@renew.sh/sdk",
   "version": "0.1.13",
-  "description": "Renew SDK for collections, Stellar settlement accounts, checkout, and webhook verification.",
+  "description": "Renew SDK for collections, Avalanche settlement accounts, checkout, and webhook verification.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "renew",
     "payments",
     "stablecoins",
-    "stellar",
+    "avalanche",
     "usdc"
   ],
   "engines": {

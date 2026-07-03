@@ -29,13 +29,13 @@ const flowSteps = [
   },
   {
     title: "Settle",
-    description: "Renew reconciles paid collections into Stellar USDC and holds them in the settlement vault.",
+    description: "Renew reconciles paid collections into Avalanche USDC and holds them in the settlement vault.",
     icon: CheckCircle2,
     visual: "settle",
   },
   {
     title: "Payout",
-    description: "Track payout batches as released Stellar USDC lands in the merchant wallet.",
+    description: "Track payout batches as released Avalanche USDC lands in the merchant wallet.",
     icon: WalletCards,
     visual: "payout",
   },
@@ -161,7 +161,7 @@ function SettleDiagram() {
           <DiagramIcon icon={Route} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[#151713]">main-wallet</p>
-            <p className="mt-0.5 text-xs font-medium text-[#7a847c]">Stellar USDC account</p>
+            <p className="mt-0.5 text-xs font-medium text-[#7a847c]">Avalanche USDC account</p>
           </div>
         </div>
       </div>
@@ -259,7 +259,7 @@ function PayoutDiagram() {
 
       <div className="space-y-2 px-4 py-4 sm:px-5 sm:py-5">
         <DetailRow label="Destination" value="8xQd...42mA" />
-        <DetailRow label="Rail" value="Stellar USDC" />
+        <DetailRow label="Rail" value="Avalanche USDC" />
         <DetailRow label="Event" value="settlement.settled" tone="success" />
       </div>
     </div>

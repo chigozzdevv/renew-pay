@@ -11,7 +11,7 @@ export const landingProductNav: NavItem[] = [];
 
 export const proofItems: ProofItem[] = [
   { value: "24/7", label: "always-on settlement" },
-  { value: "Stellar", label: "USDC settlement" },
+  { value: "Avalanche", label: "USDC settlement" },
   { value: "T+1", label: "next-day release window" },
   { value: "<60s", label: "operator confirmation loop" }
 ];

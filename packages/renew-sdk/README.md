@@ -3,7 +3,7 @@
 Renew SDK for:
 
 - collection creation
-- Stellar settlement accounts
+- Avalanche settlement accounts
 - checkout links
 - browser checkout
 - webhook signing and verification helpers
@@ -25,7 +25,7 @@ Use `environment` or `apiOrigin` only for advanced overrides. The API host and k
 
 ## Settlement
 
-Connect the Stellar wallet that should receive settlement in Dashboard > Settings > Settlement. Use the server SDK only when you already have the Stellar address and want to manage settlement accounts from your backend.
+Connect the Avalanche wallet that should receive settlement in Dashboard > Settings > Settlement. Use the server SDK only when you already have the wallet address and want to manage settlement accounts from your backend.
 
 ```ts
 import { renew } from "@renew.sh/sdk";
@@ -42,11 +42,11 @@ await client.settlement.accounts.create({
 });
 ```
 
-The settlement wallet must be funded on Stellar and trust Circle USDC before it can receive settlement.
+The settlement wallet must be able to receive USDC on Avalanche.
 
 ## Settlement Path
 
-Renew collects local payments, receives canonical USDC, routes settlement to Stellar USDC through Circle CCTP, then releases funds from the Renew settlement vault after the payout window.
+Renew collects local payments, receives canonical USDC, routes settlement to Avalanche USDC through Circle CCTP, then releases funds from the Renew settlement vault after the payout window.
 
 ## Server Usage
 
@@ -138,4 +138,4 @@ const isValid = verifyRenewWebhookSignature({
 
 - Use server keys only on trusted backend infrastructure.
 - Use checkout URLs in browser flows.
-- Sandbox mode uses test keys, test checkout, sandbox local collection rails, Circle Iris sandbox, and the Stellar testnet vault. Live mode should only be used with production credentials and endpoints.
+- Sandbox mode uses test keys, test checkout, sandbox local collection rails, Circle Iris sandbox, and the Avalanche testnet vault. Live mode should only be used with production credentials and endpoints.

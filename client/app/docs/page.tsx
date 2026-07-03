@@ -6,7 +6,7 @@ import { DocsPageClient } from "@/components/docs/docs-page-client";
 export const metadata: Metadata = {
   title: "Renew Docs | Collections, Settlement, and Webhooks",
   description:
-    "Public docs for Renew collections, Stellar settlement, payouts, webhooks, and customer APIs.",
+    "Public docs for Renew collections, Avalanche settlement, payouts, webhooks, and customer APIs.",
 };
 
 export default function DocsPage() {

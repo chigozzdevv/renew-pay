@@ -26,7 +26,7 @@ const fiatNodes: CurrencyNode[] = [
 ];
 
 const stableNodes: CurrencyNode[] = [
-  { id: "usdc", label: "USDC", sub: "Stellar", x: 558, y: 115, side: "stable" },
+  { id: "usdc", label: "USDC", sub: "Avalanche", x: 558, y: 115, side: "stable" },
   { id: "vault", label: "Vault", sub: "Release", x: 568, y: 255, side: "stable" },
   { id: "payout", label: "Payout", sub: "Wallet", x: 548, y: 385, side: "stable" },
 ];
