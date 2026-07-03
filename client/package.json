@@ -12,11 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@creit.tech/stellar-wallets-kit": "^2.2.0",
     "@privy-io/react-auth": "^3.18.0",
     "@renew.sh/sdk": "^0.1.12",
     "@solana-program/memo": "^0.10.0",
-    "@stellar/stellar-sdk": "^13.3.0",
     "framer-motion": "12.23.12",
     "next": "^16.1.6",
     "ox": "^0.8.9",

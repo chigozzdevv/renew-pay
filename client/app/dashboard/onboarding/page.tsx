@@ -12,11 +12,10 @@ import { ImageUpload } from "@/components/shared/image-upload";
 import { ApiError } from "@/lib/api";
 import { loadCollectionMarketCatalog } from "@/lib/markets";
 import {
-  checkStellarUsdcTrustline,
-  connectStellarWallet,
-  enableStellarUsdcTrustline,
-  type StellarUsdcTrustlineStatus,
-} from "@/lib/stellar-wallet";
+  checkWalletStatus,
+  connectWallet,
+  type WalletStatus,
+} from "@/lib/wallets";
 import {
   registerOnboardingMerchant,
   loadOnboardingState,
@@ -46,7 +45,7 @@ const STEP_META: Record<string, { title: string; subtitle: string }> = {
   },
   payout: {
     title: "Settlement",
-    subtitle: "Connect the Stellar wallet that receives settlement.",
+    subtitle: "Connect the wallet that receives settlement.",
   },
   register: {
     title: "Register",
@@ -131,8 +130,8 @@ function useOnboardingWorkspace() {
     null
   );
   const [payoutWallet, setPayoutWallet] = useState("");
-  const [payoutTrustline, setPayoutTrustline] =
-    useState<StellarUsdcTrustlineStatus | null>(null);
+  const [payoutWalletStatus, setPayoutWalletStatus] =
+    useState<WalletStatus | null>(null);
   const [isCheckingPayoutWallet, setIsCheckingPayoutWallet] = useState(false);
 
   useEffect(() => {
@@ -148,7 +147,7 @@ function useOnboardingWorkspace() {
     const address = payoutWallet.trim();
 
     if (!address) {
-      setPayoutTrustline(null);
+      setPayoutWalletStatus(null);
       setIsCheckingPayoutWallet(false);
       return;
     }
@@ -156,15 +155,15 @@ function useOnboardingWorkspace() {
     let isCurrent = true;
 
     setIsCheckingPayoutWallet(true);
-    void checkStellarUsdcTrustline(mode, address)
+    void checkWalletStatus(address)
       .then((status) => {
         if (isCurrent) {
-          setPayoutTrustline(status);
+          setPayoutWalletStatus(status);
         }
       })
       .catch(() => {
         if (isCurrent) {
-          setPayoutTrustline(null);
+          setPayoutWalletStatus(null);
         }
       })
       .finally(() => {
@@ -176,7 +175,7 @@ function useOnboardingWorkspace() {
     return () => {
       isCurrent = false;
     };
-  }, [mode, payoutWallet]);
+  }, [payoutWallet]);
 
   useEffect(() => {
     if (!actionError) {
@@ -251,28 +250,13 @@ function useOnboardingWorkspace() {
     setActionError(null);
 
     try {
-      const address = await connectStellarWallet(mode);
-      const status = await checkStellarUsdcTrustline(mode, address);
+      const address = await connectWallet(user?.operatorWalletAddress);
+      const status = await checkWalletStatus(address);
 
       setPayoutWallet(address);
-      setPayoutTrustline(status);
+      setPayoutWalletStatus(status);
     } catch (connectError) {
       setActionError(toErrorMessage(connectError));
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function enableSettlementUsdc() {
-    setBusyAction("settlement-enable");
-    setActionError(null);
-
-    try {
-      await enableStellarUsdcTrustline(mode, payoutWallet);
-      const status = await checkStellarUsdcTrustline(mode, payoutWallet);
-      setPayoutTrustline(status);
-    } catch (enableError) {
-      setActionError(toErrorMessage(enableError));
     } finally {
       setBusyAction(null);
     }
@@ -294,10 +278,9 @@ function useOnboardingWorkspace() {
     businessDraft,
     setBusinessDraft,
     payoutWallet,
-    payoutTrustline,
+    payoutWalletStatus,
     isCheckingPayoutWallet,
     connectSettlementWallet,
-    enableSettlementUsdc,
     runAction,
   };
 }
@@ -511,27 +494,23 @@ function VerificationStep({
 
 function SettlementStep({
   payoutWallet,
-  trustline,
+  walletStatus,
   isCheckingWallet,
   busyAction,
   onConnect,
-  onEnableUsdc,
   onSave,
 }: {
   payoutWallet: string;
-  trustline: StellarUsdcTrustlineStatus | null;
+  walletStatus: WalletStatus | null;
   isCheckingWallet: boolean;
   busyAction: string | null;
   onConnect: () => void;
-  onEnableUsdc: () => void;
   onSave: () => void;
 }) {
   const isConnecting = busyAction === "settlement-connect";
-  const isEnabling = busyAction === "settlement-enable";
   const isSaving = busyAction === "settlement";
   const hasWallet = payoutWallet.trim().length > 0;
-  const canEnableUsdc = hasWallet && trustline?.funded && !trustline.trusted;
-  const canSave = hasWallet && Boolean(trustline?.trusted);
+  const canSave = hasWallet && Boolean(walletStatus?.connected);
 
   return (
     <div className="space-y-4">
@@ -546,14 +525,12 @@ function SettlementStep({
             </p>
             {hasWallet ? (
               <div className="mt-2">
-                <Badge tone={trustline?.trusted ? "brand" : "warning"}>
+                <Badge tone={walletStatus?.connected ? "brand" : "warning"}>
                   {isCheckingWallet
-                    ? "Checking USDC"
-                    : trustline?.trusted
-                      ? "USDC enabled"
-                      : trustline?.funded === false
-                        ? "Needs XLM"
-                        : "Enable USDC"}
+                    ? "Checking wallet"
+                    : walletStatus?.connected
+                      ? "Connected"
+                      : "Not connected"}
                 </Badge>
               </div>
             ) : null}
@@ -561,7 +538,7 @@ function SettlementStep({
           <Button
             type="button"
             className="whitespace-nowrap"
-            disabled={isConnecting || isEnabling || isSaving || isCheckingWallet}
+            disabled={isConnecting || isSaving || isCheckingWallet}
             onClick={onConnect}
           >
             {isConnecting
@@ -572,28 +549,12 @@ function SettlementStep({
           </Button>
         </div>
 
-        {trustline?.funded === false ? (
-          <p className="mt-3 text-sm font-medium text-[color:var(--muted)]">
-            Fund the wallet with XLM before enabling USDC.
-          </p>
-        ) : null}
-
-        {canEnableUsdc ? (
-          <Button
-            type="button"
-            className="mt-4 w-full"
-            disabled={isConnecting || isEnabling || isSaving || isCheckingWallet}
-            onClick={onEnableUsdc}
-          >
-            {isEnabling ? "Enabling..." : "Enable USDC"}
-          </Button>
-        ) : null}
       </div>
       <Button
         type="button"
         tone="brand"
         className={`w-full ${ONBOARDING_PRIMARY_BUTTON_CLASS}`}
-        disabled={!canSave || isConnecting || isEnabling || isSaving || isCheckingWallet}
+        disabled={!canSave || isConnecting || isSaving || isCheckingWallet}
         onClick={onSave}
       >
         {isSaving ? "Saving..." : "Save and continue"}
@@ -661,10 +622,9 @@ function OnboardingModal({
     businessDraft,
     setBusinessDraft,
     payoutWallet,
-    payoutTrustline,
+    payoutWalletStatus,
     isCheckingPayoutWallet,
     connectSettlementWallet,
-    enableSettlementUsdc,
     runAction,
   } = state;
 
@@ -806,11 +766,10 @@ function OnboardingModal({
             {activeStepKey === "payout" && (
               <SettlementStep
                 payoutWallet={payoutWallet}
-                trustline={payoutTrustline}
+                walletStatus={payoutWalletStatus}
                 isCheckingWallet={isCheckingPayoutWallet}
                 busyAction={busyAction}
                 onConnect={() => void connectSettlementWallet()}
-                onEnableUsdc={() => void enableSettlementUsdc()}
                 onSave={() =>
                   void runAction("settlement", async () => {
                     await saveOnboardingPayout({
@@ -914,7 +873,7 @@ function OnboardingSurface() {
           ? registerDisabledReason
           : null,
     signerLabel: formatAddress(data?.payout.payoutWallet ?? null),
-    signerNote: "This settlement wallet receives Stellar USDC.",
+    signerNote: "This settlement wallet receives USDC.",
     onRegister: () =>
       void runAction("register", async () => {
         if (!token || !user) {

@@ -8,10 +8,8 @@ import {
   getIdentityToken,
   useLogin,
   usePrivy,
+  useWallets,
 } from "@privy-io/react-auth";
-import {
-  useWallets as useSolanaWallets,
-} from "@privy-io/react-auth/solana";
 
 import { accessTokenStorageKey, ApiError, readAccessToken } from "@/lib/api";
 import { exchangePrivySession } from "@/lib/auth";
@@ -74,8 +72,12 @@ function extractEmbeddedWalletAddress(wallets: Array<{
   walletClientType?: string;
 }>) {
   const wallet = wallets.find((entry) => {
-    const walletType = entry.chainType ?? entry.type ?? "solana";
-    return entry.walletClientType === "privy" && walletType === "solana";
+    const walletType = (entry.chainType ?? entry.type ?? "ethereum").toLowerCase();
+    const walletClientType = entry.walletClientType?.toLowerCase();
+    return (
+      walletType === "ethereum" &&
+      (walletClientType === "privy" || walletClientType === "privy-v2")
+    );
   });
 
   return wallet?.address?.trim() ?? null;
@@ -122,7 +124,7 @@ function extractPrivyEmbeddedWalletAddress(user: unknown) {
     if (
       accountType === "wallet" &&
       address &&
-      chainType === "solana" &&
+      chainType === "ethereum" &&
       (walletClientType === "privy" || walletClientType === "privy-v2")
     ) {
       return address;
@@ -151,7 +153,7 @@ type PrivySessionCardProps = {
 export function PrivySessionCard({ nextPath }: PrivySessionCardProps) {
   const router = useRouter();
   const { ready, authenticated, user, logout } = usePrivy();
-  const { wallets } = useSolanaWallets();
+  const { wallets } = useWallets();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldExchange, setShouldExchange] = useState(false);
   const [error, setError] = useState<string | null>(null);

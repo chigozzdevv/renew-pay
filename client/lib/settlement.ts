@@ -23,7 +23,7 @@ export type SettlementAccountPage = {
 };
 
 export type SettlementAssetOption = {
-  network: "stellar";
+  network: "avalanche";
   symbol: "USDC";
   label: string;
   decimals: number;

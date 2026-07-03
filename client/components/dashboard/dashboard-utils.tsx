@@ -54,9 +54,10 @@ export function formatTxHash(value: string) {
   return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
 
-export function getStellarTxUrl(mode: WorkspaceMode, txHash: string) {
-  const network = mode === "live" ? "public" : "testnet";
-  return `https://stellar.expert/explorer/${network}/tx/${txHash}`;
+export function getAvalancheTxUrl(mode: WorkspaceMode, txHash: string) {
+  const baseUrl =
+    mode === "live" ? "https://snowtrace.io" : "https://testnet.snowtrace.io";
+  return `${baseUrl}/tx/${txHash}`;
 }
 
 export function statusTone(
@@ -154,7 +155,7 @@ export function extractPrivyEmbeddedWalletAddress(user: unknown) {
     if (
       accountType === "wallet" &&
       address &&
-      chainType === "solana" &&
+      chainType === "ethereum" &&
       (walletClientType === "privy" || walletClientType === "privy-v2")
     ) {
       return address;

@@ -28,7 +28,7 @@ export type CollectionMarketQuote = {
   feeAmount: number;
   expiresAt: string | null;
   settlementAsset: "USDC";
-  settlementNetwork: "STELLAR";
+  settlementNetwork: "AVALANCHE";
   channel: {
     externalId: string;
     country: string;

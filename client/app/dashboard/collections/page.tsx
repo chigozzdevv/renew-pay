@@ -381,7 +381,7 @@ export default function CollectionsPage() {
                 .filter((account) => !account.isDefault)
                 .map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.name} · Stellar USDC
+                    {account.name} · Avalanche USDC
                   </option>
                 ))}
             </Select>

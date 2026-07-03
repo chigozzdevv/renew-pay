@@ -31,11 +31,10 @@ import {
   type VerificationStatus,
 } from "@/lib/verification";
 import {
-  checkStellarUsdcTrustline,
-  connectStellarWallet,
-  enableStellarUsdcTrustline,
-  type StellarUsdcTrustlineStatus,
-} from "@/lib/stellar-wallet";
+  checkWalletStatus,
+  connectWallet,
+  type WalletStatus,
+} from "@/lib/wallets";
 import { cn } from "@/lib/utils";
 
 type SettingsTabKey =
@@ -142,8 +141,7 @@ export default function SettingsPage() {
     primaryWallet: "",
     walletAlerts: true,
   });
-  const [walletTrustline, setWalletTrustline] =
-    useState<StellarUsdcTrustlineStatus | null>(null);
+  const [walletStatus, setWalletStatus] = useState<WalletStatus | null>(null);
   const [walletStatusError, setWalletStatusError] = useState<string | null>(null);
   const [isCheckingWallet, setIsCheckingWallet] = useState(false);
 
@@ -225,7 +223,7 @@ export default function SettingsPage() {
     const address = walletDraft.primaryWallet.trim();
 
     if (!address) {
-      setWalletTrustline(null);
+      setWalletStatus(null);
       setWalletStatusError(null);
       setIsCheckingWallet(false);
       return;
@@ -235,20 +233,20 @@ export default function SettingsPage() {
 
     setIsCheckingWallet(true);
     setWalletStatusError(null);
-    void checkStellarUsdcTrustline(mode, address)
+    void checkWalletStatus(address)
       .then((status) => {
         if (!isCurrent) {
           return;
         }
 
-        setWalletTrustline(status);
+        setWalletStatus(status);
       })
       .catch((error) => {
         if (!isCurrent) {
           return;
         }
 
-        setWalletTrustline(null);
+        setWalletStatus(null);
         setWalletStatusError(toErrorMessage(error));
       })
       .finally(() => {
@@ -260,7 +258,7 @@ export default function SettingsPage() {
     return () => {
       isCurrent = false;
     };
-  }, [mode, walletDraft.primaryWallet]);
+  }, [walletDraft.primaryWallet]);
 
   useEffect(() => {
     if (!actionMessage && !actionError) {
@@ -427,54 +425,18 @@ export default function SettingsPage() {
     setWalletStatusError(null);
 
     try {
-      const address = await connectStellarWallet(mode);
-      const status = await checkStellarUsdcTrustline(mode, address);
+      const address = await connectWallet(user?.operatorWalletAddress);
+      const status = await checkWalletStatus(address);
 
       setWalletDraft((current) => ({
         ...current,
         primaryWallet: address,
       }));
-      setWalletTrustline(status);
-
-      if (!status.funded) {
-        setActionError("Fund this Stellar wallet with XLM first.");
-        return;
-      }
-
-      if (!status.trusted) {
-        setActionMessage("Wallet connected.");
-        return;
-      }
+      setWalletStatus(status);
 
       await saveConnectedWallet(address);
       await reload();
       setActionMessage("Wallet connected.");
-    } catch (error) {
-      setActionError(toErrorMessage(error));
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function handleWalletEnableUsdc() {
-    setBusyAction("wallet-enable");
-    setActionMessage(null);
-    setActionError(null);
-    setWalletStatusError(null);
-
-    try {
-      const address = walletDraft.primaryWallet.trim();
-
-      await enableStellarUsdcTrustline(mode, address);
-      const status = await checkStellarUsdcTrustline(mode, address);
-      setWalletTrustline(status);
-
-      if (status.trusted) {
-        await saveConnectedWallet(address);
-        await reload();
-      }
-
-      setActionMessage("USDC enabled.");
     } catch (error) {
       setActionError(toErrorMessage(error));
     } finally {
@@ -624,14 +586,12 @@ export default function SettingsPage() {
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {walletDraft.primaryWallet ? (
-                      <Badge tone={walletTrustline?.trusted ? "brand" : "warning"}>
+                      <Badge tone={walletStatus?.connected ? "brand" : "warning"}>
                         {isCheckingWallet
-                          ? "Checking USDC"
-                          : walletTrustline?.trusted
-                            ? "USDC enabled"
-                            : walletTrustline?.funded === false
-                              ? "Needs XLM"
-                              : "Enable USDC"}
+                          ? "Checking wallet"
+                          : walletStatus?.connected
+                            ? "Connected"
+                            : "Not connected"}
                       </Badge>
                     ) : null}
                   </div>
@@ -641,7 +601,6 @@ export default function SettingsPage() {
                   className="whitespace-nowrap"
                   disabled={
                     busyAction === "wallet-connect" ||
-                    busyAction === "wallet-enable" ||
                     isCheckingWallet
                   }
                   onClick={() => void handleWalletConnect()}
@@ -658,29 +617,6 @@ export default function SettingsPage() {
                 <p className="mt-3 text-sm font-medium text-[#9a3a31]">
                   {walletStatusError}
                 </p>
-              ) : null}
-
-              {walletTrustline?.funded === false ? (
-                <p className="mt-3 text-sm font-medium text-[color:var(--muted)]">
-                  Fund the wallet with XLM before enabling USDC.
-                </p>
-              ) : null}
-
-              {walletDraft.primaryWallet &&
-              walletTrustline?.funded &&
-              !walletTrustline.trusted ? (
-                <Button
-                  type="button"
-                  className="mt-4 w-full"
-                  disabled={
-                    busyAction === "wallet-connect" ||
-                    busyAction === "wallet-enable" ||
-                    isCheckingWallet
-                  }
-                  onClick={() => void handleWalletEnableUsdc()}
-                >
-                  {busyAction === "wallet-enable" ? "Enabling..." : "Enable USDC"}
-                </Button>
               ) : null}
 
             </div>

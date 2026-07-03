@@ -9,7 +9,7 @@ import {
   StatusBadge,
   formatCurrency,
   formatDateTime,
-  getStellarTxUrl,
+  getAvalancheTxUrl,
   toErrorMessage,
 } from "@/components/dashboard/dashboard-utils";
 import { useDashboardSession } from "@/components/dashboard/session-provider";
@@ -30,9 +30,9 @@ import {
 import { loadPayouts, type PayoutRecord } from "@/lib/payouts";
 import { loadWorkspaceSettings } from "@/lib/settings";
 import {
-  checkStellarUsdcTrustline,
-  type StellarUsdcTrustlineStatus,
-} from "@/lib/stellar-wallet";
+  checkWalletStatus,
+  type WalletStatus,
+} from "@/lib/wallets";
 
 function formatAddress(value: string | null) {
   if (!value) {
@@ -196,7 +196,7 @@ function SettlementJourney({
               </div>
               {step.txHash ? (
                 <a
-                  href={getStellarTxUrl(mode, step.txHash)}
+                  href={getAvalancheTxUrl(mode, step.txHash)}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[color:var(--ink)] underline decoration-black/20 underline-offset-4"
@@ -216,8 +216,7 @@ function SettlementJourney({
 export default function SettlementPage() {
   const { mode } = useWorkspaceMode();
   const [detailPayout, setDetailPayout] = useState<PayoutRecord | null>(null);
-  const [walletTrustline, setWalletTrustline] =
-    useState<StellarUsdcTrustlineStatus | null>(null);
+  const [walletStatus, setWalletStatus] = useState<WalletStatus | null>(null);
   const [walletStatusError, setWalletStatusError] = useState<string | null>(null);
   const [isCheckingWallet, setIsCheckingWallet] = useState(false);
 
@@ -245,7 +244,7 @@ export default function SettlementPage() {
 
   useEffect(() => {
     if (!settlementWallet.trim()) {
-      setWalletTrustline(null);
+      setWalletStatus(null);
       setWalletStatusError(null);
       setIsCheckingWallet(false);
       return;
@@ -255,15 +254,15 @@ export default function SettlementPage() {
 
     setIsCheckingWallet(true);
     setWalletStatusError(null);
-    void checkStellarUsdcTrustline(mode, settlementWallet)
+    void checkWalletStatus(settlementWallet)
       .then((status) => {
         if (isCurrent) {
-          setWalletTrustline(status);
+          setWalletStatus(status);
         }
       })
       .catch((statusError) => {
         if (isCurrent) {
-          setWalletTrustline(null);
+          setWalletStatus(null);
           setWalletStatusError(toErrorMessage(statusError));
         }
       })
@@ -276,7 +275,7 @@ export default function SettlementPage() {
     return () => {
       isCurrent = false;
     };
-  }, [mode, settlementWallet]);
+  }, [settlementWallet]);
 
   const metrics = useMemo(() => {
     const now = Date.now();
@@ -349,14 +348,12 @@ export default function SettlementPage() {
             ) : null}
           </div>
           {settlementWallet ? (
-            <Badge tone={walletTrustline?.trusted ? "brand" : "warning"}>
+            <Badge tone={walletStatus?.connected ? "brand" : "warning"}>
               {isCheckingWallet
-                ? "Checking USDC"
-                : walletTrustline?.trusted
-                  ? "USDC enabled"
-                  : walletTrustline?.funded === false
-                    ? "Needs XLM"
-                    : "Enable USDC"}
+                ? "Checking wallet"
+                : walletStatus?.connected
+                  ? "Connected"
+                  : "Not connected"}
             </Badge>
           ) : (
             <Badge tone="warning">Not connected</Badge>
