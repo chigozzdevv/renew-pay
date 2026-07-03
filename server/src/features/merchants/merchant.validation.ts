@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-import { isStellarAddress } from "@/shared/constants/stellar";
+import { isEvmAddress } from "@/shared/constants/address";
 
 const addressSchema = z
   .string()
   .trim()
-  .refine(isStellarAddress, "Must be a valid Stellar address.");
+  .refine(isEvmAddress, "Must be a valid wallet address.");
 
 const marketSchema = z.string().trim().min(2).max(8).toUpperCase();
 

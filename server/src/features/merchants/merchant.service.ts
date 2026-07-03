@@ -8,7 +8,7 @@ import type {
   ListMerchantsQuery,
   UpdateMerchantInput,
 } from "@/features/merchants/merchant.validation";
-import { normalizeStellarAddress } from "@/shared/constants/stellar";
+import { normalizeEvmAddress } from "@/shared/constants/address";
 
 function toMerchantResponse(document: {
   _id: { toString(): string };
@@ -44,7 +44,7 @@ export async function createMerchant(input: CreateMerchantInput) {
     environment: env.PAYMENT_ENV,
   });
 
-  const merchantAccount = normalizeStellarAddress(input.merchantAccount);
+  const merchantAccount = normalizeEvmAddress(input.merchantAccount);
 
   if (!merchantAccount) {
     throw new HttpError(400, "Merchant wallet is invalid.");
@@ -58,7 +58,7 @@ export async function createMerchant(input: CreateMerchantInput) {
 
   const createdMerchant = await MerchantModel.create({
     merchantAccount,
-    payoutWallet: normalizeStellarAddress(input.payoutWallet),
+    payoutWallet: normalizeEvmAddress(input.payoutWallet),
     name: input.name,
     supportEmail: input.supportEmail,
     timezone: input.timezone,
@@ -121,7 +121,7 @@ export async function updateMerchant(
   }
 
   if (input.payoutWallet !== undefined) {
-    merchant.payoutWallet = normalizeStellarAddress(input.payoutWallet);
+    merchant.payoutWallet = normalizeEvmAddress(input.payoutWallet);
   }
 
   if (input.name !== undefined) {

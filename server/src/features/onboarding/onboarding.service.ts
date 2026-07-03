@@ -8,9 +8,6 @@ import {
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import { assertSupportedCollectionMarkets } from "@/features/onramps/onramp.service";
 import {
-  assertStellarUsdcTrustline,
-} from "@/features/settlement/providers/stellar/trustline.service";
-import {
   upsertDefaultSettlementAccountForWallet,
 } from "@/features/settlement/settlement.service";
 import { getOrCreateMerchantSetting } from "@/features/settings/setting.factory";
@@ -22,9 +19,9 @@ import type {
   OnboardingVerificationStartInput,
 } from "@/features/onboarding/onboarding.validation";
 import {
-  isStellarAddress,
-  normalizeStellarAddress,
-} from "@/shared/constants/stellar";
+  isEvmAddress,
+  normalizeEvmAddress,
+} from "@/shared/constants/address";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 
@@ -75,7 +72,7 @@ async function resolveOnboardingState(input: {
   const ownerKycComplete = ownerKyc.status === "approved";
   const merchantKybComplete = merchantKyb.status === "approved";
   const verificationComplete = ownerKycComplete || merchantKybComplete;
-  const payoutConfigured = isStellarAddress(merchant.payoutWallet);
+  const payoutConfigured = isEvmAddress(merchant.payoutWallet);
 
   const currentStepKey = !businessComplete
     ? "business"
@@ -172,7 +169,7 @@ function toOnboardingResponse(input: Awaited<ReturnType<typeof resolveOnboarding
     },
     payout: {
       payoutWallet: input.merchant.payoutWallet ?? "",
-      payoutConfigured: isStellarAddress(input.merchant.payoutWallet),
+      payoutConfigured: isEvmAddress(input.merchant.payoutWallet),
       bankTransferStatus: "coming_soon" as const,
     },
   };
@@ -333,17 +330,11 @@ export async function saveOnboardingPayout(input: {
     getOrCreateSetting(input.merchantId),
   ]);
 
-  const payoutWallet = normalizeStellarAddress(input.payload.payoutWallet);
+  const payoutWallet = normalizeEvmAddress(input.payload.payoutWallet);
 
   if (!payoutWallet) {
     throw new HttpError(400, "Settlement wallet is invalid.");
   }
-
-  await assertStellarUsdcTrustline({
-    environment: input.payload.environment,
-    address: payoutWallet,
-    ownerLabel: "Settlement wallet",
-  });
 
   merchant.payoutWallet = payoutWallet;
   setting.wallets.primaryWallet = payoutWallet;
@@ -391,7 +382,7 @@ export async function registerOnboardingMerchant(input: {
     throw new HttpError(409, "Onboarding is still missing required steps.");
   }
 
-  const merchantPayoutWallet = normalizeStellarAddress(state.merchant.payoutWallet);
+  const merchantPayoutWallet = normalizeEvmAddress(state.merchant.payoutWallet);
 
   if (!merchantPayoutWallet) {
     throw new HttpError(
@@ -400,11 +391,6 @@ export async function registerOnboardingMerchant(input: {
     );
   }
 
-  await assertStellarUsdcTrustline({
-    environment: input.payload.environment,
-    address: merchantPayoutWallet,
-    ownerLabel: "Settlement wallet",
-  });
   await upsertDefaultSettlementAccountForWallet({
     merchantId: input.merchantId,
     environment: input.payload.environment,

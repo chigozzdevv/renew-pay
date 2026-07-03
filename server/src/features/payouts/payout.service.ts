@@ -16,16 +16,17 @@ import type {
   UpdatePayoutInput,
 } from "@/features/payouts/payout.validation";
 import { getCctpSettlementConfig } from "@/features/settlement/providers/cctp/config";
-import { bridgeUsdcToStellar } from "@/features/settlement/providers/cctp/service";
+import { bridgeUsdcToSettlement } from "@/features/settlement/providers/cctp/service";
 import {
-  depositToStellarVault,
-  releaseStellarVaultBatch,
-} from "@/features/settlement/providers/stellar/vault.service";
+  depositToVault,
+  isSettlementVaultProvider,
+  releaseVaultBatch,
+} from "@/features/settlement/providers/avalanche/vault.service";
 import {
   SettlementAccountModel,
   type SettlementAccountRecord,
 } from "@/features/settlement/settlement-account.model";
-import { normalizeStellarAddress } from "@/shared/constants/stellar";
+import { normalizeEvmAddress } from "@/shared/constants/address";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 import { createRuntimeModeCondition, toStoredRuntimeMode } from "@/shared/utils/runtime-environment";
@@ -291,28 +292,28 @@ async function enqueuePayoutProcessingJob(input: {
   );
 }
 
-async function processStellarVaultPayout(input: {
+async function processVaultPayout(input: {
   payout: PayoutRecord;
   account: SettlementAccountRecord;
   runtimeEnvironment: RuntimeMode;
 }) {
   const { payout, account, runtimeEnvironment } = input;
-  const accountDestinationAddress = normalizeStellarAddress(account.destinationAddress);
-  const payoutDestinationAddress = normalizeStellarAddress(payout.destinationWallet);
+  const accountDestinationAddress = normalizeEvmAddress(account.destinationAddress);
+  const payoutDestinationAddress = normalizeEvmAddress(payout.destinationWallet);
 
   if (!accountDestinationAddress) {
-    throw new HttpError(409, "Stellar settlement account is not configured.");
+    throw new HttpError(409, "Settlement account is not configured.");
   }
 
   if (payoutDestinationAddress !== accountDestinationAddress) {
     throw new HttpError(
       409,
-      "Payout destination must match the Stellar settlement wallet."
+      "Payout destination must match the settlement wallet."
     );
   }
 
   if (!payout.bridgeReceiveTxHash) {
-    const bridge = await bridgeUsdcToStellar({
+    const bridge = await bridgeUsdcToSettlement({
       environment: runtimeEnvironment,
       amount: payout.netUsdc,
       sourceTxHash: payout.bridgeSourceTxHash ?? null,
@@ -351,7 +352,7 @@ async function processStellarVaultPayout(input: {
   }
 
   if (!payout.vaultDepositTxHash) {
-    const deposit = await depositToStellarVault({
+    const deposit = await depositToVault({
       payoutId: payout._id.toString(),
       merchantId: payout.merchantId.toString(),
       environment: runtimeEnvironment,
@@ -390,10 +391,10 @@ async function processStellarVaultPayout(input: {
   }
 
   if (!payout.vaultBatchId) {
-    throw new HttpError(409, "Stellar vault batch is not configured.");
+    throw new HttpError(409, "Vault batch is not configured.");
   }
 
-  const release = await releaseStellarVaultBatch({
+  const release = await releaseVaultBatch({
     environment: runtimeEnvironment,
     vaultBatchId: payout.vaultBatchId,
   });
@@ -466,10 +467,10 @@ export async function createPayout(input: CreatePayoutInput) {
         throw new HttpError(404, "Settlement account was not found.");
       }
 
-      const accountDestinationAddress = normalizeStellarAddress(
+      const accountDestinationAddress = normalizeEvmAddress(
         account.destinationAddress
       );
-      const payoutDestinationAddress = normalizeStellarAddress(
+      const payoutDestinationAddress = normalizeEvmAddress(
         input.destinationWallet
       );
 
@@ -479,7 +480,7 @@ export async function createPayout(input: CreatePayoutInput) {
       ) {
         throw new HttpError(
           409,
-          "Payout destination must match the Stellar settlement wallet."
+          "Payout destination must match the settlement wallet."
         );
       }
     }
@@ -523,7 +524,7 @@ export async function createPayout(input: CreatePayoutInput) {
     grossUsdc: input.grossUsdc,
     feeUsdc: input.feeUsdc,
     netUsdc: input.netUsdc,
-    destinationWallet: normalizeStellarAddress(input.destinationWallet) ?? input.destinationWallet,
+    destinationWallet: normalizeEvmAddress(input.destinationWallet) ?? input.destinationWallet,
     status,
     txHash: input.txHash ?? null,
     bridgeSourceTxHash: input.bridgeSourceTxHash ?? null,
@@ -896,10 +897,11 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
   const settlementAccount = await resolvePayoutSettlementAccount(payout);
 
   if (
-    settlementAccount?.provider === "stellar_vault" &&
-    settlementAccount.chain === "stellar"
+    settlementAccount &&
+    isSettlementVaultProvider(settlementAccount.provider) &&
+    settlementAccount.chain === "avalanche"
   ) {
-    return processStellarVaultPayout({
+    return processVaultPayout({
       payout,
       account: settlementAccount,
       runtimeEnvironment,
@@ -915,7 +917,7 @@ export async function runPayoutProcessingJob(input: { payoutId: string }) {
   payout.bridgeAttestedAt = null;
   payout.submittedAt = payout.submittedAt ?? new Date();
   payout.settledAt = null;
-  payout.reversalReason = "Stellar settlement account is not configured for automated payout.";
+  payout.reversalReason = "Settlement account is not configured for automated payout.";
   await payout.save();
 
   await syncLinkedPaymentFromPayout(payout);

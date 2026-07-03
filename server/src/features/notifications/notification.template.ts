@@ -267,11 +267,11 @@ function buildTemplateDocument(input: {
       } satisfies NotificationTemplateDocument;
     case "merchant.settlement.settled":
       return {
-        subject: `Stellar settlement released for ${referenceLabel}`,
+        subject: `Avalanche settlement released for ${referenceLabel}`,
         eyebrow: "Settlement released",
         heading: "",
         body: [
-          `${settlementAmountLabel} was released to your Stellar wallet.`,
+          `${settlementAmountLabel} was released to your wallet.`,
           ...(destinationLabel ? [`Destination: ${destinationLabel}.`] : []),
         ],
         cta: {

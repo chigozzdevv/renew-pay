@@ -1,13 +1,11 @@
 import { MerchantModel } from "@/features/merchants/merchant.model";
 import {
-  listStellarSettlementAssets,
-} from "@/features/settlement/providers/stellar/assets";
+  listAvalancheSettlementAssets,
+} from "@/features/settlement/providers/avalanche/assets";
 import {
-  assertStellarVaultAccountConfig,
-} from "@/features/settlement/providers/stellar/vault.service";
-import {
-  assertStellarUsdcTrustline,
-} from "@/features/settlement/providers/stellar/trustline.service";
+  assertVaultAccountConfig,
+  settlementVaultProvider,
+} from "@/features/settlement/providers/avalanche/vault.service";
 import {
   SettlementAccountModel,
   type SettlementAccountRecord,
@@ -18,7 +16,7 @@ import {
   type UpdateSettlementAccountInput,
 } from "@/features/settlement/settlement.validation";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
-import { normalizeStellarAddress } from "@/shared/constants/stellar";
+import { normalizeEvmAddress } from "@/shared/constants/address";
 import { HttpError } from "@/shared/errors/http-error";
 import {
   buildPagination,
@@ -50,8 +48,8 @@ function normalizeAccountInput<T extends CreateSettlementAccountInput | UpdateSe
   return {
     ...input,
     mode: "standard" as const,
-    provider: "stellar_vault" as const,
-    chain: "stellar" as const,
+    provider: settlementVaultProvider,
+    chain: "avalanche" as const,
     assetSymbol: "USDC",
   };
 }
@@ -81,7 +79,7 @@ function toSettlementAssetOption(input: {
   };
 }) {
   return {
-    network: "stellar" as const,
+    network: "avalanche" as const,
     symbol: input.asset.symbol,
     label: input.asset.label,
     decimals: input.asset.decimals,
@@ -91,7 +89,7 @@ function toSettlementAssetOption(input: {
 export function listSettlementAssets(environment: RuntimeMode = "test") {
   return {
     environment,
-    assets: listStellarSettlementAssets(environment).map((asset) =>
+    assets: listAvalancheSettlementAssets(environment).map((asset) =>
       toSettlementAssetOption({
         asset,
       })
@@ -151,11 +149,7 @@ async function ensureAccountScope(
 export async function createSettlementAccount(input: CreateSettlementAccountInput) {
   const normalized = normalizeAccountInput(input);
   await ensureMerchant(normalized.merchantId);
-  assertStellarVaultAccountConfig(normalized);
-  await assertStellarUsdcTrustline({
-    environment: normalized.environment,
-    address: normalized.destinationAddress ?? "",
-  });
+  assertVaultAccountConfig(normalized);
 
   if (normalized.isDefault) {
     await applyDefaultAccountPolicy({
@@ -187,7 +181,7 @@ export async function upsertDefaultSettlementAccountForWallet(input: {
   environment: RuntimeMode;
   destinationAddress: string;
 }) {
-  const destinationAddress = normalizeStellarAddress(input.destinationAddress);
+  const destinationAddress = normalizeEvmAddress(input.destinationAddress);
 
   if (!destinationAddress) {
     throw new HttpError(400, "Settlement wallet is invalid.");
@@ -206,12 +200,7 @@ export async function upsertDefaultSettlementAccountForWallet(input: {
     },
   });
 
-  assertStellarVaultAccountConfig(normalized);
-  await assertStellarUsdcTrustline({
-    environment: normalized.environment,
-    address: destinationAddress,
-    ownerLabel: "Settlement wallet",
-  });
+  assertVaultAccountConfig(normalized);
 
   await applyDefaultAccountPolicy({
     merchantId: normalized.merchantId,
@@ -389,16 +378,10 @@ export async function updateSettlementAccount(
     account.status = normalized.status;
   }
 
-  const asset = assertStellarVaultAccountConfig(account);
-  if (account.destinationAddress) {
-    await assertStellarUsdcTrustline({
-      environment: accountEnvironment,
-      address: account.destinationAddress,
-    });
-  }
+  const asset = assertVaultAccountConfig(account);
   account.mode = "standard";
-  account.provider = "stellar_vault";
-  account.chain = "stellar";
+  account.provider = settlementVaultProvider;
+  account.chain = "avalanche";
   account.assetSymbol = asset.symbol;
 
   if (normalized.metadata !== undefined) {

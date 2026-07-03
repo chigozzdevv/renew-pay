@@ -1,10 +1,10 @@
 import { env } from "@/config/env.config";
-import { getStellarSettlementConfig } from "@/features/settlement/providers/stellar/config";
+import { getAvalancheSettlementConfig } from "@/features/settlement/providers/avalanche/config";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 
 export function getCctpSettlementConfig(mode: RuntimeMode) {
   const isLive = mode === "live";
-  const stellarConfig = getStellarSettlementConfig(mode);
+  const avalancheConfig = getAvalancheSettlementConfig(mode);
 
   return {
     environment: mode,
@@ -33,12 +33,14 @@ export function getCctpSettlementConfig(mode: RuntimeMode) {
     collectionMessageTransmitterProgramId: isLive
       ? env.CCTP_COLLECTION_MESSAGE_TRANSMITTER_PROGRAM_ID_LIVE
       : env.CCTP_COLLECTION_MESSAGE_TRANSMITTER_PROGRAM_ID_TEST,
-    stellarCctpForwarderContractId: isLive
-      ? env.STELLAR_CCTP_FORWARDER_CONTRACT_ID_LIVE
-      : env.STELLAR_CCTP_FORWARDER_CONTRACT_ID_TEST,
-    stellarRpcUrl: stellarConfig.rpcUrl,
-    stellarNetworkPassphrase: stellarConfig.networkPassphrase,
-    stellarOperatorSecret: stellarConfig.operatorSecret,
+    avalancheRpcUrl: avalancheConfig.rpcUrl,
+    avalancheChainId: avalancheConfig.chainId,
+    avalancheUsdcContractAddress: avalancheConfig.usdcContractAddress,
+    avalancheVaultContractAddress: avalancheConfig.vaultContractAddress,
+    avalancheOperatorPrivateKey: avalancheConfig.operatorPrivateKey,
+    avalancheCctpTokenMessengerAddress: avalancheConfig.cctpTokenMessengerAddress,
+    avalancheCctpMessageTransmitterAddress:
+      avalancheConfig.cctpMessageTransmitterAddress,
     minFinalityThreshold: isLive
       ? env.CCTP_MIN_FINALITY_THRESHOLD_LIVE
       : env.CCTP_MIN_FINALITY_THRESHOLD_TEST,

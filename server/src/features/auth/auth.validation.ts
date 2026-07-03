@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isSolanaAddress } from "@/shared/constants/solana";
+import { isEvmAddress } from "@/shared/constants/address";
 
 const objectIdSchema = z
   .string()
@@ -9,7 +9,7 @@ const objectIdSchema = z
 const addressSchema = z
   .string()
   .trim()
-  .refine(isSolanaAddress, "Must be a valid Solana address.");
+  .refine(isEvmAddress, "Must be a valid wallet address.");
 
 export const privySessionSchema = z.object({
   authToken: z.string().trim().min(20),

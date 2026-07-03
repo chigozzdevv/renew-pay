@@ -632,7 +632,7 @@ export async function createWidgetQuote(input: CreateWidgetQuoteInput) {
   return {
     ...(await createPartnaWidgetQuote(input)),
     settlementAsset: "USDC",
-    settlementNetwork: "STELLAR",
+    settlementNetwork: "AVALANCHE",
   };
 }
 
@@ -728,7 +728,7 @@ export async function quoteUsdAmountInCollectionCurrency(input: {
     feeAmount,
     expiresAt: null,
     settlementAsset: "USDC" as const,
-    settlementNetwork: "STELLAR" as const,
+    settlementNetwork: "AVALANCHE" as const,
     channel: {
       externalId: buildPartnaChannelId(input.currency, marketAsset.network),
       country: marketMetadata.countryCodes[0] ?? input.currency,
@@ -790,7 +790,7 @@ export async function quoteLocalAmountInSettlementAsset(input: {
     feeAmount,
     expiresAt: null,
     settlementAsset: "USDC" as const,
-    settlementNetwork: "STELLAR" as const,
+    settlementNetwork: "AVALANCHE" as const,
     channel: {
       externalId: buildPartnaChannelId(input.currency, marketAsset.network),
       country: marketMetadata.countryCodes[0] ?? input.currency,

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { optionalPaginationQuerySchema } from "@/shared/utils/pagination";
-import { isStellarAddress } from "@/shared/constants/stellar";
+import { isEvmAddress } from "@/shared/constants/address";
 import { environmentInputSchema } from "@/shared/utils/runtime-environment";
 
 const objectIdSchema = z
@@ -37,18 +37,18 @@ function validateAccountShape(
     ctx.addIssue({
       code: "custom",
       path: ["destinationAddress"],
-      message: "A Stellar payout wallet is required.",
+      message: "A payout wallet is required.",
     });
   }
 
   if (
     input.destinationAddress &&
-    !isStellarAddress(input.destinationAddress)
+    !isEvmAddress(input.destinationAddress)
   ) {
     ctx.addIssue({
       code: "custom",
       path: ["destinationAddress"],
-      message: "Payout wallet must be a valid Stellar address.",
+      message: "Payout wallet must be a valid wallet address.",
     });
   }
 }
@@ -76,12 +76,12 @@ export const updateSettlementAccountSchema = accountBaseSchema
   .superRefine((input, ctx) => {
     if (
       input.destinationAddress &&
-      !isStellarAddress(input.destinationAddress)
+      !isEvmAddress(input.destinationAddress)
     ) {
       ctx.addIssue({
         code: "custom",
         path: ["destinationAddress"],
-        message: "Payout wallet must be a valid Stellar address.",
+        message: "Payout wallet must be a valid wallet address.",
       });
     }
   });

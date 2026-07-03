@@ -1,13 +1,10 @@
 import { HttpError } from "@/shared/errors/http-error";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
-import { normalizeStellarAddress } from "@/shared/constants/stellar";
+import { normalizeEvmAddress } from "@/shared/constants/address";
 
 import { appendAuditLog } from "@/features/audit/audit.service";
 import { assertMerchantKybApprovedForLive } from "@/features/kyc/kyc.service";
 import { MerchantModel } from "@/features/merchants/merchant.model";
-import {
-  assertStellarUsdcTrustline,
-} from "@/features/settlement/providers/stellar/trustline.service";
 import {
   upsertDefaultSettlementAccountForWallet,
 } from "@/features/settlement/settlement.service";
@@ -155,12 +152,7 @@ export async function updateSettingsByMerchantId(
 
   if (input.wallets) {
     if (input.wallets.primaryWallet !== undefined) {
-      const primaryWallet = normalizeStellarAddress(input.wallets.primaryWallet);
-      await assertStellarUsdcTrustline({
-        environment: input.environment,
-        address: primaryWallet ?? "",
-        ownerLabel: "Settlement wallet",
-      });
+      const primaryWallet = normalizeEvmAddress(input.wallets.primaryWallet);
       await upsertDefaultSettlementAccountForWallet({
         merchantId,
         environment: input.environment,
@@ -257,12 +249,7 @@ export async function saveWalletSettings(
   );
 
   const { merchant, setting } = await getOrCreateSetting(merchantId);
-  const primaryWallet = normalizeStellarAddress(input.primaryWallet);
-  await assertStellarUsdcTrustline({
-    environment: input.environment,
-    address: primaryWallet ?? "",
-    ownerLabel: "Settlement wallet",
-  });
+  const primaryWallet = normalizeEvmAddress(input.primaryWallet);
   await upsertDefaultSettlementAccountForWallet({
     merchantId,
     environment: input.environment,

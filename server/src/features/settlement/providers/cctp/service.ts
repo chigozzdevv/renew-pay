@@ -8,19 +8,18 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
-  BASE_FEE,
-  Contract,
-  Keypair as StellarKeypair,
-  StrKey,
-  TransactionBuilder,
-  rpc,
-  xdr,
-} from "@stellar/stellar-sdk";
+  createPublicClient,
+  createWalletClient,
+  defineChain,
+  http,
+  type Address,
+  type Hex,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
+import { avalancheCctpMessageTransmitterAbi } from "@/features/settlement/providers/avalanche/abi";
 import { getCctpSettlementConfig } from "@/features/settlement/providers/cctp/config";
-import {
-  assertStellarUsdcTrustline,
-} from "@/features/settlement/providers/stellar/trustline.service";
+import { normalizeEvmAddress } from "@/shared/constants/address";
 import type { RuntimeMode } from "@/shared/constants/runtime-mode";
 import { HttpError } from "@/shared/errors/http-error";
 
@@ -50,9 +49,9 @@ const depositForBurnWithHookDiscriminator = Buffer.from([
   111, 245, 62, 131, 204, 108, 223, 155,
 ]);
 
-const cctpHookMagicBytesLength = 24;
-const cctpHookVersion = 0;
 const collectionAssetDecimals = 6;
+const evmPrivateKeyRegex = /^0x[a-fA-F0-9]{64}$/;
+const hexBytesRegex = /^(0x)?[a-fA-F0-9]+$/;
 
 function assertNonEmpty(value: string | null | undefined, message: string) {
   if (!value?.trim()) {
@@ -65,7 +64,7 @@ function assertNonEmpty(value: string | null | undefined, message: string) {
 async function parseSolanaCollectionKeypair(privateKey: string) {
   const trimmed = assertNonEmpty(
     privateKey,
-      "Collection private key is required for CCTP settlement."
+    "Collection private key is required for CCTP settlement."
   );
 
   try {
@@ -117,6 +116,51 @@ function amountToSourceTokenUnits(amount: number, options?: { allowZero?: boolea
   );
 }
 
+function normalizePrivateKey(value: string) {
+  const trimmed = assertNonEmpty(
+    value,
+    "Avalanche settlement operator key is required."
+  );
+  const normalized = trimmed.startsWith("0x") ? trimmed : `0x${trimmed}`;
+
+  if (!evmPrivateKeyRegex.test(normalized)) {
+    throw new HttpError(
+      409,
+      "Avalanche settlement operator key must be a 32-byte hex private key."
+    );
+  }
+
+  return normalized as Hex;
+}
+
+function assertEvmAddress(value: string, message: string) {
+  const normalized = normalizeEvmAddress(value);
+
+  if (!normalized) {
+    throw new HttpError(409, message);
+  }
+
+  return normalized as Address;
+}
+
+function stripHexPrefix(value: string) {
+  return value.startsWith("0x") ? value.slice(2) : value;
+}
+
+function hexBytes(value: string, message: string) {
+  const trimmed = value.trim();
+
+  if (
+    !trimmed ||
+    !hexBytesRegex.test(trimmed) ||
+    stripHexPrefix(trimmed).length % 2 !== 0
+  ) {
+    throw new HttpError(409, message);
+  }
+
+  return `0x${stripHexPrefix(trimmed).toLowerCase()}` as Hex;
+}
+
 function u64Le(value: bigint) {
   const buffer = Buffer.alloc(8);
   buffer.writeBigUInt64LE(value);
@@ -129,33 +173,8 @@ function u32Le(value: number) {
   return buffer;
 }
 
-function u32Be(value: number) {
-  const buffer = Buffer.alloc(4);
-  buffer.writeUInt32BE(value);
-  return buffer;
-}
-
 function encodeAnchorBytes(value: Buffer) {
   return Buffer.concat([u32Le(value.length), value]);
-}
-
-function stellarContractToSolanaPublicKey(contractId: string) {
-  try {
-    return new PublicKey(StrKey.decodeContract(contractId));
-  } catch {
-    throw new HttpError(409, "Stellar CCTP forwarder contract is invalid.");
-  }
-}
-
-function createForwarderHookData(forwardRecipient: string) {
-  const recipientBytes = Buffer.from(forwardRecipient, "utf8");
-
-  return Buffer.concat([
-    Buffer.alloc(cctpHookMagicBytesLength),
-    u32Be(cctpHookVersion),
-    u32Be(recipientBytes.length),
-    recipientBytes,
-  ]);
 }
 
 function findProgramAddress(
@@ -180,6 +199,21 @@ function findProgramAddress(
   return publicKey;
 }
 
+function evmAddressToBytes32PublicKey(address: string) {
+  const normalized = assertEvmAddress(
+    address,
+    "Avalanche CCTP mint recipient must be a valid wallet address."
+  );
+  const buffer = Buffer.alloc(32);
+  Buffer.from(stripHexPrefix(normalized), "hex").copy(buffer, 12);
+
+  return new PublicKey(buffer);
+}
+
+function zeroBytes32PublicKey() {
+  return new PublicKey(Buffer.alloc(32));
+}
+
 function buildDepositForBurnWithHookData(input: {
   amount: bigint;
   destinationDomain: number;
@@ -201,18 +235,50 @@ function buildDepositForBurnWithHookData(input: {
   ]);
 }
 
-function stripHexPrefix(value: string) {
-  return value.startsWith("0x") ? value.slice(2) : value;
+function createAvalancheChain(input: {
+  chainId: number;
+  rpcUrl: string;
+  environment: RuntimeMode;
+}) {
+  return defineChain({
+    id: input.chainId,
+    name:
+      input.environment === "live"
+        ? "Avalanche C-Chain"
+        : "Avalanche Fuji C-Chain",
+    nativeCurrency: {
+      name: "Avalanche",
+      symbol: "AVAX",
+      decimals: 18,
+    },
+    rpcUrls: {
+      default: {
+        http: [input.rpcUrl],
+      },
+    },
+  });
 }
 
-async function burnSourceUsdcForStellar(input: {
+function getAvalancheOperatorAddress(environment: RuntimeMode) {
+  const config = getCctpSettlementConfig(environment);
+  const account = privateKeyToAccount(
+    normalizePrivateKey(config.avalancheOperatorPrivateKey)
+  );
+
+  return account.address;
+}
+
+async function burnSourceUsdcForAvalanche(input: {
   environment: RuntimeMode;
   amount: number;
 }) {
   const config = getCctpSettlementConfig(input.environment);
-  const connection = new Connection(config.collectionRpcUrl, "confirmed");
+  const connection = new Connection(
+    assertNonEmpty(config.collectionRpcUrl, "Collection RPC URL is required."),
+    "confirmed"
+  );
   const collectionKeypair = await parseSolanaCollectionKeypair(
-      config.collectionPrivateKey
+    config.collectionPrivateKey
   );
   const { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } = await import(
     "@solana/spl-token"
@@ -248,28 +314,14 @@ async function burnSourceUsdcForStellar(input: {
     collectionAssetMint,
     collectionKeypair.publicKey
   );
-  const stellarOperator = StellarKeypair.fromSecret(
-    assertNonEmpty(
-      config.stellarOperatorSecret,
-      "Stellar settlement operator key is required for CCTP settlement."
-    )
-  );
-  await assertStellarUsdcTrustline({
-    environment: input.environment,
-    address: stellarOperator.publicKey(),
-    ownerLabel: "Stellar settlement operator",
-  });
-  const forwarderContractId = assertNonEmpty(
-    config.stellarCctpForwarderContractId,
-    "Stellar CCTP forwarder contract is required."
-  );
-  const forwarderPublicKey = stellarContractToSolanaPublicKey(forwarderContractId);
+  const operatorAddress = getAvalancheOperatorAddress(input.environment);
   const amount = amountToSourceTokenUnits(input.amount);
   const maxFee = amountToSourceTokenUnits(config.maxFeeUsdc, { allowZero: true });
 
   if (maxFee >= amount) {
     throw new HttpError(409, "CCTP max fee must be lower than the settlement amount.");
   }
+
   const messageSentEventData = SolanaKeypair.generate();
   const instruction = new TransactionInstruction({
     programId: tokenMessengerProgramId,
@@ -345,11 +397,11 @@ async function burnSourceUsdcForStellar(input: {
     data: buildDepositForBurnWithHookData({
       amount,
       destinationDomain: config.destinationDomain,
-      mintRecipient: forwarderPublicKey,
-      destinationCaller: forwarderPublicKey,
+      mintRecipient: evmAddressToBytes32PublicKey(operatorAddress),
+      destinationCaller: zeroBytes32PublicKey(),
       maxFee,
       minFinalityThreshold: config.minFinalityThreshold,
-      hookData: createForwarderHookData(stellarOperator.publicKey()),
+      hookData: Buffer.alloc(0),
     }),
   });
   const transaction = new Transaction().add(instruction);
@@ -434,74 +486,49 @@ async function fetchCircleAttestation(input: {
   });
 }
 
-async function mintAndForwardOnStellar(input: {
+async function receiveUsdcOnAvalanche(input: {
   environment: RuntimeMode;
   message: string;
   attestation: string;
 }) {
   const config = getCctpSettlementConfig(input.environment);
-  const server = new rpc.Server(
-    assertNonEmpty(config.stellarRpcUrl, "Stellar RPC URL is required.")
+  const rpcUrl = assertNonEmpty(config.avalancheRpcUrl, "Avalanche RPC URL is required.");
+  const account = privateKeyToAccount(
+    normalizePrivateKey(config.avalancheOperatorPrivateKey)
   );
-  const operatorKeypair = StellarKeypair.fromSecret(
-    assertNonEmpty(
-      config.stellarOperatorSecret,
-      "Stellar settlement operator key is required."
-    )
+  const chain = createAvalancheChain({
+    chainId: config.avalancheChainId,
+    rpcUrl,
+    environment: input.environment,
+  });
+  const transport = http(rpcUrl);
+  const publicClient = createPublicClient({ chain, transport });
+  const walletClient = createWalletClient({ account, chain, transport });
+  const messageTransmitterAddress = assertEvmAddress(
+    config.avalancheCctpMessageTransmitterAddress,
+    "Avalanche CCTP message transmitter must be a valid wallet address."
   );
-  const operatorAccount = await server.getAccount(operatorKeypair.publicKey());
-  const contract = new Contract(
-    assertNonEmpty(
-      config.stellarCctpForwarderContractId,
-      "Stellar CCTP forwarder contract is required."
-    )
-  );
-  const transaction = new TransactionBuilder(operatorAccount, {
-    fee: BASE_FEE,
-    networkPassphrase: assertNonEmpty(
-      config.stellarNetworkPassphrase,
-      "Stellar network passphrase is required."
-    ),
-  })
-    .addOperation(
-      contract.call(
-        "mint_and_forward",
-        xdr.ScVal.scvBytes(Buffer.from(stripHexPrefix(input.message), "hex")),
-        xdr.ScVal.scvBytes(Buffer.from(stripHexPrefix(input.attestation), "hex"))
-      )
-    )
-    .setTimeout(60)
-    .build();
-  const preparedTransaction = await server.prepareTransaction(transaction);
-  preparedTransaction.sign(operatorKeypair);
-  const submittedTransaction = await server.sendTransaction(preparedTransaction);
+  const receiveHash = await walletClient.writeContract({
+    address: messageTransmitterAddress,
+    abi: avalancheCctpMessageTransmitterAbi,
+    functionName: "receiveMessage",
+    args: [
+      hexBytes(input.message, "Circle CCTP message must be hex encoded."),
+      hexBytes(input.attestation, "Circle CCTP attestation must be hex encoded."),
+    ],
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: receiveHash,
+  });
 
-  if (
-    submittedTransaction.status !== "PENDING" &&
-    submittedTransaction.status !== "DUPLICATE"
-  ) {
-    throw new HttpError(
-      502,
-      `Stellar CCTP receive transaction was not accepted: ${submittedTransaction.status}.`
-    );
+  if (receipt.status !== "success") {
+    throw new HttpError(502, "Avalanche CCTP receive transaction reverted.");
   }
 
-  const confirmedTransaction = await server.pollTransaction(
-    submittedTransaction.hash,
-    { attempts: 20 }
-  );
-
-  if (confirmedTransaction.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
-    throw new HttpError(
-      502,
-      `Stellar CCTP receive transaction did not complete successfully: ${confirmedTransaction.status}.`
-    );
-  }
-
-  return confirmedTransaction.txHash;
+  return receiveHash;
 }
 
-export async function bridgeUsdcToStellar(input: CctpBridgeInput) {
+export async function bridgeUsdcToSettlement(input: CctpBridgeInput) {
   if (input.receiveTxHash) {
     return {
       completed: true,
@@ -514,7 +541,7 @@ export async function bridgeUsdcToStellar(input: CctpBridgeInput) {
   }
 
   if (!input.sourceTxHash) {
-    const sourceTxHash = await burnSourceUsdcForStellar({
+    const sourceTxHash = await burnSourceUsdcForAvalanche({
       environment: input.environment,
       amount: input.amount,
     });
@@ -548,7 +575,7 @@ export async function bridgeUsdcToStellar(input: CctpBridgeInput) {
     };
   }
 
-  const receiveTxHash = await mintAndForwardOnStellar({
+  const receiveTxHash = await receiveUsdcOnAvalanche({
     environment: input.environment,
     message: attestation.message,
     attestation: attestation.attestation,
@@ -567,6 +594,7 @@ export async function bridgeUsdcToStellar(input: CctpBridgeInput) {
 export const __test__ = {
   amountToSourceTokenUnits,
   buildDepositForBurnWithHookData,
-  createForwarderHookData,
+  evmAddressToBytes32PublicKey,
   fetchCircleAttestationWithDeps,
+  hexBytes,
 };

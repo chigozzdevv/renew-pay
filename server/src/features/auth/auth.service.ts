@@ -12,8 +12,8 @@ import type {
 import { getOwnerPermissions, normalizePermissions } from "@/shared/constants/access-control";
 import {
   createUnconfiguredWalletAddress,
-  normalizeSolanaAddress,
-} from "@/shared/constants/solana";
+  normalizeEvmAddress,
+} from "@/shared/constants/address";
 import { HttpError } from "@/shared/errors/http-error";
 import { signJwt } from "@/shared/utils/jwt";
 
@@ -255,7 +255,7 @@ export async function exchangePrivySession(input: PrivySessionInput) {
   const identityClaims = await verifyPrivyIdentityToken(input.identityToken);
   const providerUserId = authClaims.user_id?.trim() || null;
   const operatorWalletAddress = input.operatorWalletAddress
-    ? normalizeSolanaAddress(input.operatorWalletAddress)
+    ? normalizeEvmAddress(input.operatorWalletAddress)
     : null;
 
   if (!providerUserId) {

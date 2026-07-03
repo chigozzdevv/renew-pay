@@ -27,7 +27,7 @@ const envSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().positive().default(4000),
     MONGODB_URI: z.string().trim().min(1).default("mongodb://127.0.0.1:27017"),
-    MONGODB_DB_NAME: z.string().trim().min(1).default("renew_v2"),
+    MONGODB_DB_NAME: z.string().trim().min(1).default("renew_v4"),
     CORS_ORIGINS: z.string().trim().default("http://localhost:3000"),
     PAYMENT_ENV: z.enum(["test", "live"]).default("test"),
     PLAYGROUND_RENEW_SECRET_KEY: z.string().trim().default(""),
@@ -45,42 +45,46 @@ const envSchema = z
       .trim()
       .min(1)
       .default("https://api.mainnet-beta.solana.com"),
-    STELLAR_RPC_URL_TEST: publicStringDefault("https://soroban-testnet.stellar.org"),
-    STELLAR_RPC_URL_LIVE: publicStringDefault("https://mainnet.sorobanrpc.com"),
-    STELLAR_HORIZON_URL_TEST: publicStringDefault(
-      "https://horizon-testnet.stellar.org"
+    AVALANCHE_RPC_URL_TEST: publicStringDefault(
+      "https://api.avax-test.network/ext/bc/C/rpc"
     ),
-    STELLAR_HORIZON_URL_LIVE: publicStringDefault("https://horizon.stellar.org"),
-    STELLAR_USDC_ASSET_CODE_TEST: publicStringDefault("USDC"),
-    STELLAR_USDC_ASSET_CODE_LIVE: publicStringDefault("USDC"),
-    STELLAR_USDC_ASSET_ISSUER_TEST: publicStringDefault(
-      "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+    AVALANCHE_RPC_URL_LIVE: publicStringDefault(
+      "https://api.avax.network/ext/bc/C/rpc"
     ),
-    STELLAR_USDC_ASSET_ISSUER_LIVE: publicStringDefault(
-      "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
-    ),
-    STELLAR_USDC_CONTRACT_ID_TEST: publicStringDefault(
-      "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
-    ),
-    STELLAR_USDC_CONTRACT_ID_LIVE: publicStringDefault(
-      "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
-    ),
-    STELLAR_SETTLEMENT_VAULT_CONTRACT_ID_TEST: z.string().trim().default(""),
-    STELLAR_SETTLEMENT_VAULT_CONTRACT_ID_LIVE: z.string().trim().default(""),
-    STELLAR_SETTLEMENT_OPERATOR_SECRET_TEST: z.string().trim().default(""),
-    STELLAR_SETTLEMENT_OPERATOR_SECRET_LIVE: z.string().trim().default(""),
-    STELLAR_CCTP_FORWARDER_CONTRACT_ID_TEST: z
+    AVALANCHE_CHAIN_ID_TEST: z.coerce.number().int().positive().default(43113),
+    AVALANCHE_CHAIN_ID_LIVE: z.coerce.number().int().positive().default(43114),
+    AVALANCHE_USDC_CONTRACT_ADDRESS_TEST: z
       .string()
       .trim()
-      .default("CA66Q2WFBND6V4UEB7RD4SAXSVIWMD6RA4X3U32ELVFGXV5PJK4T4VSZ"),
-    STELLAR_CCTP_FORWARDER_CONTRACT_ID_LIVE: z
+      .default("0x5425890298aed601595a70AB815c96711a31Bc65"),
+    AVALANCHE_USDC_CONTRACT_ADDRESS_LIVE: z
       .string()
       .trim()
-      .default("CBZL2IH7F6BIDAA3WBNXYKIXSATJGMSW7K5P5MJ6STX5RXN47TZJDF5T"),
+      .default("0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"),
+    AVALANCHE_SETTLEMENT_VAULT_ADDRESS_TEST: z.string().trim().default(""),
+    AVALANCHE_SETTLEMENT_VAULT_ADDRESS_LIVE: z.string().trim().default(""),
+    AVALANCHE_SETTLEMENT_OPERATOR_PRIVATE_KEY_TEST: z.string().trim().default(""),
+    AVALANCHE_SETTLEMENT_OPERATOR_PRIVATE_KEY_LIVE: z.string().trim().default(""),
+    AVALANCHE_CCTP_TOKEN_MESSENGER_ADDRESS_TEST: z
+      .string()
+      .trim()
+      .default("0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"),
+    AVALANCHE_CCTP_TOKEN_MESSENGER_ADDRESS_LIVE: z
+      .string()
+      .trim()
+      .default("0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d"),
+    AVALANCHE_CCTP_MESSAGE_TRANSMITTER_ADDRESS_TEST: z
+      .string()
+      .trim()
+      .default("0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275"),
+    AVALANCHE_CCTP_MESSAGE_TRANSMITTER_ADDRESS_LIVE: z
+      .string()
+      .trim()
+      .default("0x81D40F21F12A8F0E3252Bccb954D722d4c464B64"),
     CCTP_SOURCE_DOMAIN_TEST: z.coerce.number().int().nonnegative().default(5),
     CCTP_SOURCE_DOMAIN_LIVE: z.coerce.number().int().nonnegative().default(5),
-    CCTP_DESTINATION_DOMAIN_TEST: z.coerce.number().int().nonnegative().default(27),
-    CCTP_DESTINATION_DOMAIN_LIVE: z.coerce.number().int().nonnegative().default(27),
+    CCTP_DESTINATION_DOMAIN_TEST: z.coerce.number().int().nonnegative().default(1),
+    CCTP_DESTINATION_DOMAIN_LIVE: z.coerce.number().int().nonnegative().default(1),
     CCTP_COLLECTION_ASSET_MINT_TEST: z
       .string()
       .trim()

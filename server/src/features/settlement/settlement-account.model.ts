@@ -42,13 +42,13 @@ const settlementAccountSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      default: "stellar_vault",
+      default: "renew_vault",
     },
     chain: {
       type: String,
       required: true,
       trim: true,
-      default: "stellar",
+      default: "avalanche",
     },
     assetSymbol: {
       type: String,

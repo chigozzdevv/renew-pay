@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isStellarAddress } from "@/shared/constants/stellar";
+import { isEvmAddress } from "@/shared/constants/address";
 import { environmentInputSchema } from "@/shared/utils/runtime-environment";
 
 const objectIdSchema = z
@@ -11,7 +11,7 @@ const objectIdSchema = z
 const addressSchema = z
   .string()
   .trim()
-  .refine(isStellarAddress, "Must be a valid Stellar address.");
+  .refine(isEvmAddress, "Must be a valid wallet address.");
 
 const nullableUrlSchema = z
   .union([z.string().trim().url(), z.literal(""), z.null()])
