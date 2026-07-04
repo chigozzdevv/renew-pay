@@ -5,6 +5,7 @@ import {
   __test__,
   buildPartnaCustomerAccountName,
 } from "../../../src/features/onramps/partna.service";
+import { HttpError } from "../../../src/shared/errors/http-error";
 
 test("Partna customer account names use the documented hex shape", () => {
   const accountName = buildPartnaCustomerAccountName({
@@ -41,6 +42,22 @@ test("Partna sandbox mock deposits are treated as successful payment signals", (
       status: "pending",
       message: "queued",
     }),
+    false
+  );
+});
+
+test("Partna missing address errors are treated as sandbox recovery candidates", () => {
+  assert.equal(
+    __test__.isPartnaMissingAddressDetailsError(
+      new HttpError(400, "user has not supplied address details")
+    ),
+    true
+  );
+
+  assert.equal(
+    __test__.isPartnaMissingAddressDetailsError(
+      new HttpError(400, "user has not completed kyc")
+    ),
     false
   );
 });

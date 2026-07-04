@@ -15,6 +15,7 @@ import {
   hasActivePartnaPaymentProfile,
   startPartnaCustomerPaymentProfileVerification,
 } from "@/features/onramps/partna.service";
+import type { PartnaRampRecord } from "@/features/onramps/providers/partna/partna.types";
 import {
   queuePaymentIssueNotifications,
   queueCustomerReceiptForStatusChange,
@@ -104,6 +105,33 @@ function getPartnaRampDestinationAddress(mode: RuntimeMode) {
   }
 
   return normalized;
+}
+
+function createDeterministicDigits(seed: string, length: number) {
+  const digest = createHash("sha256").update(seed).digest("hex");
+  const modulo = 10n ** BigInt(length);
+  const value = BigInt(`0x${digest.slice(0, 16)}`) % modulo;
+
+  return value.toString().padStart(length, "0");
+}
+
+function buildPartnaSandboxBankAccount(input: {
+  paymentId: string;
+  customerName: string;
+}) {
+  return {
+    bankCode: "999998",
+    bankName: "Partna Sandbox Bank",
+    accountName: `Renew / ${input.customerName}`.slice(0, 80),
+    accountNumber: createDeterministicDigits(input.paymentId, 10),
+  };
+}
+
+function isPartnaSandboxBankDetailsError(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    /cannot get bank account details|address details|supplied address/i.test(error.message)
+  );
 }
 
 function readNumber(value: unknown) {
@@ -1206,20 +1234,71 @@ async function ensurePartnaRampForPayment(
   }
 
   const partnaRampReference = payment._id.toString();
-  const ramp = await getPartnaProvider(environment).createRamp({
-    accountName,
-    cancelPendingRampRequest: true,
-    cryptoAddress: getPartnaRampDestinationAddress(environment),
-    expireAction: "useCurrentRate",
-    fromAmount: payment.amount,
-    fromCurrency: payment.currency,
-    fromNetwork,
-    rampReference: partnaRampReference,
-    rateKey,
-    toCurrency: "USDC",
-    toNetwork: "solana",
-    type: "fiatToCrypto",
-  });
+  const provider = getPartnaProvider(environment);
+  let ramp: PartnaRampRecord;
+
+  try {
+    ramp = await provider.createRamp({
+      accountName,
+      cancelPendingRampRequest: true,
+      cryptoAddress: getPartnaRampDestinationAddress(environment),
+      expireAction: "useCurrentRate",
+      fromAmount: payment.amount,
+      fromCurrency: payment.currency,
+      fromNetwork,
+      rampReference: partnaRampReference,
+      rateKey,
+      toCurrency: "USDC",
+      toNetwork: "solana",
+      type: "fiatToCrypto",
+    });
+  } catch (error) {
+    if (environment !== "test" || !isPartnaSandboxBankDetailsError(error)) {
+      throw error;
+    }
+
+    const sandboxBankAccount = buildPartnaSandboxBankAccount({
+      paymentId: partnaRampReference,
+      customerName: customer.name,
+    });
+    const errorMessage =
+      error instanceof Error ? error.message : "Partna sandbox ramp failed.";
+
+    ramp = {
+      rampReference: partnaRampReference,
+      status: "pending",
+      accountName: sandboxBankAccount.accountName,
+      accountNumber: sandboxBankAccount.accountNumber,
+      bankName: sandboxBankAccount.bankName,
+      currentRate: quote.fxRate,
+      expiryDate: null,
+      feeInFromCurrency: null,
+      feeInToCurrency: quote.feeAmount,
+      fromAmount: quote.localAmount,
+      fromCurrency: payment.currency,
+      fromNetwork,
+      toAmount: quote.usdcAmount,
+      toCurrency: "USDC",
+      toNetwork: "solana",
+      totalFeesInFromCurrency: null,
+      totalFeesInToCurrency: quote.feeAmount,
+      raw: {
+        sandboxRecovery: true,
+        sandboxRecoveryReason: errorMessage,
+        bankCode: sandboxBankAccount.bankCode,
+        bankName: sandboxBankAccount.bankName,
+        accountName: sandboxBankAccount.accountName,
+        accountNumber: sandboxBankAccount.accountNumber,
+        rampReference: partnaRampReference,
+        status: "pending",
+        fromAmount: quote.localAmount,
+        fromCurrency: payment.currency,
+        toAmount: quote.usdcAmount,
+        toCurrency: "USDC",
+        currentRate: quote.fxRate,
+      },
+    };
+  }
   const previousStatus = payment.status;
   const metadata = asRecord(payment.metadata);
   const rampFeeAmount = ramp.totalFeesInToCurrency ?? ramp.feeInToCurrency ?? quote.feeAmount;
@@ -1245,6 +1324,7 @@ async function ensurePartnaRampForPayment(
       ...ramp.raw,
       rampReference: ramp.rampReference,
       payId: payment.payId,
+      bankCode: readString(ramp.raw.bankCode),
       accountName: ramp.accountName,
       accountNumber: ramp.accountNumber,
       bankName: ramp.bankName,
@@ -1598,3 +1678,8 @@ export async function updatePayment(
 
   return toPaymentResponse(payment);
 }
+
+export const __test__ = {
+  buildPartnaSandboxBankAccount,
+  isPartnaSandboxBankDetailsError,
+};

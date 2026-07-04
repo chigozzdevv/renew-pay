@@ -454,12 +454,14 @@ export class PartnaRemoteProvider implements PartnaProvider {
   }
 
   async createAccount(input: PartnaCreateAccountInput) {
+    const email = input.email?.trim().toLowerCase();
     const payload = await this.requestJson(
       this.config.v4BaseUrl,
       "/account",
       "POST",
       {
         accountName: input.accountName,
+        ...(email ? { email } : {}),
       }
     );
 

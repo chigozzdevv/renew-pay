@@ -1,5 +1,6 @@
 export type PartnaCreateAccountInput = {
   accountName: string;
+  email?: string | null;
 };
 
 export type PartnaInitiateBvnKycInput = {

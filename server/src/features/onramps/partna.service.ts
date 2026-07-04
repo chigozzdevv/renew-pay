@@ -203,6 +203,13 @@ function isPartnaOtpConfirmationError(error: unknown) {
   );
 }
 
+function isPartnaMissingAddressDetailsError(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    /address details|supplied address/i.test(error.message)
+  );
+}
+
 export function hasActivePartnaPaymentProfile(customer: {
   paymentProfile?: {
     provider?: string | null;
@@ -259,6 +266,7 @@ export async function startPartnaCustomerPaymentProfileVerification(input: {
   try {
     await provider.createAccount({
       accountName,
+      email: normalizeEmail(customer.email),
     });
   } catch (error) {
     if (!isPartnaAccountAlreadyExistsError(error)) {
@@ -595,24 +603,44 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
     throw new HttpError(409, "Verification code is invalid or expired.");
   }
 
-  const verifiedBankAccount = await provider.createBankAccount({
-    accountName,
-    currency: customer.market,
-    preferredAccountName: customer.name,
-  });
+  let verifiedBankAccount: PartnaManagedBankAccount | null = null;
+  let sandboxRecovery: Record<string, unknown> | null = null;
+
+  try {
+    verifiedBankAccount = await provider.createBankAccount({
+      accountName,
+      currency: customer.market,
+      preferredAccountName: customer.name,
+    });
+  } catch (error) {
+    if (input.environment !== "test" || !isPartnaMissingAddressDetailsError(error)) {
+      throw error;
+    }
+
+    sandboxRecovery = {
+      kind: "partna_sandbox_missing_address_details",
+      recoveredAt: new Date().toISOString(),
+      message:
+        error instanceof Error
+          ? error.message
+          : "Partna sandbox bank account creation failed.",
+    };
+  }
 
   customer.paymentProvider = "partna";
   customer.paymentProfile = {
     provider: "partna",
     status: "active",
     verifiedAt: new Date(),
-    bankTransfer: {
-      bankCode: verifiedBankAccount.bankCode,
-      bankName: verifiedBankAccount.bankName,
-      accountName: verifiedBankAccount.accountName,
-      accountNumber: verifiedBankAccount.accountNumber,
-      currency: verifiedBankAccount.currency,
-    },
+    bankTransfer: verifiedBankAccount
+      ? {
+          bankCode: verifiedBankAccount.bankCode,
+          bankName: verifiedBankAccount.bankName,
+          accountName: verifiedBankAccount.accountName,
+          accountNumber: verifiedBankAccount.accountNumber,
+          currency: verifiedBankAccount.currency,
+        }
+      : null,
     partna: {
       email: normalizeEmail(customer.email),
       fullName: customer.name,
@@ -622,7 +650,8 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
       raw: {
         ...existingRaw,
         kycStatus: "verified",
-        bankAccount: verifiedBankAccount.raw,
+        ...(verifiedBankAccount ? { bankAccount: verifiedBankAccount.raw } : {}),
+        ...(sandboxRecovery ? { sandboxRecovery } : {}),
       },
     },
   };
@@ -1107,6 +1136,64 @@ export async function confirmPartnaRampPayment(input: {
     throw new HttpError(409, "Customer payment account is not ready.");
   }
 
+  if (input.environment === "test" && rampMetadata.sandboxRecovery === true) {
+    const confirmedStatus = "completed";
+
+    input.payment.metadata = {
+      ...metadata,
+      partnaRamp: {
+        ...rampMetadata,
+        rampReference,
+        partnaAccountName: accountName,
+        status: confirmedStatus,
+        providerStatus: readString(rampMetadata.status) ?? "sandbox_recovered",
+        confirmed: true,
+        checkedAt: new Date().toISOString(),
+        mockFiatDepositRequestedAt:
+          readString(rampMetadata.mockFiatDepositRequestedAt) ??
+          new Date().toISOString(),
+        mockFiatDeposit: {
+          success: true,
+          message: "sandbox payment confirmed",
+        },
+      },
+    };
+    await input.payment.save();
+
+    const result = await processPartnaWebhook(
+      {
+        event: "ramp.confirmed",
+        data: {
+          ...rampMetadata,
+          rampReference,
+          status: confirmedStatus,
+          confirmed: true,
+          fromAmount:
+            readNumber(rampMetadata.fromAmount) ??
+            input.payment.collection.localAmount ??
+            input.payment.amount,
+          fromCurrency: readString(rampMetadata.fromCurrency) ?? input.payment.currency,
+          toAmount:
+            readNumber(rampMetadata.toAmount) ??
+            input.payment.collection.stableAmount ??
+            null,
+          toCurrency: readString(rampMetadata.toCurrency) ?? "USDC",
+          currentRate:
+            readNumber(rampMetadata.currentRate) ??
+            input.payment.collection.fxRate ??
+            null,
+        },
+      },
+      input.environment
+    );
+
+    return {
+      confirmed: true,
+      status: confirmedStatus,
+      result,
+    };
+  }
+
   const provider = getPartnaProvider(input.environment);
   let ramps = await provider.getRampRequests({
     accountName,
@@ -1234,5 +1321,6 @@ export async function getCustomerPartnaBankAccount(
 
 export const __test__ = {
   extractPartnaRampReference,
+  isPartnaMissingAddressDetailsError,
   partnaMockFiatDepositSucceeded,
 };
