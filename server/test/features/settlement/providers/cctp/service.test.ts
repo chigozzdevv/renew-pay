@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { PublicKey } from "@solana/web3.js";
+
 import { __test__ } from "@/features/settlement/providers/cctp/service";
 import { HttpError } from "@/shared/errors/http-error";
 
@@ -27,6 +29,22 @@ test("CCTP amount conversion rejects zero and negative amounts", () => {
     () => __test__.amountToSourceTokenUnits(-1),
     (error) => error instanceof HttpError && error.statusCode === 400
   );
+});
+
+test("CCTP burn instruction uses plain deposit_for_burn data", () => {
+  const data = __test__.buildDepositForBurnData({
+    amount: 1_400_000n,
+    destinationDomain: 1,
+    mintRecipient: new PublicKey(Buffer.alloc(32, 1)),
+    destinationCaller: new PublicKey(Buffer.alloc(32)),
+    maxFee: 0n,
+    minFinalityThreshold: 2000,
+  });
+
+  assert.deepEqual([...data.subarray(0, 8)], [
+    215, 60, 61, 46, 114, 55, 128, 176,
+  ]);
+  assert.equal(data.length, 8 + 8 + 4 + 32 + 32 + 8 + 4);
 });
 
 test("CCTP attestation polling retries before returning a completed message", async () => {

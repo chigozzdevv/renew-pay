@@ -45,8 +45,8 @@ type CircleAttestationResponse = {
   messages?: CircleAttestationMessage[];
 };
 
-const depositForBurnWithHookDiscriminator = Buffer.from([
-  111, 245, 62, 131, 204, 108, 223, 155,
+const depositForBurnDiscriminator = Buffer.from([
+  215, 60, 61, 46, 114, 55, 128, 176,
 ]);
 
 const collectionAssetDecimals = 6;
@@ -173,10 +173,6 @@ function u32Le(value: number) {
   return buffer;
 }
 
-function encodeAnchorBytes(value: Buffer) {
-  return Buffer.concat([u32Le(value.length), value]);
-}
-
 function findProgramAddress(
   label: string,
   programId: PublicKey,
@@ -214,24 +210,22 @@ function zeroBytes32PublicKey() {
   return new PublicKey(Buffer.alloc(32));
 }
 
-function buildDepositForBurnWithHookData(input: {
+function buildDepositForBurnData(input: {
   amount: bigint;
   destinationDomain: number;
   mintRecipient: PublicKey;
   destinationCaller: PublicKey;
   maxFee: bigint;
   minFinalityThreshold: number;
-  hookData: Buffer;
 }) {
   return Buffer.concat([
-    depositForBurnWithHookDiscriminator,
+    depositForBurnDiscriminator,
     u64Le(input.amount),
     u32Le(input.destinationDomain),
     input.mintRecipient.toBuffer(),
     input.destinationCaller.toBuffer(),
     u64Le(input.maxFee),
     u32Le(input.minFinalityThreshold),
-    encodeAnchorBytes(input.hookData),
   ]);
 }
 
@@ -394,14 +388,13 @@ async function burnSourceUsdcForAvalanche(input: {
       },
       { pubkey: tokenMessengerProgramId, isSigner: false, isWritable: false },
     ],
-    data: buildDepositForBurnWithHookData({
+    data: buildDepositForBurnData({
       amount,
       destinationDomain: config.destinationDomain,
       mintRecipient: evmAddressToBytes32PublicKey(operatorAddress),
       destinationCaller: zeroBytes32PublicKey(),
       maxFee,
       minFinalityThreshold: config.minFinalityThreshold,
-      hookData: Buffer.alloc(0),
     }),
   });
   const transaction = new Transaction().add(instruction);
@@ -593,7 +586,7 @@ export async function bridgeUsdcToSettlement(input: CctpBridgeInput) {
 
 export const __test__ = {
   amountToSourceTokenUnits,
-  buildDepositForBurnWithHookData,
+  buildDepositForBurnData,
   evmAddressToBytes32PublicKey,
   fetchCircleAttestationWithDeps,
   hexBytes,
