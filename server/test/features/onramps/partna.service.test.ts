@@ -61,3 +61,47 @@ test("Partna missing address errors are treated as sandbox recovery candidates",
     false
   );
 });
+
+test("Partna sandbox wrong verification method can recover after OTP dispatch", () => {
+  assert.equal(
+    __test__.canRecoverPartnaSandboxOtpConfirmation({
+      environment: "test",
+      otp: "123456",
+      existingRaw: {
+        kycStatus: "otp_pending",
+        otpDispatchMessage: "OTP sent successfully",
+        sandboxOtp: "123456",
+      },
+      error: new HttpError(400, "Wrong verification method. Update method and try again."),
+    }),
+    true
+  );
+
+  assert.equal(
+    __test__.canRecoverPartnaSandboxOtpConfirmation({
+      environment: "live",
+      otp: "123456",
+      existingRaw: {
+        kycStatus: "otp_pending",
+        otpDispatchMessage: "OTP sent successfully",
+        sandboxOtp: "123456",
+      },
+      error: new HttpError(400, "Wrong verification method. Update method and try again."),
+    }),
+    false
+  );
+
+  assert.equal(
+    __test__.canRecoverPartnaSandboxOtpConfirmation({
+      environment: "test",
+      otp: "000000",
+      existingRaw: {
+        kycStatus: "otp_pending",
+        otpDispatchMessage: "OTP sent successfully",
+        sandboxOtp: "123456",
+      },
+      error: new HttpError(400, "Wrong verification method. Update method and try again."),
+    }),
+    false
+  );
+});

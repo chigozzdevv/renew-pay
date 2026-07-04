@@ -203,10 +203,42 @@ function isPartnaOtpConfirmationError(error: unknown) {
   );
 }
 
+function isPartnaWrongVerificationMethodError(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    /wrong verification method|update method/i.test(error.message)
+  );
+}
+
 function isPartnaMissingAddressDetailsError(error: unknown) {
   return (
     error instanceof HttpError &&
     /address details|supplied address/i.test(error.message)
+  );
+}
+
+function canRecoverPartnaSandboxOtpConfirmation(input: {
+  environment: RuntimeMode;
+  otp: string;
+  existingRaw: Record<string, unknown>;
+  error: unknown;
+}) {
+  if (
+    input.environment !== "test" ||
+    !isPartnaWrongVerificationMethodError(input.error)
+  ) {
+    return false;
+  }
+
+  const expectedOtp = readString(input.existingRaw.sandboxOtp) ?? "123456";
+  const kycStatus = readString(input.existingRaw.kycStatus);
+  const dispatchMessage =
+    readString(input.existingRaw.otpDispatchMessage)?.toLowerCase() ?? "";
+
+  return (
+    input.otp.trim() === expectedOtp &&
+    kycStatus === "otp_pending" &&
+    dispatchMessage.includes("otp sent")
   );
 }
 
@@ -568,6 +600,8 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
     customer.paymentProfile.partna.raw !== null
       ? (customer.paymentProfile.partna.raw as Record<string, unknown>)
       : {};
+  let otpConfirmationRecovery: Record<string, unknown> | null = null;
+
   try {
     await provider.confirmBvnOtp({
       accountName,
@@ -575,32 +609,48 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
       otp: input.verification.otp,
     });
   } catch (error) {
-    if (!isPartnaOtpConfirmationError(error)) {
+    if (
+      canRecoverPartnaSandboxOtpConfirmation({
+        environment: input.environment,
+        otp: input.verification.otp,
+        existingRaw,
+        error,
+      })
+    ) {
+      otpConfirmationRecovery = {
+        kind: "partna_sandbox_wrong_verification_method",
+        recoveredAt: new Date().toISOString(),
+        message:
+          error instanceof Error
+            ? error.message
+            : "Partna sandbox OTP confirmation failed.",
+      };
+    } else if (!isPartnaOtpConfirmationError(error)) {
       throw error;
-    }
-
-    customer.paymentProvider = "partna";
-    customer.paymentProfile = {
-      provider: "partna",
-      status: "pending",
-      verifiedAt: null,
-      bankTransfer: null,
-      partna: {
-        email: normalizeEmail(customer.email),
-        fullName: customer.name,
-        accountName,
-        bvnLast4: customer.paymentProfile?.partna?.bvnLast4 ?? null,
-        callbackUrl: buildPartnaCallbackUrl(input.environment),
-        raw: {
-          ...existingRaw,
-          kycStatus: "otp_pending",
-          otpDispatchMessage: "Verification code is invalid or expired.",
+    } else {
+      customer.paymentProvider = "partna";
+      customer.paymentProfile = {
+        provider: "partna",
+        status: "pending",
+        verifiedAt: null,
+        bankTransfer: null,
+        partna: {
+          email: normalizeEmail(customer.email),
+          fullName: customer.name,
+          accountName,
+          bvnLast4: customer.paymentProfile?.partna?.bvnLast4 ?? null,
+          callbackUrl: buildPartnaCallbackUrl(input.environment),
+          raw: {
+            ...existingRaw,
+            kycStatus: "otp_pending",
+            otpDispatchMessage: "Verification code is invalid or expired.",
+          },
         },
-      },
-    };
-    await customer.save();
+      };
+      await customer.save();
 
-    throw new HttpError(409, "Verification code is invalid or expired.");
+      throw new HttpError(409, "Verification code is invalid or expired.");
+    }
   }
 
   let verifiedBankAccount: PartnaManagedBankAccount | null = null;
@@ -650,6 +700,7 @@ export async function completePartnaCustomerPaymentProfileVerification(input: {
       raw: {
         ...existingRaw,
         kycStatus: "verified",
+        ...(otpConfirmationRecovery ? { otpConfirmationRecovery } : {}),
         ...(verifiedBankAccount ? { bankAccount: verifiedBankAccount.raw } : {}),
         ...(sandboxRecovery ? { sandboxRecovery } : {}),
       },
@@ -1320,7 +1371,9 @@ export async function getCustomerPartnaBankAccount(
 }
 
 export const __test__ = {
+  canRecoverPartnaSandboxOtpConfirmation,
   extractPartnaRampReference,
   isPartnaMissingAddressDetailsError,
+  isPartnaWrongVerificationMethodError,
   partnaMockFiatDepositSucceeded,
 };
